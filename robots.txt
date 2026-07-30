@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /portal
+Disallow: /portal.html
+
+# Sitemap location
+Sitemap: https://getapplydesk.com/sitemap.xml

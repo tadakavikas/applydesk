@@ -3,12 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ApplyDesk — A calm, consistent job search, run for you</title>
-<meta name="description" content="Done-for-you job search. Our team handles 20-30 tailored applications and recruiter outreach each business day, with a clear report every evening.">
-<meta property="og:title" content="ApplyDesk — A calm, consistent job search, run for you">
-<meta property="og:description" content="Our team handles the daily applications and recruiter outreach. You review a clear report each evening and focus on interviews.">
-<meta property="og:url" content="https://getapplydesk.com">
-<meta property="og:type" content="website">
+<title>ApplyDesk — Documents</title>
+<meta name="description" content="Onboarding documents for ApplyDesk clients, recruiters, and managers.">
 <link rel="icon" type="image/png" href="/favicon-64.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,716 +12,102 @@
 <style>
 :root{
   --bg:#f4f8fc; --card:#fff; --ink:#0e2b4a; --text:#1e3a56; --text2:#54708c; --text3:#8aa2b8;
-  --blue:#1d72c8; --blue-d:#155a9e; --blue-bg:#e8f1fa; --blue-l:#f4f9fe;
-  --border:#dbe7f2; --border-s:#c6d8ea; --green:#178a63; --green-bg:#e3f4ec;
-  --red:#c9264a; --red-bg:#fdeaef; --amber:#8a5b12; --amber-bg:#fdf3dc;
-  --r:9px; --sans:'Inter',system-ui,-apple-system,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --blue:#1d72c8; --blue-d:#155a9e; --blue-bg:#e8f1fa; --border:#dbe7f2;
+  --green:#178a63; --amber:#8a5b12; --amber-bg:#fdf3dc;
+  --sans:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{font-family:var(--sans);color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
-.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-
-nav.top{position:sticky;top:0;background:rgba(244,248,252,0.88);backdrop-filter:blur(14px);border-bottom:0.5px solid var(--border);z-index:60}
-.nav-inner{display:flex;align-items:center;justify-content:space-between;height:62px}
-.logo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;color:var(--ink)}
-.logo .mark{width:26px;height:26px;background:var(--blue);color:#fff;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
-.nav-links{display:flex;gap:26px;font-size:14px;color:var(--text2)}
+body{font-family:var(--sans);color:var(--text);background:var(--bg);line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:60px 24px 40px}
+nav{background:rgba(244,248,252,0.88);backdrop-filter:blur(14px);border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:10}
+.nav-inner{max-width:1120px;margin:0 auto;padding:0 24px;height:62px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;color:var(--ink);text-decoration:none}
+.mark{width:26px;height:26px;background:var(--blue);color:#fff;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.nav-links{display:flex;gap:24px;font-size:14px;color:var(--text2)}
+.nav-links a{color:inherit;text-decoration:none}
 .nav-links a:hover{color:var(--ink)}
-.nav-cta{display:flex;gap:10px;align-items:center}
-.btn{display:inline-block;background:#fff;border:0.5px solid var(--border-s);padding:9px 18px;border-radius:var(--r);font-size:14px;font-weight:500;color:var(--ink);transition:all .15s;text-align:center;line-height:1.25}
-.btn:hover{border-color:var(--blue);color:var(--blue-d)}
-.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
-.btn.primary:hover{background:var(--blue-d);color:#fff}
-.btn.big{padding:13px 26px;font-size:15px}
-.btn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
-.btn.dark:hover{background:#1a3a5f;color:#fff}
-
-section{padding:72px 0}
-section.alt{background:#fff}
-.sec-eyebrow{font-size:12px;color:var(--blue);text-transform:uppercase;letter-spacing:.11em;margin-bottom:12px;font-weight:600;font-family:var(--mono)}
-.sec-h{font-size:clamp(28px,3.8vw,40px);font-weight:600;letter-spacing:-0.025em;margin-bottom:14px;color:var(--ink);line-height:1.12}
-.sec-lede{color:var(--text2);font-size:16px;line-height:1.65;max-width:640px}
-.sec-header{text-align:center;margin-bottom:40px}
-.sec-header .sec-lede{margin:0 auto}
-
-.hero{padding:60px 0 40px;background:linear-gradient(180deg,#fff 0%,var(--bg) 100%)}
-.hero-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:40px;align-items:center}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:5px 15px;background:var(--blue-bg);border-radius:99px;color:var(--blue-d);margin-bottom:22px;font-weight:600}
-.eyebrow .dot{width:6px;height:6px;background:var(--green);border-radius:99px}
-.hero-h{font-size:clamp(34px,4.6vw,52px);line-height:1.06;letter-spacing:-0.028em;font-weight:600;margin-bottom:18px;color:var(--ink)}
-.hero-sub{color:var(--text2);font-size:17px;margin-bottom:26px;line-height:1.6;max-width:520px}
-.ctas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
-.hero-note{font-size:13px;color:var(--text3);display:flex;gap:16px;flex-wrap:wrap;align-items:center}
-.hero-note .dot{width:5px;height:5px;background:var(--text3);border-radius:99px;display:inline-block}
-
-.mockcard{background:#fff;border:0.5px solid var(--border);border-radius:14px;padding:22px;box-shadow:0 12px 40px rgba(14,43,74,.08);position:relative}
-.mockcard::before{content:"";position:absolute;inset:-40px -20px;background:radial-gradient(circle at 60% 40%,rgba(29,114,200,.06),transparent 60%);z-index:-1;border-radius:20px}
-.mockhead{display:flex;justify-content:space-between;align-items:center;padding-bottom:14px;border-bottom:0.5px solid #e8f0f8;margin-bottom:16px;gap:12px}
-.mt1{font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;font-weight:600;font-family:var(--mono)}
-.mt2{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}
-.mt3{font-size:11px;color:var(--text3);font-family:var(--mono)}
-.cycle-dots{display:flex;gap:6px}
-.cycle-dot{width:5px;height:5px;border-radius:99px;background:var(--border-s);cursor:pointer;border:none;padding:0;transition:all .4s}
-.cycle-dot.on{background:var(--blue);width:18px;border-radius:3px}
-.frame{min-height:220px;position:relative}
-.slide{position:absolute;inset:0;opacity:0;transition:opacity .5s;pointer-events:none}
-.slide.on{opacity:1;pointer-events:auto;position:relative}
-.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.kpi{background:var(--blue-l);border:0.5px solid #e0ecf7;border-radius:10px;padding:14px}
-.kpi .l{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
-.kpi .v{font-size:24px;font-weight:700;color:var(--ink);margin-top:5px;letter-spacing:-0.02em}
-.kpi .d{font-size:11px;color:var(--green);margin-top:4px}
-.chartb{background:var(--blue-l);border:0.5px solid #e0ecf7;border-radius:10px;padding:16px}
-.chart-svg{width:100%;height:110px}
-.sbox{background:var(--blue-l);border:0.5px solid #e0ecf7;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.sbox svg{color:var(--text3)}
-.sbox input{border:none;background:transparent;font-family:inherit;font-size:13px;flex:1;outline:none;color:var(--ink);pointer-events:none}
-.sbox .cnt{font-size:11px;color:var(--text3);font-family:var(--mono)}
-.res{background:var(--blue-l);border:0.5px solid #e0ecf7;border-radius:10px}
-.res .rrow{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid #e0ecf7;font-size:12.5px;align-items:center;gap:10px}
-.res .rrow:last-child{border-bottom:none}
-.res .nm{font-weight:600;color:var(--ink)}
-.res .mt{font-size:10.5px;color:var(--text3);font-family:var(--mono);margin-top:2px}
-.res a{font-size:11px;color:var(--blue);font-weight:600}
-.chatb{background:var(--blue-l);border:0.5px solid #e0ecf7;border-radius:10px;padding:14px;min-height:200px}
-.cm{padding:9px 13px;border-radius:11px;font-size:12.5px;margin-bottom:8px;max-width:82%;line-height:1.5}
-.cm.you{background:var(--blue);color:#fff;margin-left:auto}
-.cm.them{background:#fff;border:0.5px solid var(--border)}
-.cm .who{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;color:var(--text3)}
-.cm.you .who{color:rgba(255,255,255,.75)}
-
-.stripe{background:var(--ink);color:#fff;padding:22px 0}
-.stripe-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;align-items:center}
-.stripe .num{font-size:26px;font-weight:700;letter-spacing:-0.02em}
-.stripe .lbl{font-size:12px;color:#9db8d2;margin-top:2px}
-.stripe .live::before{content:"● ";color:#4ade80}
-
-.combo{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.step{background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:22px;transition:transform .15s,border-color .15s}
-.step:hover{transform:translateY(-2px);border-color:var(--blue)}
-.step-icon{width:36px;height:36px;background:var(--blue-bg);color:var(--blue);border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-family:var(--mono);font-weight:600}
-.step-t{font-size:15.5px;font-weight:600;margin-bottom:7px;color:var(--ink)}
-.step-d{font-size:13px;color:var(--text2);line-height:1.6}
-
-.who-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.persona{background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:26px 22px}
-.persona-icon{width:44px;height:44px;background:var(--blue-bg);color:var(--blue);border-radius:99px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:18px}
-.persona-t{font-size:15.5px;font-weight:600;color:var(--ink);margin-bottom:8px}
-.persona-d{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px}
-.persona-tag{font-size:11px;color:var(--blue);font-family:var(--mono);font-weight:600}
-
-.team{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:900px;margin:0 auto}
-.member{background:var(--blue-l);border:0.5px solid var(--border);border-radius:12px;padding:28px 22px;text-align:center}
-.avatar{width:54px;height:54px;border-radius:99px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;color:var(--blue);font-size:23px;background:#fff;border:0.5px solid var(--border)}
-.role{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);margin-bottom:5px;font-weight:600;font-family:var(--mono)}
-.mname{font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:8px}
-.mdesc{font-size:12.5px;color:var(--text2);line-height:1.6}
-
-.compare-wrap{background:#fff;border:0.5px solid var(--border);border-radius:14px;overflow:hidden}
-.compare{width:100%;border-collapse:collapse;font-size:13.5px}
-.compare th,.compare td{text-align:left;padding:14px 20px;border-bottom:0.5px solid var(--border)}
-.compare thead th{background:var(--blue-l);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);font-weight:600;font-family:var(--mono)}
-.compare thead th.us{color:var(--blue);background:var(--blue-bg)}
-.compare tbody th{font-weight:500;color:var(--text2);width:32%}
-.compare tbody td{text-align:center}
-.compare tbody td.us{background:#f9fcfe;color:var(--ink);font-weight:600}
-.compare tbody tr:last-child th,.compare tbody tr:last-child td{border-bottom:none}
-.check{color:var(--green);font-weight:700}
-.xmark{color:var(--text3)}
-.compare-note{font-size:12px;color:var(--text3);text-align:center;margin-top:14px;font-style:italic}
-
-.founding{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.founder{background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:22px;position:relative;overflow:hidden}
-.founder::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--blue)}
-.founder-badge{font-size:10px;color:var(--blue);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;font-family:var(--mono)}
-.founder-role{font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:4px}
-.founder-loc{font-size:12.5px;color:var(--text3);margin-bottom:12px}
-.founder-status{font-size:12px;color:var(--green);display:flex;align-items:center;gap:6px}
-.founder-status::before{content:"";width:6px;height:6px;background:var(--green);border-radius:99px}
-.founding-note{background:var(--blue-l);border:0.5px dashed var(--border-s);border-radius:12px;padding:20px;text-align:center;margin-top:20px;font-size:13.5px;color:var(--text2);line-height:1.6}
-
-.price{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.plan{background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:28px 24px;display:flex;flex-direction:column}
-.plan.feat{border:1.5px solid var(--blue);box-shadow:0 10px 30px rgba(29,114,200,.10);position:relative}
-.plan.feat::before{content:"MOST POPULAR";position:absolute;top:-11px;left:24px;background:var(--blue);color:#fff;font-size:10px;padding:4px 10px;border-radius:99px;font-weight:600;letter-spacing:.06em;font-family:var(--mono)}
-.ptag{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:7px;font-weight:600;font-family:var(--mono)}
-.pname{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:11px}
-.pprice{font-size:34px;font-weight:700;color:var(--ink);letter-spacing:-0.02em}
-.pprice .per{font-size:13px;color:var(--text3);font-weight:400}
-.pfeats{list-style:none;margin:18px 0 22px;font-size:13.5px;color:var(--text2);flex:1}
-.pfeats li{padding:6px 0 6px 22px;position:relative;line-height:1.55}
-.pfeats li::before{content:"✓";position:absolute;left:0;top:6px;width:14px;height:14px;color:var(--green);font-weight:700;font-size:12px}
-
-.origin-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center;background:#fff;border:0.5px solid var(--border);border-radius:14px;padding:36px;max-width:920px;margin:0 auto}
-.origin-tag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--blue);margin-bottom:12px;font-weight:600;font-family:var(--mono)}
-.origin-h{font-size:24px;font-weight:600;letter-spacing:-0.015em;margin-bottom:14px;color:var(--ink);line-height:1.25}
-.origin-t{font-size:14px;color:var(--text2);line-height:1.75}
-.origin-side{background:var(--blue-l);border-radius:12px;padding:22px}
-.origin-stat{margin-bottom:18px}
-.origin-stat:last-child{margin-bottom:0}
-.origin-stat .n{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-0.02em}
-.origin-stat .l{font-size:12px;color:var(--text2);margin-top:2px}
-
-.faq{max-width:720px;margin:0 auto}
-.faq details{background:#fff;border:0.5px solid var(--border);border-radius:10px;padding:0;margin-bottom:10px;transition:border-color .15s}
-.faq details[open]{border-color:var(--blue)}
-.faq summary{cursor:pointer;font-size:15px;font-weight:600;color:var(--ink);list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 22px}
-.faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:"+";font-size:22px;color:var(--text3);transition:transform .25s;font-weight:400}
-.faq details[open] summary::after{transform:rotate(45deg);color:var(--blue)}
-.faq details p{padding:0 22px 20px;font-size:13.5px;color:var(--text2);line-height:1.7}
-
-.final{background:var(--ink);color:#fff;text-align:center;padding:64px 24px;border-radius:16px}
-.final .fh{font-size:clamp(28px,3.5vw,36px);font-weight:600;letter-spacing:-0.02em;margin-bottom:12px}
-.final .fsub{color:#9db8d2;margin-bottom:26px;max-width:440px;margin-left:auto;margin-right:auto;font-size:15px}
-.final .btn{background:#fff;color:var(--ink);border-color:#fff}
-.final .btn:hover{background:var(--blue-bg)}
-.final-note{margin-top:18px;font-size:13px;color:#9db8d2}
-footer{padding:32px 0 40px;font-size:13px;color:var(--text3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;border-top:0.5px solid var(--border)}
-footer a{color:var(--text2)}
-footer a:hover{color:var(--ink)}
-
-#lead-overlay{position:fixed;inset:0;background:rgba(14,43,74,0.5);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
-#lead-overlay.open{display:flex}
-#lead-modal{background:#fff;border-radius:14px;max-width:460px;width:100%;padding:34px;position:relative;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(14,43,74,.28)}
-#lead-modal .close-x{position:absolute;top:14px;right:18px;font-size:19px;color:var(--text3);padding:6px;background:none;border:none;cursor:pointer}
-#lead-modal h3{font-size:22px;font-weight:600;letter-spacing:-0.015em;margin-bottom:8px;color:var(--ink)}
-#lead-modal .sub{font-size:14px;color:var(--text2);margin-bottom:22px;line-height:1.55}
-#lead-modal label{font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px}
-#lead-modal label .req{color:var(--red)}
-#lead-modal input,#lead-modal select{width:100%;border:0.5px solid var(--border-s);padding:11px 13px;font-family:inherit;font-size:14px;background:#f9fcfe;margin-bottom:14px;border-radius:var(--r);color:var(--ink);outline:none;transition:border-color .15s}
-#lead-modal input:focus,#lead-modal select:focus{border-color:var(--blue)}
-#lead-modal .lead-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-#lead-modal .btn{width:100%;margin-top:4px}
-#lf-err{color:var(--red);font-weight:500;font-size:13px;margin-top:10px;min-height:1em}
-#lead-thanks-view{text-align:center;padding:18px 0}
-#lead-thanks-view .ok{width:54px;height:54px;border-radius:99px;background:var(--green-bg);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:25px;margin:0 auto 18px}
-
-#chat-fab{position:fixed;bottom:24px;right:24px;z-index:90;width:52px;height:52px;background:var(--blue);color:#fff;border-radius:99px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 22px rgba(29,114,200,.32);transition:transform .15s;border:none;cursor:pointer}
-#chat-fab:hover{transform:scale(1.05)}
-#chat-panel{position:fixed;bottom:90px;right:24px;z-index:91;width:min(360px,calc(100vw - 48px));background:#fff;border:0.5px solid var(--border);border-radius:14px;display:none;flex-direction:column;max-height:min(540px,75vh);box-shadow:0 14px 44px rgba(14,43,74,.18);overflow:hidden}
-#chat-panel.open{display:flex}
-.chat-head{background:var(--ink);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
-.chat-head .cav{width:34px;height:34px;background:var(--blue);color:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
-.chat-head .cname{font-size:14px;font-weight:600}
-.chat-head .cstat{font-size:11px;font-family:var(--mono);color:#9db8d2;margin-top:2px;display:flex;align-items:center;gap:5px}
-.chat-head .cstat::before{content:"";width:6px;height:6px;background:#4ade80;border-radius:99px}
-.chat-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
-.cmsg{max-width:88%;padding:10px 14px;border-radius:11px;font-size:13.5px;line-height:1.5}
-.cmsg.bot{background:#fff;align-self:flex-start;border:0.5px solid var(--border);white-space:pre-line}
-.cmsg.user{background:var(--blue);color:#fff;align-self:flex-end}
-.chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px;background:var(--bg)}
-.chip-q{background:#fff;border:0.5px solid var(--border-s);padding:6px 12px;font-size:12px;font-weight:500;border-radius:99px;color:var(--text);cursor:pointer}
-.chip-q:hover{border-color:var(--blue);color:var(--blue-d)}
-.chat-input{display:flex;border-top:0.5px solid var(--border);background:#fff}
-.chat-input input{flex:1;border:none;padding:12px 15px;font-family:inherit;font-size:13.5px;outline:none;background:transparent;color:var(--ink)}
-.chat-input button{border-left:0.5px solid var(--border);padding:0 20px;font-size:13px;font-weight:600;color:var(--blue);cursor:pointer;background:none;border-top:none;border-bottom:none;border-right:none}
-
-@media(max-width:900px){.hero-grid,.origin-grid{grid-template-columns:1fr}.combo,.who-grid,.founding,.team{grid-template-columns:1fr 1fr}.price{grid-template-columns:1fr}.stripe-grid{grid-template-columns:1fr 1fr;gap:16px}}
-@media(max-width:600px){
-  .nav-links{display:none}
-  .kpis{grid-template-columns:1fr 1fr}
-  .combo,.who-grid,.founding,.team,.stripe-grid{grid-template-columns:1fr}
-  section{padding:56px 0}
-  #chat-fab{bottom:16px;right:16px}
-  #chat-panel{bottom:78px;right:16px;left:16px;width:auto}
-  .compare{font-size:12px}
-  .compare th,.compare td{padding:10px 12px}
-}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:5px 15px;background:var(--blue-bg);border-radius:99px;color:var(--blue-d);margin-bottom:20px;font-weight:600;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em}
+h1{font-size:38px;font-weight:600;letter-spacing:-0.025em;color:var(--ink);margin-bottom:14px;line-height:1.1}
+.lede{color:var(--text2);font-size:16px;line-height:1.6;margin-bottom:40px}
+.doc-grid{display:grid;grid-template-columns:1fr;gap:16px}
+.doc-card{background:var(--card);border:0.5px solid var(--border);border-radius:12px;padding:26px 24px;transition:border-color .15s,transform .15s;display:flex;align-items:flex-start;gap:20px}
+.doc-card.available:hover{border-color:var(--blue);transform:translateY(-1px)}
+.doc-icon{width:48px;height:48px;background:var(--blue-bg);color:var(--blue);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.doc-icon.pending{background:var(--amber-bg);color:var(--amber)}
+.doc-body{flex:1}
+.doc-role{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--blue);font-weight:600;font-family:var(--mono);margin-bottom:4px}
+.doc-title{font-size:18px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.doc-desc{font-size:14px;color:var(--text2);line-height:1.55;margin-bottom:14px}
+.doc-btn{display:inline-flex;align-items:center;gap:8px;background:var(--blue);color:#fff;padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:500;text-decoration:none;transition:background .15s}
+.doc-btn:hover{background:var(--blue-d)}
+.doc-btn.disabled{background:var(--amber-bg);color:var(--amber);pointer-events:none}
+.footer{margin-top:60px;padding-top:24px;border-top:0.5px solid var(--border);font-size:13px;color:var(--text3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.footer a{color:var(--text2);text-decoration:none}
+.footer a:hover{color:var(--ink)}
+.note{margin-top:32px;padding:18px 20px;background:var(--blue-bg);border-radius:10px;font-size:14px;color:var(--blue-d);border:0.5px solid #c8dcef}
+.note strong{font-weight:600}
+@media(max-width:640px){h1{font-size:30px}.doc-card{flex-direction:column;gap:14px}.wrap{padding:40px 20px}}
 </style>
 </head>
 <body>
-
-<h1 class="sr-only">ApplyDesk — a calm, consistent job search run for you</h1>
-
-<nav class="top">
-  <div class="wrap nav-inner">
-    <div class="logo"><span class="mark">A</span>ApplyDesk</div>
+<nav>
+  <div class="nav-inner">
+    <a href="/" class="logo"><span class="mark">A</span>ApplyDesk</a>
     <div class="nav-links">
-      <a href="#how">How it works</a>
-      <a href="#compare">Why us</a>
-      <a href="#pricing">Pricing</a>
-      <a href="#faq">FAQ</a>
-    </div>
-    <div class="nav-cta">
-      <a href="portal.html" class="btn">Log in</a>
-      <button class="btn primary" onclick="openLead()">Get started</button>
+      <a href="/#how">How it works</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/portal.html">Log in</a>
     </div>
   </div>
 </nav>
 
-<header class="hero">
-  <div class="wrap hero-grid">
-    <div>
-      <div class="eyebrow"><span class="dot"></span> Now onboarding founding clients</div>
-      <h1 class="hero-h">A calm, consistent job search. Run for you, every day.</h1>
-      <p class="hero-sub">Our team handles the daily applications and recruiter outreach for your search. You review a clear report each evening and focus on interviews.</p>
-      <div class="ctas">
-        <button class="btn primary big" onclick="openLead('Job Applications · $150/mo')">Get started for $150/mo</button>
-        <a href="#how" class="btn big">See how it works</a>
-      </div>
-      <div class="hero-note">
-        <span>No lock-in</span>
-        <span class="dot"></span>
-        <span>Cancel any month</span>
-        <span class="dot"></span>
-        <span>First report in 24h</span>
-      </div>
-    </div>
-    <div>
-      <div class="mockcard">
-        <div class="mockhead">
-          <div>
-            <div class="mt1" id="cycle-title">Your dashboard</div>
-            <div class="mt2">Rahul S. <span class="mt3">· Jul 21, 2026</span></div>
-          </div>
-          <div class="cycle-dots">
-            <button class="cycle-dot on" data-i="0" aria-label="Screen 1"></button>
-            <button class="cycle-dot" data-i="1" aria-label="Screen 2"></button>
-            <button class="cycle-dot" data-i="2" aria-label="Screen 3"></button>
-            <button class="cycle-dot" data-i="3" aria-label="Screen 4"></button>
-          </div>
-        </div>
-        <div class="frame">
-          <div class="slide on" data-slide="0">
-            <div class="kpis">
-              <div class="kpi"><div class="l">Applied</div><div class="v">26</div><div class="d">target 20</div></div>
-              <div class="kpi"><div class="l">Reach-outs</div><div class="v">7</div><div class="d">target 5</div></div>
-              <div class="kpi"><div class="l">Replies</div><div class="v">2</div><div class="d">this week: 5</div></div>
-              <div class="kpi"><div class="l">Resumes tailored</div><div class="v">26</div><div class="d">1 per role</div></div>
-            </div>
-          </div>
-          <div class="slide" data-slide="1">
-            <div class="chartb">
-              <div style="font-size:12px;color:var(--text2);margin-bottom:8px;display:flex;justify-content:space-between"><span>Applications per day</span><span style="font-family:var(--mono);color:var(--text3);font-size:11px">baseline 20</span></div>
-              <svg class="chart-svg" viewBox="0 0 360 100" preserveAspectRatio="none" aria-hidden="true">
-                <line x1="0" y1="50" x2="360" y2="50" stroke="#1d72c8" stroke-width="1" stroke-dasharray="4 4" opacity="0.35"/>
-                <polyline fill="none" stroke="#1d72c8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="0,78 18,64 36,48 54,72 72,36 90,52 108,24 126,58 144,30 162,42 180,22 198,48 216,26 234,36 252,16 270,34 288,14 306,28 324,22 342,14 360,18"/>
-              </svg>
-              <div style="font-size:11px;color:var(--text3);margin-top:6px;font-family:var(--mono)">Consistent above baseline</div>
-            </div>
-          </div>
-          <div class="slide" data-slide="2">
-            <div class="sbox">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-              <input value="stripe" readonly>
-              <span class="cnt">3 matches</span>
-            </div>
-            <div class="res">
-              <div class="rrow"><div><div class="nm">Stripe · Data Engineer II</div><div class="mt">Applied Jul 21 · Stripe_DE_v3.pdf</div></div><a>Resume</a></div>
-              <div class="rrow"><div><div class="nm">Stripe · Sr. Analytics Engineer</div><div class="mt">Applied Jul 12 · Stripe_AE_v1.pdf</div></div><a>Resume</a></div>
-              <div class="rrow"><div><div class="nm">Stripe · Recruiter reach-out</div><div class="mt">Sent Jul 12 · no reply yet</div></div><a>View</a></div>
-            </div>
-          </div>
-          <div class="slide" data-slide="3">
-            <div class="chatb">
-              <div class="cm them"><div class="who">Sahithi · Your recruiter</div>Applied to 8 roles this morning, prioritizing remote-first companies as you asked. Full report this evening.</div>
-              <div class="cm you"><div class="who">You</div>Perfect. Can you also look at Series B fintechs this week?</div>
-              <div class="cm them"><div class="who">Pooja · Ops manager</div>Noted. Sahithi will add a fintech list by tomorrow morning.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</header>
+<div class="wrap">
+  <div class="eyebrow">📄 Documents</div>
+  <h1>Onboarding documents</h1>
+  <p class="lede">Documents relevant to your role at ApplyDesk. If you were invited as a client, recruiter, or ops manager, please review the applicable document below.</p>
 
-<div class="stripe">
-  <div class="wrap stripe-grid">
-    <div><div class="num" id="live-apps">—</div><div class="lbl live">Applications this month</div></div>
-    <div><div class="num" id="live-reach">—</div><div class="lbl live">Recruiter reach-outs</div></div>
-    <div><div class="num" id="live-clients">—</div><div class="lbl live">Founding clients active</div></div>
-    <div><div class="num">6:00 PM</div><div class="lbl">Daily report, every business day</div></div>
+  <div class="doc-grid">
+
+    <div class="doc-card available">
+      <div class="doc-icon">📋</div>
+      <div class="doc-body">
+        <div class="doc-role">For clients</div>
+        <div class="doc-title">Client Service Agreement</div>
+        <div class="doc-desc">The terms of your ApplyDesk subscription, including what we commit to deliver, pricing, cancellation policy, dispute resolution, and data handling. Please review before you sign in for the first time.</div>
+        <a href="/docs/client-agreement.docx" class="doc-btn" download>Download agreement (Word)</a>
+      </div>
+    </div>
+
+    <div class="doc-card available">
+      <div class="doc-icon">📗</div>
+      <div class="doc-body">
+        <div class="doc-role">For recruiters</div>
+        <div class="doc-title">Recruiter Handbook</div>
+        <div class="doc-desc">Daily operating rhythm (12 PM IST start, 25-30 applications, 5-10 reach-outs per client), tool installation guide for Simplify, FrogHire, Apollo.io, MailSuite and Claude, exact prompts for resume tailoring and recruiter reach-outs, end of day checklist, and troubleshooting guide.</div>
+        <a href="/docs/recruiter-handbook.docx" class="doc-btn" download>Download handbook (Word)</a>
+      </div>
+    </div>
+
+    <div class="doc-card">
+      <div class="doc-icon pending">📘</div>
+      <div class="doc-body">
+        <div class="doc-role">For ops managers</div>
+        <div class="doc-title">Ops Manager Guide</div>
+        <div class="doc-desc">Oversight duties, quality review process, when and how to intervene on tricky roles, and how to manage recruiter assignments. Coming soon — your admin will share this directly during onboarding.</div>
+        <a href="#" class="doc-btn disabled">Coming soon</a>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="note">
+    <strong>Need help?</strong> If you cannot find the document you were expecting, or have questions about your role, email us at <a href="mailto:hello@getapplydesk.com" style="color:inherit;text-decoration:underline">hello@getapplydesk.com</a>.
+  </div>
+
+  <div class="footer">
+    <div>© 2026 ApplyDesk</div>
+    <div><a href="mailto:hello@getapplydesk.com">hello@getapplydesk.com</a> · <a href="/portal.html">Client login</a></div>
   </div>
 </div>
-
-<section id="how" class="alt">
-  <div class="wrap">
-    <div class="sec-header">
-      <div class="sec-eyebrow">How it works</div>
-      <h2 class="sec-h">Four steps, every business day</h2>
-      <p class="sec-lede">A simple, repeatable routine. Nothing hidden, nothing exaggerated.</p>
-    </div>
-    <div class="combo">
-      <div class="step"><div class="step-icon">01</div><div class="step-t">Find matching roles</div><div class="step-d">We search LinkedIn and major job portals for roles that fit your skills, level, and location needs.</div></div>
-      <div class="step"><div class="step-icon">02</div><div class="step-t">Tailor the resume</div><div class="step-d">Each application uses a resume adjusted to that specific job description, built from your real experience.</div></div>
-      <div class="step"><div class="step-icon">03</div><div class="step-t">Contact recruiters</div><div class="step-d">Where a recruiter or hiring contact is visible, we send a short, professional note on your behalf.</div></div>
-      <div class="step"><div class="step-icon">04</div><div class="step-t">Report every evening</div><div class="step-d">Every company, role, link, and contact from the day, logged in your dashboard and sent to you.</div></div>
-    </div>
-  </div>
-</section>
-
-<section id="who">
-  <div class="wrap">
-    <div class="sec-header">
-      <div class="sec-eyebrow">Who this is for</div>
-      <h2 class="sec-h">Built for people running out of time, not effort</h2>
-    </div>
-    <div class="who-grid">
-      <div class="persona">
-        <div class="persona-icon">👔</div>
-        <div class="persona-t">Working professionals</div>
-        <div class="persona-d">You have a full-time job and cannot spend 4 hours a day applying. You need someone consistent handling the volume while you protect your energy for interviews.</div>
-        <div class="persona-tag">Most of our founding clients</div>
-      </div>
-      <div class="persona">
-        <div class="persona-icon">🎓</div>
-        <div class="persona-t">Recent graduates</div>
-        <div class="persona-d">You are new to the market, competing against hundreds per role, and every rejection hits harder. A steady daily routine and someone to talk to matters.</div>
-        <div class="persona-tag">Structured, patient support</div>
-      </div>
-      <div class="persona">
-        <div class="persona-icon">🔄</div>
-        <div class="persona-t">Career switchers</div>
-        <div class="persona-d">You are moving between industries or roles. Tailoring each resume properly for a new domain is exhausting, and where most self-applied searches stall.</div>
-        <div class="persona-tag">Domain-aware reframing</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="compare" class="alt">
-  <div class="wrap">
-    <div class="sec-header">
-      <div class="sec-eyebrow">Comparison</div>
-      <h2 class="sec-h">The honest difference</h2>
-      <p class="sec-lede">There are only three ways to run this. Here is what each really costs.</p>
-    </div>
-    <div class="compare-wrap">
-      <table class="compare">
-        <thead>
-          <tr>
-            <th></th>
-            <th class="us">ApplyDesk</th>
-            <th>Doing it yourself</th>
-            <th>Other done-for-you services</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><th>Daily applications</th><td class="us">20 – 30, tailored</td><td>2 – 5, when energy permits</td><td>Varies; often generic</td></tr>
-          <tr><th>Resume tailored per role</th><td class="us"><span class="check">✓</span></td><td>Sometimes</td><td>Sometimes</td></tr>
-          <tr><th>Direct recruiter reach-outs</th><td class="us">5 – 10 per day</td><td>Rare</td><td>Often not included</td></tr>
-          <tr><th>Daily written report</th><td class="us"><span class="check">✓</span></td><td>You track it yourself</td><td>Weekly or none</td></tr>
-          <tr><th>Full application history, searchable</th><td class="us"><span class="check">✓</span></td><td>Spreadsheet, if you keep one</td><td>Rarely offered</td></tr>
-          <tr><th>Dedicated recruiter you can chat with</th><td class="us"><span class="check">✓</span></td><td>—</td><td>Support ticket queue</td></tr>
-          <tr><th>Contract</th><td class="us">Month-to-month, cancel anytime</td><td>None</td><td>Multi-month common</td></tr>
-          <tr><th>Cost of your time</th><td class="us">~30 min / day reviewing</td><td>3 – 4 hours / day</td><td>Depends on service</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="compare-note">Doing it yourself is free but expensive in hours. This comparison is our honest view; check any service directly before choosing.</div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="sec-header">
-      <div class="sec-eyebrow">Your team</div>
-      <h2 class="sec-h">Real people behind every search</h2>
-      <p class="sec-lede">A small team works on your search. Every conversation is visible to all of them.</p>
-    </div>
-    <div class="team">
-      <div class="member"><div class="avatar">◐</div><div class="role">Your recruiter</div><div class="mname">Runs the daily work</div><div class="mdesc">Tailors resumes, submits applications, and contacts recruiters for you.</div></div>
-      <div class="member"><div class="avatar">◑</div><div class="role">Ops manager</div><div class="mname">Reviews the quality</div><div class="mdesc">Checks the daily reports and steps in when a role needs extra attention.</div></div>
-      <div class="member"><div class="avatar">◒</div><div class="role">Oversight</div><div class="mname">Keeps everything visible</div><div class="mdesc">Reads every thread and can step in personally whenever needed.</div></div>
-    </div>
-  </div>
-</section>
-
-<section id="founding" class="alt">
-  <div class="wrap">
-    <div class="sec-header">
-      <div class="sec-eyebrow">Founding clients</div>
-      <h2 class="sec-h">Currently running searches for</h2>
-      <p class="sec-lede">Anonymized to protect their privacy. Client stories will publish here as searches conclude.</p>
-    </div>
-    <div class="founding" id="founding-cards">
-      <div class="founder">
-        <div class="founder-badge">Founding client #1</div>
-        <div class="founder-role">Data engineer</div>
-        <div class="founder-loc">Charlotte, NC · Mid-level</div>
-        <div class="founder-status">Search active</div>
-      </div>
-      <div class="founder">
-        <div class="founder-badge">Founding client #2</div>
-        <div class="founder-role">Data analyst</div>
-        <div class="founder-loc">Bay Area · Mid-level</div>
-        <div class="founder-status">Search active</div>
-      </div>
-      <div class="founder">
-        <div class="founder-badge">Founding client #3</div>
-        <div class="founder-role">Software engineer</div>
-        <div class="founder-loc">Toronto · Senior</div>
-        <div class="founder-status">Search active</div>
-      </div>
-    </div>
-    <div class="founding-note">Every founding client keeps their intro rate for as long as their subscription runs. Currently onboarding client four and five this week.</div>
-  </div>
-</section>
-
-<section id="pricing">
-  <div class="wrap">
-    <div class="sec-header">
-      <div class="sec-eyebrow">Pricing</div>
-      <h2 class="sec-h">Simple, month to month</h2>
-      <p class="sec-lede">No contracts. Cancel any month. Dashboard access included with every plan.</p>
-    </div>
-    <div class="price">
-      <div class="plan">
-        <div class="ptag">One-time</div><div class="pname">Resume Rewrite</div><div class="pprice">$150</div>
-        <ul class="pfeats"><li>Rebuilt from your real experience</li><li>ATS-friendly structure and keywords</li><li>Two revision rounds</li><li>Delivered in 3 business days</li></ul>
-        <button class="btn" onclick="openLead('Resume Rewrite · $150 one time')">Get started</button>
-      </div>
-      <div class="plan feat">
-        <div class="ptag">Monthly</div><div class="pname">Job Applications</div><div class="pprice">$150<span class="per">/month</span></div>
-        <ul class="pfeats"><li>20-30 tailored applications daily</li><li>5-10 recruiter reach-outs daily</li><li>Resume tailored to every role</li><li>Evening report, searchable history</li><li>Full dashboard access</li></ul>
-        <button class="btn primary" onclick="openLead('Job Applications · $150/mo')">Start this week</button>
-      </div>
-      <div class="plan">
-        <div class="ptag">One-time · 60 days active</div><div class="pname">Recruiter Training</div><div class="pprice">$100</div>
-        <ul class="pfeats"><li>Practice calls with mentors</li><li>Salary conversation guidance</li><li>Check-ins during your active period</li><li>Interview follow-up playbook</li></ul>
-        <button class="btn" onclick="openLead('Recruiter Training · $100')">Book training</button>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="alt">
-  <div class="wrap">
-    <div class="origin-grid">
-      <div>
-        <div class="origin-tag">Why we built this</div>
-        <div class="origin-h">Made by job seekers who lived the struggle.</div>
-        <p class="origin-t">ApplyDesk was built by experienced job seekers who spent months applying into silence. We studied what finally worked, turned it into a daily routine, and now run that routine for our clients. It does not remove the effort of interviewing, but it removes the hours of searching, tailoring, and submitting that make a search exhausting.</p>
-      </div>
-      <div class="origin-side">
-        <div class="origin-stat"><div class="n">3+ clients</div><div class="l">Currently active searches</div></div>
-        <div class="origin-stat"><div class="n">Every business day</div><div class="l">Applications and reach-outs</div></div>
-        <div class="origin-stat"><div class="n">6:00 PM</div><div class="l">Daily evening report</div></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="faq">
-  <div class="wrap">
-    <div class="sec-header">
-      <div class="sec-eyebrow">Common questions</div>
-      <h2 class="sec-h">Straight answers</h2>
-    </div>
-    <div class="faq">
-      <details open><summary>How do you improve my resume?</summary><p>We work only with your real experience. We reword it with the keywords recruiters search for and measurable results, and adjust it for each specific job description. We do not invent anything.</p></details>
-      <details><summary>How do you access my accounts safely?</summary><p>You sign a simple service agreement and share credentials for job portals only, never your personal email. Everything we do appears in your daily report, and you can revoke access anytime.</p></details>
-      <details><summary>What counts as a quality application?</summary><p>A role that matches your skills, level, salary range, and work-authorization needs, applied with a resume adjusted to that job description. Each one appears on your report with a link.</p></details>
-      <details><summary>Do you guarantee interviews or offers?</summary><p>No, and we would be careful of anyone who does. Hiring decisions belong to employers. What we commit to is the daily work: the applications, the outreach, and a complete report you can verify.</p></details>
-      <details><summary>What if I get hired quickly?</summary><p>Then the plan simply ends at the end of the month. There is no lock-in and no penalty. You can cancel any month.</p></details>
-      <details><summary>Who is on my team?</summary><p>A dedicated recruiter runs your daily work, an operations manager reviews quality and steps in on tricky roles, and admin oversight reads every conversation. All three are visible to you in your dashboard chat.</p></details>
-      <details><summary>What data do you store about me?</summary><p>Your name, email, phone, target roles, portal credentials, and every application we submit on your behalf. We do not store IDs, SSN, or bank details. You can request deletion when your subscription ends.</p></details>
-    </div>
-  </div>
-</section>
-
-<section class="alt">
-  <div class="wrap">
-    <div class="final">
-      <div class="fh">Ready when you are.</div>
-      <div class="fsub">Share your resume and target roles. We reply within one business day and start the next.</div>
-      <button class="btn big" onclick="openLead()">Get started</button>
-      <div class="final-note">Or email hello@getapplydesk.com directly</div>
-    </div>
-  </div>
-</section>
-
-<footer class="wrap">
-  <div>© 2026 ApplyDesk</div>
-  <div><a href="mailto:hello@getapplydesk.com">hello@getapplydesk.com</a> · <a href="portal.html">Client login</a></div>
-</footer>
-
-<form name="lead" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
-  <input name="first-name"><input name="last-name"><input name="email"><input name="phone"><input name="plan"><input name="bot-field">
-</form>
-
-<div id="lead-overlay" onclick="if(event.target===this)closeLead()" role="dialog">
-  <div id="lead-modal">
-    <button class="close-x" onclick="closeLead()" aria-label="Close">✕</button>
-    <div id="lead-form-view">
-      <h3>Tell us about your search.</h3>
-      <p class="sub">Share your details and our team will reach out within one business day. No payment now, no commitment.</p>
-      <div class="lead-row">
-        <div><label>First name <span class="req">*</span></label><input id="lf-first" autocomplete="given-name"></div>
-        <div><label>Last name</label><input id="lf-last" autocomplete="family-name"></div>
-      </div>
-      <label>Email <span class="req">*</span></label><input id="lf-email" type="email" autocomplete="email" placeholder="you@example.com">
-      <label>Phone <span class="req">*</span></label><input id="lf-phone" type="tel" autocomplete="tel" placeholder="+1 ...">
-      <label>Interested in</label>
-      <select id="lf-plan">
-        <option>Job Applications · $150/mo</option>
-        <option>Resume Rewrite · $150 one time</option>
-        <option>Recruiter Training · $100</option>
-        <option>Both</option>
-        <option>Just have questions</option>
-      </select>
-      <button class="btn primary" onclick="submitLead()">Send</button>
-      <p id="lf-err"></p>
-    </div>
-    <div id="lead-thanks-view" style="display:none">
-      <div class="ok">✓</div>
-      <h3>Received.</h3>
-      <p class="sub">Your details are in. A real person will reach out within one business day.</p>
-      <button class="btn" onclick="closeLead()">Close</button>
-    </div>
-  </div>
-</div>
-
-<button id="chat-fab" onclick="toggleChat()" aria-label="Open chat">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-</button>
-<div id="chat-panel" role="dialog" aria-label="ApplyDesk assistant">
-  <div class="chat-head">
-    <div class="cav">A</div>
-    <div><div class="cname">Ask ApplyDesk</div><div class="cstat">Online</div></div>
-  </div>
-  <div class="chat-body" id="chat-body"></div>
-  <div class="chips" id="chat-chips"></div>
-  <div class="chat-input">
-    <input id="chat-text" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')sendChat()">
-    <button onclick="sendChat()">Send</button>
-  </div>
-</div>
-
-<script>
-const SB_URL='https://rofyegirmgqjhekuxjat.supabase.co';
-const SB_KEY='sb_publishable_4f6WR1sk2N9EUO2bU7dkyA_9TByUhTL';
-
-(function(){
-  const titles=["Your daily stats","Applications vs baseline","Find any resume fast","Message your team"];
-  const slides=document.querySelectorAll('.slide');
-  const dots=document.querySelectorAll('.cycle-dot');
-  const t=document.getElementById('cycle-title');
-  let idx=0,timer=null;
-  function go(n){idx=(n+slides.length)%slides.length;slides.forEach((s,i)=>s.classList.toggle('on',i===idx));dots.forEach((d,i)=>d.classList.toggle('on',i===idx));t.textContent=titles[idx];}
-  function start(){if(timer)clearInterval(timer);timer=setInterval(()=>go(idx+1),4200);}
-  dots.forEach((d,i)=>d.addEventListener('click',()=>{go(i);start();}));
-  start();
-})();
-
-(async function loadLive(){
-  try{
-    const r=await fetch(SB_URL+'/rest/v1/rpc/fn_get_public_stats',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
-      body:'{}'
-    });
-    if(!r.ok)throw 0;
-    const j=await r.json();
-    if(j&&j.ok){
-      document.getElementById('live-apps').textContent=(j.apps_this_month||0).toLocaleString();
-      document.getElementById('live-reach').textContent=(j.reach_this_month||0).toLocaleString();
-      document.getElementById('live-clients').textContent=(j.active_clients||0);
-    }
-  }catch(e){
-    document.getElementById('live-apps').textContent='Building';
-    document.getElementById('live-reach').textContent='Building';
-    document.getElementById('live-clients').textContent='3+';
-  }
-})();
-
-function openLead(plan){
-  document.getElementById('lead-overlay').classList.add('open');
-  if(plan)document.getElementById('lf-plan').value=plan;
-  document.getElementById('lead-form-view').style.display='block';
-  document.getElementById('lead-thanks-view').style.display='none';
-  setTimeout(()=>document.getElementById('lf-first').focus(),100);
-}
-function closeLead(){document.getElementById('lead-overlay').classList.remove('open');}
-function validateLead(first,last,email,phone){
-  const nameRe=/^[a-zA-Z][a-zA-Z\s'.-]{1,49}$/;
-  if(first.length<2)return 'Please enter your real first name.';
-  if(!nameRe.test(first))return 'First name should use letters only.';
-  if(/^(.)\1+$/.test(first.replace(/\s/g,'')))return 'That does not look like a real name.';
-  if(last&&(!nameRe.test(last)||/^(.)\1+$/.test(last.replace(/\s/g,''))))return 'Last name should use letters only.';
-  const emailRe=/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$/;
-  if(!emailRe.test(email))return 'That email address does not look valid.';
-  const junk=['test.com','example.com','abc.com','asdf.com','aaa.com','mail.com'];
-  if(junk.includes(email.split('@')[1].toLowerCase()))return 'Please use your real email address.';
-  if(/^(.)\1{3,}$/.test(email.split('@')[0]))return 'Please use your real email address.';
-  const digits=phone.replace(/[^0-9]/g,'');
-  if(digits.length<7||digits.length>15)return 'Please enter a valid phone number.';
-  if(/^(.)\1+$/.test(digits))return 'That phone number does not look real.';
-  if(/^(0123456789|1234567890|9876543210)/.test(digits))return 'Please enter your real phone number.';
-  return null;
-}
-async function submitLead(){
-  const first=document.getElementById('lf-first').value.trim();
-  const last=document.getElementById('lf-last').value.trim();
-  const email=document.getElementById('lf-email').value.trim();
-  const phone=document.getElementById('lf-phone').value.trim();
-  const plan=document.getElementById('lf-plan').value;
-  const err=document.getElementById('lf-err');
-  if(!first||!email||!phone){err.textContent='First name, email, and phone are required.';return;}
-  const problem=validateLead(first,last,email,phone);
-  if(problem){err.textContent=problem;return;}
-  err.textContent='';
-  let dbOk=false;
-  try{
-    const r=await fetch(SB_URL+'/rest/v1/rpc/fn_submit_lead',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},body:JSON.stringify({p_first:first,p_last:last,p_email:email,p_phone:phone,p_plan:plan})});
-    const j=await r.json();dbOk=!!(j&&j.ok);
-  }catch(e){}
-  try{
-    const body=new URLSearchParams({'form-name':'lead','first-name':first,'last-name':last,'email':email,'phone':phone,'plan':plan}).toString();
-    await fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
-  }catch(e){}
-  if(dbOk){
-    document.getElementById('lead-form-view').style.display='none';
-    document.getElementById('lead-thanks-view').style.display='block';
-  }else{err.textContent='Something went wrong. Email hello@getapplydesk.com';}
-}
-
-const BOT={
-  greeting:"Hi, I'm the ApplyDesk assistant. Ask me anything, or tap a question below.",
-  fallback:"I don't have that one handy. Email hello@getapplydesk.com and a real person will reply within one business day.",
-  qa:[
-    {chips:"Pricing",keys:["price","cost","charge","fee","much","pay","$"],a:"Simple, month to month:\n\n• Job Applications: $150/month\n• Resume Rewrite: $150 one time\n• Recruiter Training: $100 one time\n\nNo lock-in, cancel any month."},
-    {chips:"How it works",keys:["how","work","process","daily"],a:"Every business day: we find matching roles, tailor a resume to each job description, contact recruiters where possible, and send you a full report in the evening."},
-    {chips:"Compare",keys:["compare","vs","versus","difference","better","other"],a:"Check the Comparison section above. Short version: doing it yourself is free but takes 3-4 hours daily. Other services vary widely in what's included. We commit to 20-30 tailored applications and 5-10 reach-outs daily with a full evening report."},
-    {chips:"For me?",keys:["who","fit","for me","right","suit"],a:"Working professionals who can't spend 4 hours a day applying, recent graduates in a competitive market, and career switchers moving between industries. If you have real experience and clear target roles, we can help."},
-    {chips:"Get started",keys:["start","begin","sign","join","interested"],a:"Use any Get Started button on the page, or email hello@getapplydesk.com with your resume and target roles. We reply within one business day."},
-    {keys:["guarantee","promise","job for sure"],a:"Honest answer: no one can guarantee a job. What we commit to is the daily work, with a complete report you can verify."},
-    {keys:["safe","secure","password","credential","privacy","trust","legit","scam"],a:"Signed service agreement, credentials for job portals only, never your personal email. Everything shows in your daily report."},
-    {keys:["founding","early","current","how many"],a:"We're currently onboarding founding clients — details in the Founding Clients section above. Every founding client keeps their intro rate for as long as their subscription runs."},
-    {keys:["linkedin","portal","portals","sites","boards"],a:"LinkedIn, major job portals, and company career pages directly."},
-    {keys:["hired","cancel","stop","refund","quit"],a:"If you get hired, the plan simply ends at the end of the month. No lock-in, no penalty."},
-    {keys:["contact","email","human","talk","reach","phone"],a:"Real people are at hello@getapplydesk.com and reply within one business day."}
-  ]
-};
-let chatOpen=false,chatStarted=false;
-function toggleChat(){
-  chatOpen=!chatOpen;
-  document.getElementById('chat-panel').classList.toggle('open',chatOpen);
-  if(chatOpen&&!chatStarted){chatStarted=true;botSay(BOT.greeting);renderChips();}
-}
-function renderChips(){
-  const c=document.getElementById('chat-chips');
-  c.innerHTML=BOT.qa.filter(q=>q.chips).map(q=>`<button class="chip-q" onclick="askChip(${BOT.qa.indexOf(q)})">${q.chips}</button>`).join('');
-}
-function askChip(i){userSay(BOT.qa[i].chips);setTimeout(()=>botSay(BOT.qa[i].a),420);}
-function addMsg(cls,text){const b=document.getElementById('chat-body');const d=document.createElement('div');d.className='cmsg '+cls;d.textContent=text;b.appendChild(d);b.scrollTop=b.scrollHeight;}
-function botSay(t){addMsg('bot',t);}
-function userSay(t){addMsg('user',t);}
-function sendChat(){
-  const inp=document.getElementById('chat-text');
-  const t=inp.value.trim();if(!t)return;
-  userSay(t);inp.value='';
-  const low=t.toLowerCase();
-  let hit=null;
-  for(const q of BOT.qa){if(q.keys.some(k=>low.includes(k))){hit=q;break;}}
-  setTimeout(()=>botSay(hit?hit.a:BOT.fallback),480);
-}
-</script>
 </body>
 </html>
