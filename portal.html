@@ -419,9 +419,18 @@ window.attachResume=function(id){
   };
   inp.click();
 }
-function dataTable(rows,{showClient=true,showBy=false,canEdit=false}={}){
+function fmtTime(ts){
+  if(!ts) return '';
+  try{
+    const d = new Date(ts);
+    if(isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  }catch(e){ return ''; }
+}
+function dataTable(rows,{showClient=true,showBy=false,canEdit=false,showTime=true}={}){
   const trs=rows.map(r=>`<tr>
     <td class="mono" style="white-space:nowrap">${fmt(r.date)}</td>
+    ${showTime?`<td class="mono" style="white-space:nowrap;color:var(--text2);font-size:.78rem">${esc(fmtTime(r.created_at))}</td>`:''}
     ${showClient?`<td>${esc(clientName(r.client_code))}</td>`:''}
     <td>${r.type==='application'?'<span class="tag app">APPLIED</span>':'<span class="tag reach">REACH-OUT</span>'}</td>
     <td><b>${esc(r.company)}</b><br><span class="muted">${esc(r.role)}</span></td>
@@ -429,8 +438,8 @@ function dataTable(rows,{showClient=true,showBy=false,canEdit=false}={}){
     ${showBy?`<td>${esc(teamName(r.added_by))}</td>`:''}
     ${canEdit?`<td><button class="btn sm red" onclick="delRecord(${r.id})">✕</button></td>`:''}
   </tr>`).join('');
-  return `<div style="overflow-x:auto"><table><tr><th>Date</th>${showClient?'<th>Client</th>':''}<th>Type</th><th>Company / Role</th><th>Details</th>${showBy?'<th>Added by</th>':''}${canEdit?'<th></th>':''}</tr>
-  ${trs||`<tr><td colspan="8" class="muted">Nothing yet.</td></tr>`}</table></div>`;
+  return `<div style="overflow-x:auto"><table><tr><th>Date</th>${showTime?'<th>Time</th>':''}${showClient?'<th>Client</th>':''}<th>Type</th><th>Company / Role</th><th>Details</th>${showBy?'<th>Added by</th>':''}${canEdit?'<th></th>':''}</tr>
+  ${trs||`<tr><td colspan="9" class="muted">Nothing yet.</td></tr>`}</table></div>`;
 }
 window.toggleReply=async function(id){const r=await rpc('fn_toggle_reply',{p_actor:session.code,p_id:id});if(!r.ok){alert(r.err||'Failed');return;}await refreshAnd(rerender);}
 window.delRecord=async function(id){if(!(await askConfirm('Delete this entry? This cannot be undone.')))return;const r=await rpc('fn_del_record',{p_actor:session.code,p_id:id});if(!r.ok){alert(r.err||'Failed');return;}await refreshAnd(rerender);}
@@ -1034,7 +1043,7 @@ function renderClient(){
     const dr=mine.filter(r=>r.date===d);
     return `<div class="card">
       <h3 style="margin-bottom:10px">${fmt(d)} <span class="muted" style="font-family:Rubik;font-size:.8rem;text-transform:none">· ${dr.filter(r=>r.type==='application').length} applications, ${dr.filter(r=>r.type==='reachout').length} reach-outs</span></h3>
-      ${dataTable(dr,{showClient:false})}
+      ${dataTable(dr,{showClient:false,showTime:false})}
     </div>`;}).join('');
   $('#app').innerHTML=`
   <div class="topbar">
