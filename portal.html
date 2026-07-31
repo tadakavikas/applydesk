@@ -1045,6 +1045,17 @@ function adminFinanceView() {
   const s = finState.summary;
   const rows = finState.rows;
 
+  // Compute native currency splits from rows
+  let usdIn = 0, usdOut = 0, inrIn = 0, inrOut = 0;
+  for (const r of rows) {
+    const amt = Number(r.amount) || 0;
+    if (r.currency === 'USD') {
+      if (r.txn_type === 'IN') usdIn += amt; else usdOut += amt;
+    } else {
+      if (r.txn_type === 'IN') inrIn += amt; else inrOut += amt;
+    }
+  }
+
   const presetBtn = (key, label) => {
     const active = finState.preset === key ? 'blue' : 'sm';
     return `<button class="btn ${active}" onclick="finPreset('${key}')">${label}</button>`;
@@ -1091,9 +1102,30 @@ function adminFinanceView() {
   </div>
 
   <div class="row c3" style="margin-top:14px;margin-bottom:14px">
-    <div class="stat green"><div class="n">${finFmtInr(s.total_in_inr)}</div><div class="l">Total IN · ${s.count_in} payment${s.count_in===1?'':'s'}</div></div>
-    <div class="stat red"><div class="n">${finFmtInr(s.total_out_inr)}</div><div class="l">Total OUT · ${s.count_out} expense${s.count_out===1?'':'s'}</div></div>
-    <div class="stat blue"><div class="n">${finFmtInr(s.net_inr)}</div><div class="l">Net · ${finFmtUsd(Number(s.net_inr)/83)}</div></div>
+    <div class="stat green">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;font-size:14px;font-weight:600"><span style="font-size:10px;color:var(--text3);letter-spacing:.05em">USD</span><span style="font-family:JetBrains Mono,monospace">${finFmtUsd(usdIn)}</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:14px;font-weight:600"><span style="font-size:10px;color:var(--text3);letter-spacing:.05em">INR</span><span style="font-family:JetBrains Mono,monospace">${finFmtInr(inrIn)}</span></div>
+      <div style="border-top:0.5px solid var(--border);padding-top:6px">
+        <div class="l" style="margin-top:0">Combined IN · ${s.count_in} payment${s.count_in===1?'':'s'}</div>
+        <div class="n" style="margin-top:2px">${finFmtInr(s.total_in_inr)}</div>
+      </div>
+    </div>
+    <div class="stat red">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;font-size:14px;font-weight:600"><span style="font-size:10px;color:var(--text3);letter-spacing:.05em">USD</span><span style="font-family:JetBrains Mono,monospace">${finFmtUsd(usdOut)}</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:14px;font-weight:600"><span style="font-size:10px;color:var(--text3);letter-spacing:.05em">INR</span><span style="font-family:JetBrains Mono,monospace">${finFmtInr(inrOut)}</span></div>
+      <div style="border-top:0.5px solid var(--border);padding-top:6px">
+        <div class="l" style="margin-top:0">Combined OUT · ${s.count_out} expense${s.count_out===1?'':'s'}</div>
+        <div class="n" style="margin-top:2px">${finFmtInr(s.total_out_inr)}</div>
+      </div>
+    </div>
+    <div class="stat blue">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;font-size:14px;font-weight:600"><span style="font-size:10px;color:var(--text3);letter-spacing:.05em">USD</span><span style="font-family:JetBrains Mono,monospace">${finFmtUsd(usdIn - usdOut)}</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:14px;font-weight:600"><span style="font-size:10px;color:var(--text3);letter-spacing:.05em">INR</span><span style="font-family:JetBrains Mono,monospace">${finFmtInr(inrIn - inrOut)}</span></div>
+      <div style="border-top:0.5px solid var(--border);padding-top:6px">
+        <div class="l" style="margin-top:0">Combined Net (INR)</div>
+        <div class="n" style="margin-top:2px">${finFmtInr(s.net_inr)}</div>
+      </div>
+    </div>
   </div>
 
   <div class="card">
