@@ -904,7 +904,7 @@ let finState = {
   loading: false,
   showForm: false,
   editingId: null,
-  form: { txn_date: '', txn_type: 'IN', amount: '', currency: 'USD', category: 'Subscription', description: '', related_party: '' }
+  form: { txn_date: '', txn_type: 'IN', amount: '', currency: 'USD', category: 'Subscription', description: '', related_party: '', fx_rate: '' }
 };
 
 function finDefaultRange() {
@@ -994,6 +994,7 @@ function finForm() {
   const editing = finState.editingId != null;
   const cats = ['Subscription','Resume rewrite','Salary','Hosting','Email','Domain','Database','Software','Other'];
   const catOpts = cats.map(c => `<option value="${esc(c)}" ${f.category===c?'selected':''}>${esc(c)}</option>`).join('');
+  const isUSD = f.currency === 'USD';
   return `<div class="card" style="background:#f9fcfe">
     <h3>${editing?'Edit transaction':'Add transaction'}</h3>
     <div class="row c2" style="margin-top:14px">
@@ -1014,6 +1015,7 @@ function finForm() {
         </div>
       </div>
     </div>
+    ${isUSD ? `<div class="field"><label>Exchange rate <span style="color:var(--text3);font-weight:400;text-transform:none">(INR per 1 USD on transaction date - check google.com "USD to INR today")</span></label><input id="ff-fxrate" type="number" step="0.0001" min="0" placeholder="e.g. 88.15" value="${esc(f.fx_rate||'')}"></div>` : ''}
     <div class="row c2">
       <div class="field"><label>Category</label><select id="ff-category">${catOpts}</select></div>
       <div class="field"><label>Related party (optional)</label><input id="ff-related" placeholder="e.g. Haritha, Netlify" value="${esc(f.related_party||'')}"></div>
@@ -1056,11 +1058,12 @@ function adminFinanceView() {
         const sign = r.txn_type === 'IN' ? '+' : '-';
         const color = r.txn_type === 'IN' ? 'var(--green)' : 'var(--red)';
         const badge = r.txn_type === 'IN' ? '<span class="tag app">IN</span>' : '<span class="tag" style="background:var(--red-bg);color:var(--red)">OUT</span>';
+        const rateNote = r.currency === 'USD' && r.fx_rate ? ` @ ₹${Number(r.fx_rate).toFixed(2)}` : '';
         return `<tr>
           <td class="mono" style="white-space:nowrap">${esc(r.txn_date)}</td>
           <td>${badge}</td>
           <td><b>${esc(r.description||'(no description)')}</b>${r.related_party?`<br><span class="muted">${esc(r.related_party)}</span>`:''}<br><span class="muted" style="font-size:11px">${esc(r.category)}</span></td>
-          <td style="text-align:right;color:${color};font-weight:600">${sign}${nativeAmt}${r.currency==='USD'?`<br><span class="muted" style="font-weight:400;font-size:11px">${sign}${inrAmt}</span>`:''}</td>
+          <td style="text-align:right;color:${color};font-weight:600">${sign}${nativeAmt}${r.currency==='USD'?`<br><span class="muted" style="font-weight:400;font-size:11px">${sign}${inrAmt}${rateNote}</span>`:''}</td>
           <td style="white-space:nowrap;display:flex;gap:4px">
             <button class="btn sm" onclick="finEdit(${r.id})">✏️</button>
             <button class="btn sm red" onclick="finDelete(${r.id})">✕</button>
@@ -1128,7 +1131,7 @@ window.finSetDate = function(which, val) {
 window.finShowForm = function() {
   finState.showForm = true;
   finState.editingId = null;
-  finState.form = { txn_date: today(), txn_type: 'IN', amount: '', currency: 'USD', category: 'Subscription', description: '', related_party: '' };
+  finState.form = { txn_date: today(), txn_type: 'IN', amount: '', currency: 'USD', category: 'Subscription', description: '', related_party: '', fx_rate: '' };
   renderAdmin();
 };
 
@@ -1144,11 +1147,13 @@ window.finSetType = function(t) {
   const catEl = document.getElementById('ff-category');
   const relEl = document.getElementById('ff-related');
   const descEl = document.getElementById('ff-desc');
+  const rateEl = document.getElementById('ff-fxrate');
   finState.form = {
     txn_date: dateEl ? dateEl.value : finState.form.txn_date,
     txn_type: t,
     amount: amtEl ? amtEl.value : finState.form.amount,
     currency: finState.form.currency,
+    fx_rate: rateEl ? rateEl.value : finState.form.fx_rate,
     category: catEl ? catEl.value : finState.form.category,
     description: descEl ? descEl.value : finState.form.description,
     related_party: relEl ? relEl.value : finState.form.related_party
@@ -1162,11 +1167,13 @@ window.finSetCur = function(c) {
   const catEl = document.getElementById('ff-category');
   const relEl = document.getElementById('ff-related');
   const descEl = document.getElementById('ff-desc');
+  const rateEl = document.getElementById('ff-fxrate');
   finState.form = {
     txn_date: dateEl ? dateEl.value : finState.form.txn_date,
     txn_type: finState.form.txn_type,
     amount: amtEl ? amtEl.value : finState.form.amount,
     currency: c,
+    fx_rate: rateEl ? rateEl.value : finState.form.fx_rate,
     category: catEl ? catEl.value : finState.form.category,
     description: descEl ? descEl.value : finState.form.description,
     related_party: relEl ? relEl.value : finState.form.related_party
@@ -1180,8 +1187,15 @@ window.finSaveForm = async function() {
   const category = document.getElementById('ff-category').value;
   const description = document.getElementById('ff-desc').value.trim();
   const related = document.getElementById('ff-related').value.trim();
+  const rateEl = document.getElementById('ff-fxrate');
+  const fxRate = rateEl ? parseFloat(rateEl.value) : null;
+
   if (!date) { alert('Date is required.'); return; }
   if (!amount || amount <= 0) { alert('Please enter a positive amount.'); return; }
+  if (finState.form.currency === 'USD' && (!fxRate || fxRate <= 0)) {
+    alert('For USD transactions, please enter the exchange rate (INR per 1 USD) on the transaction date.');
+    return;
+  }
 
   const args = {
     p_txn_date: date,
@@ -1190,7 +1204,8 @@ window.finSaveForm = async function() {
     p_currency: finState.form.currency,
     p_category: category || 'Other',
     p_description: description || '',
-    p_related_party: related || ''
+    p_related_party: related || '',
+    p_fx_rate: finState.form.currency === 'USD' ? fxRate : null
   };
 
   try {
@@ -1221,6 +1236,7 @@ window.finEdit = function(id) {
     txn_type: row.txn_type,
     amount: row.amount,
     currency: row.currency,
+    fx_rate: row.fx_rate || '',
     category: row.category,
     description: row.description,
     related_party: row.related_party
