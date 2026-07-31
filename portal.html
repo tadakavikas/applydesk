@@ -99,10 +99,13 @@ async function rpc(fn, args){
     let useAuth = 'Bearer ' + SB_KEY;
     if (authMode === 'supabase') {
       const legacyReads = ['fn_get_state','fn_login','fn_get_public_stats','fn_submit_lead'];
-      if (legacyReads.indexOf(fn) === -1 && fn.indexOf('fn_a_') !== 0) {
-        // Rewrite to auth version
-        useFn = fn.replace(/^fn_/, 'fn_a_');
-        delete useArgs.p_actor;
+      const isDirectAuth = fn.indexOf('fn_a_') === 0;
+      const shouldRewrite = legacyReads.indexOf(fn) === -1 && !isDirectAuth;
+      if (shouldRewrite || isDirectAuth) {
+        if (shouldRewrite) {
+          useFn = fn.replace(/^fn_/, 'fn_a_');
+          delete useArgs.p_actor;
+        }
         try {
           const s = await sb.auth.getSession();
           if (s && s.data && s.data.session) useAuth = 'Bearer ' + s.data.session.access_token;
@@ -746,6 +749,7 @@ function renderAdmin(){
     <div class="tab ${adminTab==='recruiters'?'active':''}" onclick="setAdminTab('recruiters')">Recruiters</div>
     <div class="tab ${adminTab==='managers'?'active':''}" onclick="setAdminTab('managers')">Managers</div>
     <div class="tab ${adminTab==='msgs'?'active':''}" onclick="setAdminTab('msgs')">Messages</div>
+    <div class="tab ${adminTab==='finance'?'active':''}" onclick="setAdminTab('finance')">💰 Finance</div>
   </div>
   <div class="card">${
     adminTab==='leads'?leadsView():
@@ -754,6 +758,7 @@ function renderAdmin(){
     adminTab==='clients'?adminClientsView():
     adminTab==='recruiters'?adminRecruitersView():
     adminTab==='managers'?adminManagersView():
+    adminTab==='finance'?adminFinanceView():
     adminMsgsView()
   }</div>`;
 }
@@ -887,6 +892,353 @@ function adminMsgsView(){
     </details>`;}).join('');
   return `<h2>Client messages</h2><div style="margin-top:14px">${blocks}</div>`;
 }
+
+
+/* ═══════ FINANCE (admin only) ═══════ */
+let finState = {
+  from: '',
+  to: '',
+  preset: 'month',
+  rows: [],
+  summary: {total_in_inr: 0, total_out_inr: 0, net_inr: 0, count_in: 0, count_out: 0, series: []},
+  loading: false,
+  showForm: false,
+  editingId: null,
+  form: { txn_date: '', txn_type: 'IN', amount: '', currency: 'USD', category: 'Subscription', description: '', related_party: '' }
+};
+
+function finDefaultRange() {
+  const t = new Date();
+  const iso = d => d.toISOString().slice(0,10);
+  const from = new Date(t.getFullYear(), t.getMonth(), 1);
+  return { from: iso(from), to: iso(t) };
+}
+
+function finApplyPreset(preset) {
+  const t = new Date();
+  const iso = d => d.toISOString().slice(0,10);
+  let from, to = t;
+  if (preset === 'today') { from = t; }
+  else if (preset === '7d') { from = new Date(t); from.setDate(from.getDate() - 6); }
+  else if (preset === 'month') { from = new Date(t.getFullYear(), t.getMonth(), 1); }
+  else if (preset === 'lastmonth') { from = new Date(t.getFullYear(), t.getMonth()-1, 1); to = new Date(t.getFullYear(), t.getMonth(), 0); }
+  else if (preset === 'ytd') { from = new Date(t.getFullYear(), 0, 1); }
+  else if (preset === 'all') { from = new Date(2020, 0, 1); to = new Date(2030, 0, 1); }
+  finState.preset = preset;
+  finState.from = iso(from);
+  finState.to = iso(to);
+}
+
+async function finLoad() {
+  finState.loading = true;
+  try {
+    const listArgs = { p_from: finState.from || null, p_to: finState.to || null, p_type: null, p_limit: 500 };
+    const sumArgs = { p_from: finState.from || null, p_to: finState.to || null };
+    const [listRes, sumRes] = await Promise.all([
+      rpc('fn_a_fin_list', listArgs),
+      rpc('fn_a_fin_summary', sumArgs)
+    ]);
+    finState.rows = (listRes && listRes.ok && listRes.rows) ? listRes.rows : [];
+    finState.summary = (sumRes && sumRes.ok) ? sumRes : {total_in_inr:0,total_out_inr:0,net_inr:0,count_in:0,count_out:0,series:[]};
+  } catch(e) {
+    finState.rows = [];
+    finState.summary = {total_in_inr:0,total_out_inr:0,net_inr:0,count_in:0,count_out:0,series:[]};
+  } finally {
+    finState.loading = false;
+  }
+}
+
+function finFmtInr(n) {
+  n = Number(n || 0);
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+function finFmtUsd(n) {
+  n = Number(n || 0);
+  return '$' + n.toFixed(2);
+}
+
+function finChart(series) {
+  if (!series || !series.length) {
+    return '<div class="muted center" style="padding:40px 0">No data in this range yet.</div>';
+  }
+  // Build cumulative
+  const sorted = [...series].sort((a,b) => (a.d||'').localeCompare(b.d||''));
+  let cum = 0;
+  const points = sorted.map(p => { cum += Number(p.net || 0); return { d: p.d, bal: cum }; });
+  const W = 800, H = 200, padL = 50, padR = 20, padT = 20, padB = 30;
+  const cw = W - padL - padR, ch = H - padT - padB;
+  const maxBal = Math.max(...points.map(p => p.bal), 100);
+  const minBal = Math.min(...points.map(p => p.bal), 0);
+  const range = maxBal - minBal || 1;
+  const xStep = points.length > 1 ? cw / (points.length - 1) : 0;
+  const yFor = v => padT + ch - ((v - minBal) / range) * ch;
+  const grid = [0,1,2,3].map(i => {
+    const y = padT + (ch/3) * i;
+    return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#DBE7F2" stroke-width="0.5" ${i>0?'stroke-dasharray="2,2"':''}/>`;
+  }).join('');
+  const path = points.map((p,i) => (i===0?'M ':'L ') + (padL + i*xStep) + ' ' + yFor(p.bal)).join(' ');
+  const area = path + ` L ${padL + (points.length-1)*xStep} ${padT+ch} L ${padL} ${padT+ch} Z`;
+  const circles = points.map((p,i) => {
+    const cx = padL + i*xStep, cy = yFor(p.bal);
+    return `<circle cx="${cx}" cy="${cy}" r="${i===points.length-1?4:3}" fill="#1d72c8" ${i===points.length-1?'stroke="white" stroke-width="2"':''}/>`;
+  }).join('');
+  const labels = points.length ?
+    `<text x="${padL}" y="${H-8}" font-size="10" fill="#8aa2b8" font-family="JetBrains Mono">${points[0].d.slice(5)}</text>` +
+    (points.length > 1 ? `<text x="${W-padR}" y="${H-8}" font-size="10" fill="#8aa2b8" text-anchor="end" font-family="JetBrains Mono">${points[points.length-1].d.slice(5)}</text>` : '')
+    : '';
+  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:400px;background:#fff">${grid}<path d="${area}" fill="#1d72c8" fill-opacity="0.08"/><path d="${path}" stroke="#1d72c8" stroke-width="2" fill="none"/>${circles}${labels}</svg></div>`;
+}
+
+function finForm() {
+  const f = finState.form;
+  const editing = finState.editingId != null;
+  const cats = ['Subscription','Resume rewrite','Salary','Hosting','Email','Domain','Database','Software','Other'];
+  const catOpts = cats.map(c => `<option value="${esc(c)}" ${f.category===c?'selected':''}>${esc(c)}</option>`).join('');
+  return `<div class="card" style="background:#f9fcfe">
+    <h3>${editing?'Edit transaction':'Add transaction'}</h3>
+    <div class="row c2" style="margin-top:14px">
+      <div class="field"><label>Date</label><input id="ff-date" type="date" value="${esc(f.txn_date||today())}"></div>
+      <div class="field"><label>Type</label>
+        <div style="display:flex;gap:6px">
+          <button class="btn ${f.txn_type==='IN'?'green':'sm'}" style="flex:1" onclick="finSetType('IN')">IN (money received)</button>
+          <button class="btn ${f.txn_type==='OUT'?'red':'sm'}" style="flex:1" onclick="finSetType('OUT')">OUT (expense)</button>
+        </div>
+      </div>
+    </div>
+    <div class="row c2">
+      <div class="field"><label>Amount</label><input id="ff-amount" type="number" step="0.01" min="0" placeholder="e.g. 150.00" value="${esc(f.amount||'')}"></div>
+      <div class="field"><label>Currency</label>
+        <div style="display:flex;gap:6px">
+          <button class="btn ${f.currency==='USD'?'blue':'sm'}" style="flex:1" onclick="finSetCur('USD')">USD</button>
+          <button class="btn ${f.currency==='INR'?'blue':'sm'}" style="flex:1" onclick="finSetCur('INR')">INR</button>
+        </div>
+      </div>
+    </div>
+    <div class="row c2">
+      <div class="field"><label>Category</label><select id="ff-category">${catOpts}</select></div>
+      <div class="field"><label>Related party (optional)</label><input id="ff-related" placeholder="e.g. Haritha, Netlify" value="${esc(f.related_party||'')}"></div>
+    </div>
+    <div class="field"><label>Description</label><input id="ff-desc" placeholder="e.g. August subscription" value="${esc(f.description||'')}"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button class="btn" onclick="finCancelForm()">Cancel</button>
+      <button class="btn blue" onclick="finSaveForm()">${editing?'Save changes':'Save transaction'}</button>
+    </div>
+  </div>`;
+}
+
+function adminFinanceView() {
+  if (session.role !== 'admin') {
+    return emptyState('🔒','Admin only','Finance is restricted to admin users.','');
+  }
+  if (!finState.from && !finState.to) {
+    finApplyPreset('month');
+  }
+  // Trigger initial load if we have no rows and haven't loaded yet
+  if (!finState._loaded) {
+    finState._loaded = true;
+    finLoad().then(() => renderAdmin());
+    return '<h2>💰 Finance</h2><div class="muted center" style="padding:40px 0">Loading transactions...</div>';
+  }
+
+  const s = finState.summary;
+  const rows = finState.rows;
+
+  const presetBtn = (key, label) => {
+    const active = finState.preset === key ? 'blue' : 'sm';
+    return `<button class="btn ${active}" onclick="finPreset('${key}')">${label}</button>`;
+  };
+
+  const rowHtml = rows.length === 0
+    ? `<tr><td colspan="6" style="padding:0;border:none">${emptyState('💰','No transactions in this range','Try a wider date range or add your first transaction.','')}</td></tr>`
+    : rows.map(r => {
+        const nativeAmt = r.currency === 'USD' ? '$'+Number(r.amount).toFixed(2) : '₹'+Number(r.amount).toLocaleString('en-IN');
+        const inrAmt = '₹'+Math.round(Number(r.amount_inr)).toLocaleString('en-IN');
+        const sign = r.txn_type === 'IN' ? '+' : '-';
+        const color = r.txn_type === 'IN' ? 'var(--green)' : 'var(--red)';
+        const badge = r.txn_type === 'IN' ? '<span class="tag app">IN</span>' : '<span class="tag" style="background:var(--red-bg);color:var(--red)">OUT</span>';
+        return `<tr>
+          <td class="mono" style="white-space:nowrap">${esc(r.txn_date)}</td>
+          <td>${badge}</td>
+          <td><b>${esc(r.description||'(no description)')}</b>${r.related_party?`<br><span class="muted">${esc(r.related_party)}</span>`:''}<br><span class="muted" style="font-size:11px">${esc(r.category)}</span></td>
+          <td style="text-align:right;color:${color};font-weight:600">${sign}${nativeAmt}${r.currency==='USD'?`<br><span class="muted" style="font-weight:400;font-size:11px">${sign}${inrAmt}</span>`:''}</td>
+          <td style="white-space:nowrap;display:flex;gap:4px">
+            <button class="btn sm" onclick="finEdit(${r.id})">✏️</button>
+            <button class="btn sm red" onclick="finDelete(${r.id})">✕</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+  return `<h2>💰 Finance</h2>
+  <p class="muted" style="margin-bottom:14px">Admin-only view of all money in and out. Numbers auto-convert to INR at ₹83 = $1.</p>
+
+  <div class="card" style="background:#f9fcfe">
+    <div class="row c5" style="align-items:end">
+      <div class="field" style="margin-bottom:0"><label>From</label><input type="date" id="fin-from" value="${esc(finState.from)}" onchange="finSetDate('from',this.value)"></div>
+      <div class="field" style="margin-bottom:0"><label>To</label><input type="date" id="fin-to" value="${esc(finState.to)}" onchange="finSetDate('to',this.value)"></div>
+      <div style="grid-column:span 3;display:flex;gap:6px;flex-wrap:wrap;align-items:end">
+        ${presetBtn('today','Today')}
+        ${presetBtn('7d','7d')}
+        ${presetBtn('month','This month')}
+        ${presetBtn('lastmonth','Last month')}
+        ${presetBtn('ytd','YTD')}
+        ${presetBtn('all','All time')}
+      </div>
+    </div>
+    <p class="muted" style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border)">${rows.length} transaction${rows.length===1?'':'s'} from ${esc(finState.from)} to ${esc(finState.to)}</p>
+  </div>
+
+  <div class="row c3" style="margin-top:14px;margin-bottom:14px">
+    <div class="stat green"><div class="n">${finFmtInr(s.total_in_inr)}</div><div class="l">Total IN · ${s.count_in} payment${s.count_in===1?'':'s'}</div></div>
+    <div class="stat red"><div class="n">${finFmtInr(s.total_out_inr)}</div><div class="l">Total OUT · ${s.count_out} expense${s.count_out===1?'':'s'}</div></div>
+    <div class="stat blue"><div class="n">${finFmtInr(s.net_inr)}</div><div class="l">Net · ${finFmtUsd(Number(s.net_inr)/83)}</div></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">Balance over time</h3>
+    ${finChart(s.series)}
+  </div>
+
+  ${finState.showForm ? finForm() : ''}
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">Transactions</h3>
+      ${!finState.showForm ? '<button class="btn blue" onclick="finShowForm()">+ Add transaction</button>' : ''}
+    </div>
+    <div style="overflow-x:auto"><table>
+      <tr><th>Date</th><th>Type</th><th>Details</th><th style="text-align:right">Amount</th><th></th></tr>
+      ${rowHtml}
+    </table></div>
+  </div>`;
+}
+
+window.finPreset = function(key) {
+  finApplyPreset(key);
+  finState._loaded = false;
+  renderAdmin();
+};
+
+window.finSetDate = function(which, val) {
+  finState[which] = val;
+  finState.preset = '';
+  finState._loaded = false;
+  renderAdmin();
+};
+
+window.finShowForm = function() {
+  finState.showForm = true;
+  finState.editingId = null;
+  finState.form = { txn_date: today(), txn_type: 'IN', amount: '', currency: 'USD', category: 'Subscription', description: '', related_party: '' };
+  renderAdmin();
+};
+
+window.finCancelForm = function() {
+  finState.showForm = false;
+  finState.editingId = null;
+  renderAdmin();
+};
+
+window.finSetType = function(t) {
+  const dateEl = document.getElementById('ff-date');
+  const amtEl = document.getElementById('ff-amount');
+  const catEl = document.getElementById('ff-category');
+  const relEl = document.getElementById('ff-related');
+  const descEl = document.getElementById('ff-desc');
+  finState.form = {
+    txn_date: dateEl ? dateEl.value : finState.form.txn_date,
+    txn_type: t,
+    amount: amtEl ? amtEl.value : finState.form.amount,
+    currency: finState.form.currency,
+    category: catEl ? catEl.value : finState.form.category,
+    description: descEl ? descEl.value : finState.form.description,
+    related_party: relEl ? relEl.value : finState.form.related_party
+  };
+  renderAdmin();
+};
+
+window.finSetCur = function(c) {
+  const dateEl = document.getElementById('ff-date');
+  const amtEl = document.getElementById('ff-amount');
+  const catEl = document.getElementById('ff-category');
+  const relEl = document.getElementById('ff-related');
+  const descEl = document.getElementById('ff-desc');
+  finState.form = {
+    txn_date: dateEl ? dateEl.value : finState.form.txn_date,
+    txn_type: finState.form.txn_type,
+    amount: amtEl ? amtEl.value : finState.form.amount,
+    currency: c,
+    category: catEl ? catEl.value : finState.form.category,
+    description: descEl ? descEl.value : finState.form.description,
+    related_party: relEl ? relEl.value : finState.form.related_party
+  };
+  renderAdmin();
+};
+
+window.finSaveForm = async function() {
+  const date = document.getElementById('ff-date').value;
+  const amount = parseFloat(document.getElementById('ff-amount').value);
+  const category = document.getElementById('ff-category').value;
+  const description = document.getElementById('ff-desc').value.trim();
+  const related = document.getElementById('ff-related').value.trim();
+  if (!date) { alert('Date is required.'); return; }
+  if (!amount || amount <= 0) { alert('Please enter a positive amount.'); return; }
+
+  const args = {
+    p_txn_date: date,
+    p_txn_type: finState.form.txn_type,
+    p_amount: amount,
+    p_currency: finState.form.currency,
+    p_category: category || 'Other',
+    p_description: description || '',
+    p_related_party: related || ''
+  };
+
+  try {
+    let res;
+    if (finState.editingId != null) {
+      args.p_id = finState.editingId;
+      res = await rpc('fn_a_fin_update', args);
+    } else {
+      res = await rpc('fn_a_fin_add', args);
+    }
+    if (!res || !res.ok) { alert('Save failed: ' + ((res && res.err) || 'unknown error')); return; }
+    finState.showForm = false;
+    finState.editingId = null;
+    finState._loaded = false;
+    renderAdmin();
+  } catch(e) {
+    alert('Save failed: ' + (e.message || e));
+  }
+};
+
+window.finEdit = function(id) {
+  const row = finState.rows.find(r => r.id === id);
+  if (!row) return;
+  finState.editingId = id;
+  finState.showForm = true;
+  finState.form = {
+    txn_date: row.txn_date,
+    txn_type: row.txn_type,
+    amount: row.amount,
+    currency: row.currency,
+    category: row.category,
+    description: row.description,
+    related_party: row.related_party
+  };
+  renderAdmin();
+};
+
+window.finDelete = async function(id) {
+  if (!(await askConfirm('Delete this transaction? This cannot be undone.'))) return;
+  try {
+    const res = await rpc('fn_a_fin_delete', { p_id: id });
+    if (!res || !res.ok) { alert('Delete failed: ' + ((res && res.err) || 'unknown')); return; }
+    finState._loaded = false;
+    renderAdmin();
+  } catch(e) {
+    alert('Delete failed: ' + (e.message || e));
+  }
+};
 
 /* ═══════ MANAGER ═══════ */
 let mgrTab='leads';
