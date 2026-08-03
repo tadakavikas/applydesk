@@ -629,18 +629,9 @@ footer a:hover{color:var(--ink)}
     </div>
     <div id="lead-thanks-view" style="display:none">
       <div class="ok">🎉</div>
-      <h3 style="font-size:22px;margin-bottom:8px">Thanks for trusting us with your job search!</h3>
-      <p class="sub" style="font-size:14px;line-height:1.6;margin-bottom:16px">Your details are in, and your ApplyDesk journey starts now.</p>
-      <div style="text-align:left;background:#f4f9fe;border:0.5px solid var(--border);border-radius:10px;padding:16px 18px;margin:0 auto 18px;max-width:420px">
-        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Here is what happens next</div>
-        <div style="font-size:13.5px;color:var(--text2);line-height:1.7">
-          ✅ A recruiter will personally reach out within 24 hours<br>
-          ✅ Quick 15-min call to understand your target role and goals<br>
-          ✅ By tomorrow, we start applying on your behalf
-        </div>
-      </div>
-      <p class="sub" style="font-size:13px;line-height:1.6;color:var(--text3);margin-bottom:16px">In the meantime, close those job boards. Take a walk. Prep for interviews. Watch that movie you have been putting off.<br><br><b>Your evenings just got their freedom back.</b><br>We have got it from here. 👊</p>
-      <button class="btn" onclick="closeLead()">Close</button>
+      <h3 style="font-size:20px;margin-bottom:10px">Thanks for submitting your details!</h3>
+      <p class="sub" style="font-size:14.5px;line-height:1.6;margin-bottom:18px;color:var(--text2)">Check your inbox in the next minute for a welcome email with what happens next. If you do not see it, please check spam.</p>
+      <button class="btn primary" onclick="closeLead()">Close</button>
     </div>
   </div>
 </div>
@@ -744,6 +735,14 @@ async function submitLead(){
     await fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
   }catch(e){}
   if(dbOk){
+    // Fire-and-forget welcome email. Don't block UX if email fails.
+    try{
+      fetch(SB_URL+'/functions/v1/send-welcome',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},
+        body:JSON.stringify({email:email,first_name:first})
+      }).catch(function(){});
+    }catch(e){}
     document.getElementById('lead-form-view').style.display='none';
     document.getElementById('lead-thanks-view').style.display='block';
   }else{err.textContent='Something went wrong. Email hello@getapplydesk.com';}
