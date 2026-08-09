@@ -75,6 +75,43 @@ a{color:var(--blue);font-weight:500;text-decoration:none}
 a:hover{color:var(--blue-d)}
 .participants{border:0.5px dashed var(--border-s);padding:8px 12px;margin-bottom:12px;font-size:11.5px;color:var(--text3);border-radius:9px;background:#f9fcfe}
 @media(max-width:760px){.row.c2,.row.c3,.row.c4,.row.c5{grid-template-columns:1fr}.msg-bubble{max-width:100%}}
+
+/* ═══════ ADMIN OVERHAUL: MODAL + RINGS ═══════ */
+.ad-modal-back{position:fixed;inset:0;background:rgba(14,43,74,.55);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;animation:adFadeIn .18s ease}
+@keyframes adFadeIn{from{opacity:0}to{opacity:1}}
+.ad-modal{background:#fff;border-radius:14px;max-width:820px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(14,43,74,.25);animation:adModalIn .22s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes adModalIn{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+.ad-modal-head{padding:22px 26px;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:14px;position:sticky;top:0;background:#fff;z-index:2}
+.ad-modal-head h2{font-size:20px;margin:0;color:var(--ink)}
+.ad-modal-head .sub{font-size:12px;color:var(--text3);margin-top:3px}
+.ad-modal-close{background:transparent;border:none;font-size:24px;color:var(--text3);cursor:pointer;padding:4px 10px;border-radius:6px;line-height:1}
+.ad-modal-close:hover{background:var(--bg);color:var(--ink)}
+.ad-modal-body{padding:24px 26px}
+.ad-modal-foot{padding:16px 26px;border-top:0.5px solid var(--border);background:#f9fcfe;display:flex;justify-content:flex-end;gap:10px;border-radius:0 0 14px 14px}
+.ad-detail-grid{display:grid;grid-template-columns:auto 1fr;gap:10px 20px;font-size:13.5px}
+.ad-detail-grid .k{color:var(--text3);text-transform:uppercase;font-size:10.5px;letter-spacing:.06em;font-weight:600;padding-top:2px;white-space:nowrap}
+.ad-detail-grid .v{color:var(--ink);font-weight:500;word-break:break-word}
+.ad-detail-grid .v.muted{color:var(--text3);font-weight:400;font-style:italic}
+.ad-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:20px 0 10px}
+.ad-ring-wrap{display:flex;align-items:center;gap:22px;padding:18px 22px;background:linear-gradient(135deg,#f4f9fe 0%,#eef4fa 100%);border-radius:12px;border:0.5px solid var(--border-s)}
+.ad-ring-svg{flex-shrink:0}
+.ad-ring-info h4{font-size:16px;color:var(--ink);margin:0 0 4px}
+.ad-ring-info .amount{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em;font-family:'JetBrains Mono',monospace}
+.ad-ring-info .date{font-size:12px;color:var(--text2);margin-top:4px}
+.ad-ring-info .urgency{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:3px 10px;border-radius:99px;display:inline-block;margin-top:6px}
+.ad-ring-info .urgency.safe{background:var(--green-bg);color:var(--green)}
+.ad-ring-info .urgency.warn{background:var(--amber-bg);color:var(--amber)}
+.ad-ring-info .urgency.urgent{background:var(--red-bg);color:var(--red)}
+.ad-stats-inline{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.ad-stat-inline{padding:12px 14px;background:#f9fcfe;border:0.5px solid var(--border);border-radius:9px;text-align:center}
+.ad-stat-inline .n{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+.ad-stat-inline .l{font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-top:4px}
+.ad-admin-card{background:#fff;border:0.5px solid var(--border);border-radius:11px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;transition:border-color .15s}
+.ad-admin-card:hover{border-color:var(--blue)}
+.ad-admin-info h4{font-size:15px;margin:0 0 4px;color:var(--ink)}
+.ad-admin-info .meta{font-size:12px;color:var(--text2)}
+.ad-admin-info .meta .mono{color:var(--text3);font-size:11px;font-family:'JetBrains Mono',monospace}
+.ad-admin-badge{background:var(--blue-bg);color:var(--blue-d);padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-left:8px}
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -748,6 +785,7 @@ function renderAdmin(){
     <div class="tab ${adminTab==='clients'?'active':''}" onclick="setAdminTab('clients')">Clients</div>
     <div class="tab ${adminTab==='recruiters'?'active':''}" onclick="setAdminTab('recruiters')">Recruiters</div>
     <div class="tab ${adminTab==='managers'?'active':''}" onclick="setAdminTab('managers')">Managers</div>
+    <div class="tab ${adminTab==='admins'?'active':''}" onclick="setAdminTab('admins')">👑 Admins</div>
     <div class="tab ${adminTab==='msgs'?'active':''}" onclick="setAdminTab('msgs')">Messages</div>
     <div class="tab ${adminTab==='finance'?'active':''}" onclick="setAdminTab('finance')">💰 Finance</div>
   </div>
@@ -758,15 +796,16 @@ function renderAdmin(){
     adminTab==='clients'?adminClientsView():
     adminTab==='recruiters'?adminRecruitersView():
     adminTab==='managers'?adminManagersView():
+    adminTab==='admins'?adminAdminsView():
     adminTab==='finance'?adminFinanceView():
     adminMsgsView()
   }</div>`;
 }
 function adminClientsView(){
-  const rows=(S.clients||[]).map(c=>`<tr><td><b>${esc(c.name)}</b>${c.email?`<div class="muted" style="font-size:10px">${esc(c.email)}</div>`:``}</td><td class="mono">${esc(c.code)}</td><td>${c.target}/day</td>
+  const rows=(S.clients||[]).map(c=>`<tr style="cursor:pointer" onclick="showClientDetail('${esc(c.code)}')"><td><b style="color:var(--blue)">${esc(c.name)}</b>${c.email?`<div class="muted" style="font-size:10px">${esc(c.email)}</div>`:``}</td><td class="mono">${esc(c.code)}</td><td>${c.target}/day</td>
     <td>${(S.records||[]).filter(r=>r.client_code===c.code&&r.type==='application').length} apps · ${(S.records||[]).filter(r=>r.client_code===c.code&&r.type==='reachout').length} reach-outs</td>
     <td>${(S.recruiters||[]).filter(r=>(r.assigned||[]).includes(c.code)).map(r=>esc(r.name)).join(', ')||'<span class="muted">unassigned</span>'}</td>
-    <td style="display:flex;gap:6px"><button class="btn sm" onclick="sendInvite('client','${esc(c.code)}','${esc(c.email||'')}')">📧 Invite</button><button class="btn sm red" onclick="delClient('${esc(c.code)}')">✕</button></td></tr>`).join('');
+    <td style="display:flex;gap:6px" onclick="event.stopPropagation()"><button class="btn sm" onclick="sendInvite('client','${esc(c.code)}','${esc(c.email||'')}')">📧 Invite</button><button class="btn sm red" onclick="delClient('${esc(c.code)}')">✕</button></td></tr>`).join('');
   return `<h2>Clients</h2>
   <div class="row c4" style="margin-top:14px">
     <div class="field"><label>Client name</label><input id="c-name"></div>
@@ -847,8 +886,8 @@ function recruitersView(){
       return `<span class="chip ${on?'on':''}" onclick="toggleAssign('${esc(r.code)}','${esc(c.code)}')">${on?'✓ ':''}${esc(c.name)}</span>`;}).join('');
     const inv=`<button class="btn sm" onclick="sendInvite('recruiter','${esc(r.code)}','${esc(r.email||'')}')">📧 Invite</button>`;
     const del=session.role==='admin'?`<button class="btn sm red" onclick="delRecruiter('${esc(r.code)}')">✕</button>`:'';
-    return `<tr><td><b>${esc(r.name)}</b>${r.email?`<div class="muted" style="font-size:10px">${esc(r.email)}</div>`:''}</td><td class="mono">${esc(r.code)}</td>
-      <td>${chips||'<span class="muted">No clients exist yet</span>'}</td><td style="display:flex;gap:6px">${inv}${del}</td></tr>`;}).join('');
+    return `<tr style="cursor:pointer" onclick="showRecruiterDetail('${esc(r.code)}')"><td><b style="color:var(--blue)">${esc(r.name)}</b>${r.email?`<div class="muted" style="font-size:10px">${esc(r.email)}</div>`:''}</td><td class="mono">${esc(r.code)}</td>
+      <td onclick="event.stopPropagation()">${chips||'<span class="muted">No clients exist yet</span>'}</td><td style="display:flex;gap:6px" onclick="event.stopPropagation()">${inv}${del}</td></tr>`;}).join('');
   return `<h2>Recruiters</h2>
   <p class="muted">Click client chips to assign or unassign. Recruiters only see and enter data for clients assigned to them.</p>
   <div class="row c4" style="margin-top:14px">
@@ -893,6 +932,217 @@ function adminMsgsView(){
   return `<h2>Client messages</h2><div style="margin-top:14px">${blocks}</div>`;
 }
 
+
+
+/* ═══════ ADMIN OVERHAUL: MODAL + DETAIL VIEWS ═══════ */
+function openModal(html){
+  closeModal();
+  const back = document.createElement('div');
+  back.className = 'ad-modal-back';
+  back.id = 'ad-modal-back';
+  back.innerHTML = '<div class="ad-modal">' + html + '</div>';
+  back.onclick = function(e){ if(e.target === back) closeModal(); };
+  document.body.appendChild(back);
+}
+window.closeModal = function(){
+  const b = document.getElementById('ad-modal-back');
+  if(b) b.remove();
+};
+
+/* Payment/Payroll cycle ring SVG.
+   Full blue at day 30+, gradually red as day approaches 0 (renewal day). */
+function cycleRingSvg(daysLeft, cycleLen){
+  cycleLen = cycleLen || 30;
+  const size = 130, stroke = 12, r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(cycleLen, daysLeft));
+  const progress = clamped / cycleLen; // 1.0 = fresh, 0 = due today
+  // Blue arc fills the "remaining" portion, red backdrop for the "elapsed" portion
+  const blueLen = progress * c;
+  let color = '#1d72c8', label = 'On track';
+  if(daysLeft <= 3){ color = '#c9264a'; label = 'Due soon'; }
+  else if(daysLeft <= 10){ color = '#dc9b1a'; label = 'Approaching'; }
+  return '<svg class="ad-ring-svg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
+    '<circle cx="' + size/2 + '" cy="' + size/2 + '" r="' + r + '" fill="none" stroke="#f5d5dd" stroke-width="' + stroke + '"/>' +
+    '<circle cx="' + size/2 + '" cy="' + size/2 + '" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="' + stroke + '" stroke-linecap="round" stroke-dasharray="' + blueLen + ' ' + c + '" transform="rotate(-90 ' + size/2 + ' ' + size/2 + ')"/>' +
+    '<text x="' + size/2 + '" y="' + (size/2 - 4) + '" text-anchor="middle" font-size="30" font-weight="700" fill="#0e2b4a" font-family="Inter">' + daysLeft + '</text>' +
+    '<text x="' + size/2 + '" y="' + (size/2 + 18) + '" text-anchor="middle" font-size="10" fill="#8aa2b8" font-family="Inter" font-weight="600" letter-spacing="1">DAYS LEFT</text>' +
+    '</svg>';
+}
+
+function urgencyClass(days){
+  if(days <= 3) return 'urgent';
+  if(days <= 10) return 'warn';
+  return 'safe';
+}
+
+window.showClientDetail = async function(clientCode){
+  openModal('<div class="ad-modal-head"><div><h2>Loading client...</h2></div><button class="ad-modal-close" onclick="closeModal()">×</button></div><div class="ad-modal-body"><p class="muted">Fetching details...</p></div>');
+  try{
+    const res = await rpc('fn_a_client_detail', { p_code: clientCode });
+    if(!res || !res.ok){
+      openModal('<div class="ad-modal-head"><h2>Error</h2><button class="ad-modal-close" onclick="closeModal()">×</button></div><div class="ad-modal-body"><p>Could not load client: ' + esc((res && res.err) || 'unknown') + '</p></div>');
+      return;
+    }
+    const c = res.client;
+    const daysLeft = res.days_until_payment;
+    const nextDate = res.next_payment_date;
+    const currencySymbol = c.subscription_currency === 'USD' ? '$' : '₹';
+    const html =
+      '<div class="ad-modal-head">' +
+        '<div><h2>' + esc(c.name) + '</h2><div class="sub">Client · Code: ' + esc(c.code) + '</div></div>' +
+        '<button class="ad-modal-close" onclick="closeModal()">×</button>' +
+      '</div>' +
+      '<div class="ad-modal-body">' +
+        '<div class="ad-ring-wrap">' +
+          cycleRingSvg(daysLeft, 30) +
+          '<div class="ad-ring-info">' +
+            '<h4>Next subscription payment</h4>' +
+            '<div class="amount">' + currencySymbol + Number(c.subscription_amount).toLocaleString() + '</div>' +
+            '<div class="date">Due ' + esc(nextDate) + '</div>' +
+            '<span class="urgency ' + urgencyClass(daysLeft) + '">' + (daysLeft <= 3 ? 'URGENT · ' : (daysLeft <= 10 ? 'HEADS UP · ' : 'ON TRACK · ')) + daysLeft + ' days left</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ad-stats-inline">' +
+          '<div class="ad-stat-inline"><div class="n">' + res.stats.total_applications + '</div><div class="l">Applications</div></div>' +
+          '<div class="ad-stat-inline"><div class="n">' + res.stats.total_reachouts + '</div><div class="l">Reach-outs</div></div>' +
+          '<div class="ad-stat-inline"><div class="n">' + res.stats.total_replies + '</div><div class="l">Replies</div></div>' +
+        '</div>' +
+        '<div class="ad-section-title">Client Profile</div>' +
+        '<div class="ad-detail-grid">' +
+          '<div class="k">Email</div><div class="v">' + (c.email ? esc(c.email) : '<span class="muted">not set</span>') + '</div>' +
+          '<div class="k">Phone</div><div class="v">' + (c.phone ? esc(c.phone) : '<span class="muted">not set</span>') + '</div>' +
+          '<div class="k">Joined</div><div class="v">' + esc(c.join_date || 'unknown') + '</div>' +
+          '<div class="k">Target role</div><div class="v">' + (c.target_role ? esc(c.target_role) : '<span class="muted">not set</span>') + '</div>' +
+          '<div class="k">Sponsorship</div><div class="v">' + (c.sponsorship_status ? esc(c.sponsorship_status) : '<span class="muted">not set</span>') + '</div>' +
+          '<div class="k">Experience</div><div class="v">' + (Number(c.years_experience) > 0 ? c.years_experience + ' years' : '<span class="muted">not set</span>') + '</div>' +
+          '<div class="k">Base resume</div><div class="v">' + (c.base_resume_url ? '<a href="' + esc(c.base_resume_url) + '" target="_blank">View resume →</a>' : '<span class="muted">not uploaded</span>') + '</div>' +
+          '<div class="k">Daily target</div><div class="v">' + c.target + ' applications/day</div>' +
+          '<div class="k">Sub started</div><div class="v">' + esc(c.subscription_start_date || 'unknown') + '</div>' +
+          '<div class="k">Sub amount</div><div class="v">' + currencySymbol + Number(c.subscription_amount).toLocaleString() + ' / month</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ad-modal-foot">' +
+        '<button class="btn" onclick="closeModal()">Close</button>' +
+      '</div>';
+    openModal(html);
+  }catch(e){
+    openModal('<div class="ad-modal-head"><h2>Error</h2><button class="ad-modal-close" onclick="closeModal()">×</button></div><div class="ad-modal-body"><p>' + esc(String(e.message || e)) + '</p></div>');
+  }
+};
+
+window.showRecruiterDetail = async function(code){
+  openModal('<div class="ad-modal-head"><div><h2>Loading recruiter...</h2></div><button class="ad-modal-close" onclick="closeModal()">×</button></div><div class="ad-modal-body"><p class="muted">Fetching details...</p></div>');
+  try{
+    const res = await rpc('fn_a_recruiter_detail', { p_code: code });
+    if(!res || !res.ok){
+      openModal('<div class="ad-modal-head"><h2>Error</h2><button class="ad-modal-close" onclick="closeModal()">×</button></div><div class="ad-modal-body"><p>' + esc((res && res.err) || 'unknown') + '</p></div>');
+      return;
+    }
+    const r = res.recruiter;
+    const days = res.days_until_payroll;
+    const currencySymbol = r.payroll_currency === 'USD' ? '$' : '₹';
+    const clientList = (res.clients || []).map(function(c){
+      return '<div style="padding:8px 12px;background:#f9fcfe;border:0.5px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13px"><b>' + esc(c.name) + '</b>' + (c.email ? '<span class="muted" style="margin-left:8px;font-size:11px">' + esc(c.email) + '</span>' : '') + '</div>';
+    }).join('');
+    const html =
+      '<div class="ad-modal-head">' +
+        '<div><h2>' + esc(r.name) + '</h2><div class="sub">Recruiter · Code: ' + esc(r.code) + '</div></div>' +
+        '<button class="ad-modal-close" onclick="closeModal()">×</button>' +
+      '</div>' +
+      '<div class="ad-modal-body">' +
+        '<div class="ad-ring-wrap">' +
+          cycleRingSvg(days, 30) +
+          '<div class="ad-ring-info">' +
+            '<h4>Next payroll</h4>' +
+            '<div class="amount">' + currencySymbol + Number(r.payroll_amount).toLocaleString() + '</div>' +
+            '<div class="date">Due ' + esc(res.next_payroll_date) + ' · Day ' + r.payroll_cycle_day + ' of month</div>' +
+            '<span class="urgency ' + urgencyClass(days) + '">' + (days <= 3 ? 'URGENT · ' : (days <= 10 ? 'HEADS UP · ' : 'ON TRACK · ')) + days + ' days left</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ad-stats-inline">' +
+          '<div class="ad-stat-inline"><div class="n">' + res.stats.total_applications + '</div><div class="l">All apps</div></div>' +
+          '<div class="ad-stat-inline"><div class="n">' + res.stats.total_reachouts + '</div><div class="l">All reach-outs</div></div>' +
+          '<div class="ad-stat-inline"><div class="n">' + res.stats.last_7_days + '</div><div class="l">Last 7 days</div></div>' +
+        '</div>' +
+        '<div class="ad-section-title">Recruiter Profile</div>' +
+        '<div class="ad-detail-grid">' +
+          '<div class="k">Email</div><div class="v">' + (r.email ? esc(r.email) : '<span class="muted">not set</span>') + '</div>' +
+          '<div class="k">Phone</div><div class="v">' + (r.phone ? esc(r.phone) : '<span class="muted">not set</span>') + '</div>' +
+          '<div class="k">Joined</div><div class="v">' + esc(r.joined_date || 'unknown') + '</div>' +
+          '<div class="k">Target roles</div><div class="v">' + (r.target_roles ? esc(r.target_roles) : '<span class="muted">not set</span>') + '</div>' +
+          '<div class="k">Payroll</div><div class="v">' + currencySymbol + Number(r.payroll_amount).toLocaleString() + ' / month (day ' + r.payroll_cycle_day + ')</div>' +
+        '</div>' +
+        '<div class="ad-section-title">Assigned Clients (' + (res.clients || []).length + ')</div>' +
+        (clientList || '<p class="muted" style="font-size:13px">No clients assigned yet.</p>') +
+      '</div>' +
+      '<div class="ad-modal-foot">' +
+        '<button class="btn" onclick="closeModal()">Close</button>' +
+      '</div>';
+    openModal(html);
+  }catch(e){
+    openModal('<div class="ad-modal-head"><h2>Error</h2><button class="ad-modal-close" onclick="closeModal()">×</button></div><div class="ad-modal-body"><p>' + esc(String(e.message || e)) + '</p></div>');
+  }
+};
+
+/* ═══════ ADMINS VIEW ═══════ */
+let adminsList = null;
+async function loadAdmins(){
+  try{
+    const r = await rpc('fn_a_list_admins', {});
+    adminsList = (r && r.ok) ? r.admins : [];
+  }catch(e){ adminsList = []; }
+}
+
+function adminAdminsView(){
+  if(adminsList === null){
+    loadAdmins().then(function(){ renderAdmin(); });
+    return '<h2>👑 Admins</h2><p class="muted" style="padding:24px 0">Loading admin team...</p>';
+  }
+  const cards = (adminsList || []).map(function(a){
+    return '<div class="ad-admin-card">' +
+      '<div class="ad-admin-info">' +
+        '<h4>' + esc(a.name) + (a.code === session.code ? '<span class="ad-admin-badge">You</span>' : '') + (!a.active ? '<span class="ad-admin-badge" style="background:var(--red-bg);color:var(--red)">Deactivated</span>' : '') + '</h4>' +
+        '<div class="meta">' + (a.email ? esc(a.email) : '<span class="muted">no email</span>') +
+          (a.phone ? ' · ' + esc(a.phone) : '') +
+          ' · <span class="mono">' + esc(a.code) + '</span></div>' +
+        '<div class="meta" style="margin-top:2px">Joined ' + esc(a.joined_date || 'unknown') + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  return '<h2>👑 Admins</h2>' +
+    '<p class="muted" style="margin-bottom:18px">Admins have equal power. Any admin can add another admin.</p>' +
+    '<div style="margin-bottom:24px">' + (cards || '<p class="muted">No admins yet.</p>') + '</div>' +
+    '<div style="background:linear-gradient(135deg,#f4f9fe,#eef4fa);border:0.5px solid var(--border-s);border-radius:12px;padding:22px 24px">' +
+      '<h3 style="margin-bottom:14px;font-size:15px">➕ Invite a new admin</h3>' +
+      '<div class="row c2" style="margin-bottom:10px">' +
+        '<div class="field"><label>Full name</label><input id="new-admin-name" placeholder="e.g. Pooja Ande"></div>' +
+        '<div class="field"><label>Email</label><input id="new-admin-email" type="email" placeholder="admin@example.com"></div>' +
+      '</div>' +
+      '<div class="row c2">' +
+        '<div class="field"><label>Access code</label><input id="new-admin-code" placeholder="e.g. pooja"></div>' +
+        '<div class="field"><label>Phone (optional)</label><input id="new-admin-phone" placeholder="+1..."></div>' +
+      '</div>' +
+      '<button class="btn blue" onclick="addNewAdmin()">➕ Add admin</button>' +
+    '</div>';
+}
+
+window.addNewAdmin = async function(){
+  const name = document.getElementById('new-admin-name').value.trim();
+  const email = document.getElementById('new-admin-email').value.trim().toLowerCase();
+  const code = document.getElementById('new-admin-code').value.trim().toLowerCase();
+  const phone = document.getElementById('new-admin-phone').value.trim();
+  if(!name || !email || !code){ alert('Name, email, and code are required.'); return; }
+  try{
+    const r = await rpc('fn_a_add_admin', { p_name: name, p_email: email, p_code: code, p_phone: phone });
+    if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
+    alert('Admin added! Send them an invitation email so they can set their password.');
+    adminsList = null;
+    renderAdmin();
+  }catch(e){
+    alert('Failed: ' + (e.message || e));
+  }
+};
 
 /* ═══════ FINANCE (admin only) ═══════ */
 let finState = {
