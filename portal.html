@@ -772,6 +772,11 @@ window.createLead=async function(){
 let adminTab='leads';
 window.setAdminTab=t=>{adminTab=t;renderAdmin();}
 function renderAdmin(){
+  // Lazy-load notifications on first admin render
+  if (notifList === null && session && session.role && (session.role === 'admin' || session.role === 'manager')) {
+    loadNotifications().then(function(){ renderAdmin(); });
+  }
+
   const unclaimedCount=(leads||[]).filter(l=>!l.claimed_by).length;
   $('#app').innerHTML=`
   <div class="topbar">
@@ -788,6 +793,7 @@ function renderAdmin(){
     <div class="tab ${adminTab==='admins'?'active':''}" onclick="setAdminTab('admins')">👑 Admins</div>
     <div class="tab ${adminTab==='msgs'?'active':''}" onclick="setAdminTab('msgs')">Client chats</div>
     <div class="tab ${adminTab==='teamchats'?'active':''}" onclick="setAdminTab('teamchats')">💬 Team chats</div>
+    <div class="tab ${adminTab==='notifications'?'active':''}" onclick="setAdminTab('notifications')">🔔 Notifications${notifUnreadCount>0?`<span style="background:var(--red);color:#fff;font-size:10px;padding:1px 7px;border-radius:99px;margin-left:6px;font-weight:700">${notifUnreadCount}</span>`:''}</div>
     <div class="tab ${adminTab==='finance'?'active':''}" onclick="setAdminTab('finance')">💰 Finance</div>
   </div>
   <div class="card">${
@@ -799,6 +805,7 @@ function renderAdmin(){
     adminTab==='managers'?adminManagersView():
     adminTab==='admins'?adminAdminsView():
     adminTab==='teamchats'?adminTeamChatsView():
+    adminTab==='notifications'?adminNotificationsView():
     adminTab==='finance'?adminFinanceView():
     adminMsgsView()
   }</div>`;
@@ -1531,6 +1538,163 @@ window.tcSendMessage = async function(){
     await loadTcGroups();
     renderAdmin();
   }catch(e){ alert('Failed: ' + (e.message || e)); }
+};
+
+
+/* ═══════ NOTIFICATIONS ═══════ */
+let notifList = null;
+let notifUnreadCount = 0;
+let notifFilter = 'all';
+
+async function loadNotifications(){
+  try {
+    const r = await rpc('fn_list_notifications', { p_limit: 100 });
+    if (r && r.ok) {
+      notifList = r.notifications || [];
+      notifUnreadCount = r.unread_count || 0;
+    } else {
+      notifList = [];
+      notifUnreadCount = 0;
+    }
+  } catch(e) {
+    notifList = [];
+    notifUnreadCount = 0;
+  }
+}
+
+// Poll notifications every 60 seconds so badge updates without page reload
+setInterval(function(){
+  if (session && session.role && (session.role === 'admin' || session.role === 'manager')) {
+    loadNotifications().then(function(){
+      if (adminTab === 'notifications') renderAdmin();
+      else if (session.role === 'admin') { const bar = document.querySelector('.tabs'); if (bar) renderAdmin(); }
+    });
+  }
+}, 60000);
+
+function adminNotificationsView(){
+  if (notifList === null){
+    loadNotifications().then(function(){ renderAdmin(); });
+    return '<h2>🔔 Notifications</h2><p class="muted" style="padding:24px 0">Loading notifications...</p>';
+  }
+
+  const items = notifList || [];
+  const filtered = notifFilter === 'all'
+    ? items
+    : notifFilter === 'unread'
+      ? items.filter(function(n){ return !n.is_read; })
+      : items.filter(function(n){ return n.category === notifFilter; });
+
+  const iconFor = function(cat){
+    if (cat === 'subscription_reminder') return '💰';
+    if (cat === 'payroll_reminder') return '💼';
+    if (cat === 'new_lead') return '🔥';
+    if (cat === 'new_message') return '💬';
+    if (cat === 'resume_request') return '📄';
+    return '🔔';
+  };
+
+  const timeAgo = function(iso){
+    try {
+      const then = new Date(iso).getTime();
+      const now = Date.now();
+      const diff = Math.floor((now - then) / 1000);
+      if (diff < 60) return diff + 's ago';
+      if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+      return Math.floor(diff/86400) + 'd ago';
+    } catch(e) { return ''; }
+  };
+
+  const cards = filtered.map(function(n){
+    const d = n.data || {};
+    const days = d.days_before;
+    let urgencyStyle = '';
+    let urgencyLabel = '';
+    if (typeof days === 'number') {
+      if (days <= 1) { urgencyStyle = 'background:var(--red-bg);color:var(--red)'; urgencyLabel = days === 0 ? 'DUE TODAY' : 'DUE TOMORROW'; }
+      else if (days <= 3) { urgencyStyle = 'background:var(--red-bg);color:var(--red)'; urgencyLabel = 'URGENT'; }
+      else if (days <= 5) { urgencyStyle = 'background:var(--amber-bg);color:var(--amber)'; urgencyLabel = 'APPROACHING'; }
+      else { urgencyStyle = 'background:var(--blue-bg);color:var(--blue)'; urgencyLabel = 'HEADS UP'; }
+    }
+
+    const bg = n.is_read ? '#fff' : 'linear-gradient(135deg,#f4f9fe,#eef4fa)';
+    const border = n.is_read ? '0.5px solid var(--border)' : '0.5px solid var(--blue-l)';
+    const dot = n.is_read ? '' : '<span style="width:8px;height:8px;background:var(--blue);border-radius:99px;display:inline-block;margin-right:8px;vertical-align:middle"></span>';
+
+    return '<div style="background:' + bg + ';border:' + border + ';border-radius:11px;padding:16px 18px;margin-bottom:10px;cursor:pointer" onclick="markNotifRead(' + n.id + ', event)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px">' +
+        '<div style="flex:1">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+            dot +
+            '<span style="font-size:18px">' + iconFor(n.category) + '</span>' +
+            '<span style="font-weight:600;color:var(--ink);font-size:14.5px">' + esc(n.title) + '</span>' +
+            (urgencyLabel ? '<span style="' + urgencyStyle + ';padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.04em">' + urgencyLabel + '</span>' : '') +
+          '</div>' +
+          (n.body ? '<div style="font-size:13px;color:var(--text2);line-height:1.5;margin-top:4px;padding-left:34px">' + esc(n.body) + '</div>' : '') +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--text3);white-space:nowrap">' + timeAgo(n.created_at) + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  const filterBtn = function(key, label){
+    const active = notifFilter === key;
+    const style = active
+      ? 'padding:6px 14px;border-radius:99px;background:var(--blue);color:#fff;font-size:12px;font-weight:600;cursor:pointer;border:none'
+      : 'padding:6px 14px;border-radius:99px;background:#f4f9fe;color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;border:0.5px solid var(--border)';
+    return '<button style="' + style + '" onclick="setNotifFilter(\'' + key + '\')">' + label + '</button>';
+  };
+
+  const total = items.length;
+  const unread = items.filter(function(n){ return !n.is_read; }).length;
+  const subs = items.filter(function(n){ return n.category === 'subscription_reminder'; }).length;
+  const payrolls = items.filter(function(n){ return n.category === 'payroll_reminder'; }).length;
+
+  const isAdmin = session.role === 'admin';
+
+  return '<h2>🔔 Notifications</h2>' +
+    '<p class="muted" style="margin-bottom:14px">' + (isAdmin ? 'All admin notifications: subscription renewals, payrolls, and system alerts.' : 'Client subscription reminders for your clients.') + '</p>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">' +
+      filterBtn('all', 'All (' + total + ')') +
+      filterBtn('unread', 'Unread (' + unread + ')') +
+      filterBtn('subscription_reminder', '💰 Subscriptions (' + subs + ')') +
+      (isAdmin ? filterBtn('payroll_reminder', '💼 Payrolls (' + payrolls + ')') : '') +
+      (unread > 0 ? '<button style="padding:6px 14px;border-radius:99px;background:transparent;color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;border:0.5px solid var(--blue);margin-left:auto" onclick="markAllNotifRead()">Mark all read</button>' : '') +
+    '</div>' +
+    (filtered.length > 0 ? cards : '<div style="background:#f9fcfe;border:0.5px dashed var(--border-s);border-radius:12px;padding:40px 20px;text-align:center;color:var(--text3)"><h3 style="color:var(--ink);margin-bottom:8px">All caught up</h3><p style="font-size:13px">No notifications matching your filter.</p></div>');
+}
+
+window.setNotifFilter = function(f){
+  notifFilter = f;
+  renderAdmin();
+};
+
+window.markNotifRead = async function(id, evt){
+  if (evt) evt.stopPropagation();
+  try {
+    await rpc('fn_mark_notification_read', { p_id: id });
+    // Update locally to feel instant
+    if (notifList) {
+      const item = notifList.find(function(n){ return n.id === id; });
+      if (item && !item.is_read) {
+        item.is_read = true;
+        notifUnreadCount = Math.max(0, notifUnreadCount - 1);
+      }
+    }
+    renderAdmin();
+  } catch(e) { alert('Failed: ' + (e.message || e)); }
+};
+
+window.markAllNotifRead = async function(){
+  try {
+    const r = await rpc('fn_mark_all_notifications_read', {});
+    if (r && r.ok) {
+      if (notifList) notifList.forEach(function(n){ n.is_read = true; });
+      notifUnreadCount = 0;
+      renderAdmin();
+    }
+  } catch(e) { alert('Failed: ' + (e.message || e)); }
 };
 
 /* ═══════ FINANCE (admin only) ═══════ */
