@@ -770,12 +770,14 @@ window.createLead=async function(){
 
 /* ═══════ ADMIN ═══════ */
 let adminTab='leads';
-window.setAdminTab=t=>{adminTab=t;renderAdmin();}
-function renderAdmin(){
-  // Lazy-load notifications on first admin render
-  if (notifList === null && session && session.role && (session.role === 'admin' || session.role === 'manager')) {
+window.setAdminTab=t=>{
+  adminTab=t;
+  if (t === 'notifications' && notifList === null && session && session.role && (session.role === 'admin' || session.role === 'manager')) {
     loadNotifications().then(function(){ renderAdmin(); });
   }
+  renderAdmin();
+}
+function renderAdmin(){
 
   const unclaimedCount=(leads||[]).filter(l=>!l.claimed_by).length;
   $('#app').innerHTML=`
@@ -1562,15 +1564,43 @@ async function loadNotifications(){
   }
 }
 
-// Poll notifications every 60 seconds so badge updates without page reload
+// Poll notifications every 60 seconds so badge updates without page reload.
+// CRITICAL: Never re-render the whole view if a form input has focus (user is typing).
 setInterval(function(){
   if (session && session.role && (session.role === 'admin' || session.role === 'manager')) {
     loadNotifications().then(function(){
+      // Skip re-render if user is actively typing in ANY form field
+      const active = document.activeElement;
+      const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+      if (isTyping) {
+        // Just update the badge in the tab bar without re-rendering the whole view
+        updateNotifBadgeOnly();
+        return;
+      }
+      // Only re-render if user is actually looking at notifications tab
       if (adminTab === 'notifications') renderAdmin();
-      else if (session.role === 'admin') { const bar = document.querySelector('.tabs'); if (bar) renderAdmin(); }
+      else updateNotifBadgeOnly();
     });
   }
 }, 60000);
+
+// Update ONLY the badge count in the tab bar. No full re-render.
+function updateNotifBadgeOnly(){
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function(tab){
+    if (tab.textContent.indexOf('Notifications') !== -1) {
+      const existingBadge = tab.querySelector('span[data-notif-badge]');
+      if (existingBadge) existingBadge.remove();
+      if (notifUnreadCount > 0) {
+        const badge = document.createElement('span');
+        badge.setAttribute('data-notif-badge', '1');
+        badge.style.cssText = 'background:var(--red);color:#fff;font-size:10px;padding:1px 7px;border-radius:99px;margin-left:6px;font-weight:700';
+        badge.textContent = String(notifUnreadCount);
+        tab.appendChild(badge);
+      }
+    }
+  });
+}
 
 function adminNotificationsView(){
   if (notifList === null){
