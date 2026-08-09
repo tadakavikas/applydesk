@@ -1286,14 +1286,23 @@ function adminAdminsView(){
     return '<h2>👑 Admins</h2><p class="muted" style="padding:24px 0">Loading admin team...</p>';
   }
   const cards = (adminsList || []).map(function(a){
+    const isMe = a.code === session.code;
+    const inviteBtn = a.email && !isMe && a.active
+      ? '<button class="btn sm" onclick="sendInvite(\'admin\',\'' + esc(a.code) + '\',\'' + esc(a.email) + '\')">📧 Invite</button>'
+      : '';
+    const toggleBtn = isMe ? ''
+      : (a.active
+        ? '<button class="btn sm" style="background:var(--amber-bg);color:var(--amber)" onclick="deactivateMember(\'admin\',\'' + esc(a.code) + '\',\'' + esc(a.name) + '\')">Deactivate</button>'
+        : '<button class="btn sm" style="background:var(--green);color:#fff" onclick="reactivateMember(\'admin\',\'' + esc(a.code) + '\')">Reactivate</button>');
     return '<div class="ad-admin-card">' +
       '<div class="ad-admin-info">' +
-        '<h4>' + esc(a.name) + (a.code === session.code ? '<span class="ad-admin-badge">You</span>' : '') + (!a.active ? '<span class="ad-admin-badge" style="background:var(--red-bg);color:var(--red)">Deactivated</span>' : '') + '</h4>' +
+        '<h4>' + esc(a.name) + (isMe ? '<span class="ad-admin-badge">You</span>' : '') + (!a.active ? '<span class="ad-admin-badge" style="background:var(--red-bg);color:var(--red)">Deactivated</span>' : '') + '</h4>' +
         '<div class="meta">' + (a.email ? esc(a.email) : '<span class="muted">no email</span>') +
           (a.phone ? ' · ' + esc(a.phone) : '') +
           ' · <span class="mono">' + esc(a.code) + '</span></div>' +
         '<div class="meta" style="margin-top:2px">Joined ' + esc(a.joined_date || 'unknown') + '</div>' +
       '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">' + inviteBtn + toggleBtn + '</div>' +
     '</div>';
   }).join('');
 
@@ -1323,8 +1332,11 @@ window.addNewAdmin = async function(){
   try{
     const r = await rpc('fn_a_add_admin', { p_name: name, p_email: email, p_code: code, p_phone: phone });
     if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
-    alert('Admin added! Send them an invitation email so they can set their password.');
     adminsList = null;
+    // Auto-offer invite
+    if(confirm('Admin added! Send invitation email to ' + email + ' now so they can set their password?')){
+      await sendInvite('admin', code, email);
+    }
     renderAdmin();
   }catch(e){
     alert('Failed: ' + (e.message || e));
