@@ -845,7 +845,15 @@ function adminClientsView(){
           </select>
         </div>
         <div class="field"><label>Years of experience</label><input id="c-years" type="number" step="0.5" min="0" placeholder="e.g. 4.5"></div>
-        <div class="field"><label>Base resume URL</label><input id="c-resume-url" placeholder="https://drive.google.com/..."></div>
+        <div class="field" style="grid-column:span 3">
+          <label>Base resume</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="file" id="c-resume-file" accept=".pdf,.doc,.docx" style="flex:0 0 auto;padding:6px;font-size:12px">
+            <span class="muted" style="font-size:12px">OR paste link:</span>
+            <input id="c-resume-url" placeholder="https://drive.google.com/..." style="flex:1;min-width:200px">
+          </div>
+          <div id="c-resume-status" class="muted" style="font-size:11px;margin-top:4px"></div>
+        </div>
       </div>
       <div class="row c3">
         <div class="field"><label>Subscription start date</label><input id="c-sub-start" type="date"></div>
@@ -861,6 +869,7 @@ function adminClientsView(){
 }
 window.addClient=async function(){
   const getV = id => { const el=document.getElementById(id); return el ? el.value.trim() : ''; };
+  const setStatus = t => { const el=document.getElementById('c-resume-status'); if(el) el.textContent = t; };
   const name = getV('c-name');
   const code = getV('c-code').toLowerCase();
   const email = getV('c-email').toLowerCase();
@@ -869,11 +878,47 @@ window.addClient=async function(){
   const target = Math.max(1, parseInt(getV('c-target')) || 25);
   const sponsorship = getV('c-sponsorship');
   const years = parseFloat(getV('c-years')) || 0;
-  const resumeUrl = getV('c-resume-url');
+  let resumeUrl = getV('c-resume-url');
   const subStart = getV('c-sub-start') || null;
   const subAmount = parseFloat(getV('c-sub-amount')) || 150;
   const subCurrency = getV('c-sub-currency') || 'USD';
   if(!name || !code || !email){ alert('Name, email, and access code are required'); return; }
+
+  // If file selected, upload to Supabase Storage first
+  const fileInput = document.getElementById('c-resume-file');
+  if(fileInput && fileInput.files && fileInput.files.length > 0){
+    const file = fileInput.files[0];
+    if(file.size > 10 * 1024 * 1024){ alert('File too large. Max 10 MB.'); return; }
+    setStatus('Uploading resume...');
+    try{
+      // Get JWT for storage upload
+      const sess = await sb.auth.getSession();
+      if(!sess || !sess.data || !sess.data.session){ alert('Please log in with email/password (not access code) to upload files.'); setStatus(''); return; }
+      const token = sess.data.session.access_token;
+      const ext = file.name.split('.').pop() || 'pdf';
+      const stamp = Date.now();
+      const path = code + '/' + stamp + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const uploadRes = await fetch(SB_URL + '/storage/v1/object/client-resumes/' + encodeURIComponent(path), {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'apikey': SB_KEY, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
+        body: file
+      });
+      if(!uploadRes.ok){
+        const errText = await uploadRes.text();
+        alert('Upload failed: ' + errText);
+        setStatus('Upload failed');
+        return;
+      }
+      // Store the storage path (we'll generate signed URLs on-demand when viewing)
+      resumeUrl = 'storage://client-resumes/' + path;
+      setStatus('✓ Uploaded');
+    }catch(e){
+      alert('Upload failed: ' + (e.message || e));
+      setStatus('Upload failed');
+      return;
+    }
+  }
+
   const r = await rpc('fn_a_add_client', {
     p_name: name, p_code: code, p_target: target,
     p_email: email, p_phone: phone, p_target_role: targetRole,
@@ -1066,6 +1111,28 @@ window.reactivateMember = async function(type, code){
     await refreshAnd(rerender);
   }catch(e){ alert('Failed: ' + (e.message || e)); }
 };
+window.viewStorageResume = async function(url){
+  // url is like: storage://client-resumes/haritha01/1234_resume.pdf
+  const parts = url.replace('storage://', '').split('/');
+  const bucket = parts.shift();
+  const path = parts.join('/');
+  try{
+    const sess = await sb.auth.getSession();
+    if(!sess || !sess.data || !sess.data.session){ alert('Please log in with email/password to view resumes.'); return; }
+    const token = sess.data.session.access_token;
+    const res = await fetch(SB_URL + '/storage/v1/object/sign/' + bucket + '/' + encodeURIComponent(path), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'apikey': SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 3600 })
+    });
+    if(!res.ok){ alert('Could not generate resume link. You may not have permission.'); return; }
+    const data = await res.json();
+    const signedUrl = SB_URL + '/storage/v1' + data.signedURL;
+    window.open(signedUrl, '_blank');
+  }catch(e){ alert('Failed to open resume: ' + (e.message || e)); }
+};
+
+
 
 
 
@@ -1135,7 +1202,7 @@ window.showClientDetail = async function(clientCode){
           '<div class="k">Target role</div><div class="v">' + (c.target_role ? esc(c.target_role) : '<span class="muted">not set</span>') + '</div>' +
           '<div class="k">Sponsorship</div><div class="v">' + (c.sponsorship_status ? esc(c.sponsorship_status) : '<span class="muted">not set</span>') + '</div>' +
           '<div class="k">Experience</div><div class="v">' + (Number(c.years_experience) > 0 ? c.years_experience + ' years' : '<span class="muted">not set</span>') + '</div>' +
-          '<div class="k">Base resume</div><div class="v">' + (c.base_resume_url ? '<a href="' + esc(c.base_resume_url) + '" target="_blank">View resume →</a>' : '<span class="muted">not uploaded</span>') + '</div>' +
+          '<div class="k">Base resume</div><div class="v">' + (c.base_resume_url ? (c.base_resume_url.indexOf('storage://') === 0 ? '<a href="#" onclick="viewStorageResume(\'' + esc(c.base_resume_url) + '\');return false;">View resume →</a>' : '<a href="' + esc(c.base_resume_url) + '" target="_blank">View resume →</a>') : '<span class="muted">not uploaded</span>') + '</div>' +
           '<div class="k">Daily target</div><div class="v">' + c.target + ' applications/day</div>' +
           '<div class="k">Sub started</div><div class="v">' + esc(c.subscription_start_date || 'unknown') + '</div>' +
           '<div class="k">Sub amount</div><div class="v">' + currencySymbol + Number(c.subscription_amount).toLocaleString() + ' / month</div>' +
