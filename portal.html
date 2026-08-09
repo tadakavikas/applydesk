@@ -786,7 +786,8 @@ function renderAdmin(){
     <div class="tab ${adminTab==='recruiters'?'active':''}" onclick="setAdminTab('recruiters')">Recruiters</div>
     <div class="tab ${adminTab==='managers'?'active':''}" onclick="setAdminTab('managers')">Managers</div>
     <div class="tab ${adminTab==='admins'?'active':''}" onclick="setAdminTab('admins')">👑 Admins</div>
-    <div class="tab ${adminTab==='msgs'?'active':''}" onclick="setAdminTab('msgs')">Messages</div>
+    <div class="tab ${adminTab==='msgs'?'active':''}" onclick="setAdminTab('msgs')">Client chats</div>
+    <div class="tab ${adminTab==='teamchats'?'active':''}" onclick="setAdminTab('teamchats')">💬 Team chats</div>
     <div class="tab ${adminTab==='finance'?'active':''}" onclick="setAdminTab('finance')">💰 Finance</div>
   </div>
   <div class="card">${
@@ -797,126 +798,224 @@ function renderAdmin(){
     adminTab==='recruiters'?adminRecruitersView():
     adminTab==='managers'?adminManagersView():
     adminTab==='admins'?adminAdminsView():
+    adminTab==='teamchats'?adminTeamChatsView():
     adminTab==='finance'?adminFinanceView():
     adminMsgsView()
   }</div>`;
 }
 function adminClientsView(){
-  const rows=(S.clients||[]).map(c=>`<tr style="cursor:pointer" onclick="showClientDetail('${esc(c.code)}')"><td><b style="color:var(--blue)">${esc(c.name)}</b>${c.email?`<div class="muted" style="font-size:10px">${esc(c.email)}</div>`:``}</td><td class="mono">${esc(c.code)}</td><td>${c.target}/day</td>
+  const rows=(S.clients||[]).map(c=>{
+    const isDeactivated = c.deactivated_at != null;
+    const dimStyle = isDeactivated ? 'opacity:.5;' : '';
+    const dimBadge = isDeactivated ? '<span class="tag" style="background:var(--red-bg);color:var(--red);font-size:9px;margin-left:6px">DEACTIVATED</span>' : '';
+    const toggleBtn = isDeactivated
+      ? `<button class="btn sm" style="background:var(--green);color:#fff" onclick="reactivateMember('client','${esc(c.code)}')">Reactivate</button>`
+      : `<button class="btn sm" style="background:var(--amber-bg);color:var(--amber)" onclick="deactivateMember('client','${esc(c.code)}','${esc(c.name)}')">Deactivate</button>`;
+    return `<tr style="cursor:pointer;${dimStyle}" onclick="showClientDetail('${esc(c.code)}')"><td><b style="color:var(--blue)">${esc(c.name)}</b>${dimBadge}${c.email?`<div class="muted" style="font-size:10px">${esc(c.email)}</div>`:``}</td><td class="mono">${esc(c.code)}</td><td>${c.target}/day</td>
     <td>${(S.records||[]).filter(r=>r.client_code===c.code&&r.type==='application').length} apps · ${(S.records||[]).filter(r=>r.client_code===c.code&&r.type==='reachout').length} reach-outs</td>
     <td>${(S.recruiters||[]).filter(r=>(r.assigned||[]).includes(c.code)).map(r=>esc(r.name)).join(', ')||'<span class="muted">unassigned</span>'}</td>
-    <td style="display:flex;gap:6px" onclick="event.stopPropagation()"><button class="btn sm" onclick="sendInvite('client','${esc(c.code)}','${esc(c.email||'')}')">📧 Invite</button><button class="btn sm red" onclick="delClient('${esc(c.code)}')">✕</button></td></tr>`).join('');
+    <td style="display:flex;gap:4px;flex-wrap:wrap" onclick="event.stopPropagation()"><button class="btn sm" onclick="sendInvite('client','${esc(c.code)}','${esc(c.email||'')}')">📧</button>${toggleBtn}</td></tr>`;
+  }).join('');
   return `<h2>Clients</h2>
-  <div class="row c4" style="margin-top:14px">
-    <div class="field"><label>Client name</label><input id="c-name"></div>
-    <div class="field"><label>Email <span style="color:var(--text3);font-weight:400">(for invite)</span></label><input id="c-email" type="email" placeholder="client@example.com"></div>
-    <div class="field"><label>Access code</label><input id="c-code"></div>
-    <div class="field"><label>Daily target</label><input id="c-target" type="number" value="25" min="1"></div>
-  </div>
-  <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn blue" onclick="addClient()">ADD CLIENT</button></div>
-  <table style="margin-top:10px"><tr><th>Name</th><th>Code</th><th>Baseline</th><th>Activity</th><th>Assigned to</th><th></th></tr>${rows||`<tr><td colspan="6" style="padding:0;border:none">${emptyState('👥','No clients yet','Add your first client above with their name, a unique access code, and daily target.','')}</td></tr>`}</table>`;
+  <details open style="background:#f9fcfe;border:0.5px solid var(--border);border-radius:12px;padding:18px;margin:14px 0;transition:all .2s">
+    <summary style="cursor:pointer;font-weight:600;color:var(--ink);font-size:14px">➕ Add new client</summary>
+    <div style="margin-top:16px">
+      <div class="row c3">
+        <div class="field"><label>Client name *</label><input id="c-name" placeholder="e.g. Haritha Adumala"></div>
+        <div class="field"><label>Email *</label><input id="c-email" type="email" placeholder="client@example.com"></div>
+        <div class="field"><label>Phone</label><input id="c-phone" placeholder="+1 555 123 4567"></div>
+      </div>
+      <div class="row c3">
+        <div class="field"><label>Access code *</label><input id="c-code" placeholder="e.g. haritha01"></div>
+        <div class="field"><label>Target role</label><input id="c-target-role" placeholder="e.g. Data Engineer"></div>
+        <div class="field"><label>Daily app target</label><input id="c-target" type="number" value="25" min="1"></div>
+      </div>
+      <div class="row c3">
+        <div class="field"><label>Sponsorship</label>
+          <select id="c-sponsorship">
+            <option value="">Select...</option>
+            <option value="Citizen">US Citizen</option>
+            <option value="GC">Green Card</option>
+            <option value="H1B">H1B</option>
+            <option value="OPT">OPT</option>
+            <option value="OPT-EAD">OPT-EAD</option>
+            <option value="H4-EAD">H4-EAD</option>
+            <option value="L2-EAD">L2-EAD</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Years of experience</label><input id="c-years" type="number" step="0.5" min="0" placeholder="e.g. 4.5"></div>
+        <div class="field"><label>Base resume URL</label><input id="c-resume-url" placeholder="https://drive.google.com/..."></div>
+      </div>
+      <div class="row c3">
+        <div class="field"><label>Subscription start date</label><input id="c-sub-start" type="date"></div>
+        <div class="field"><label>Subscription amount</label><input id="c-sub-amount" type="number" step="0.01" value="150"></div>
+        <div class="field"><label>Currency</label>
+          <select id="c-sub-currency"><option value="USD">USD ($)</option><option value="INR">INR (₹)</option></select>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn blue" onclick="addClient()">➕ ADD CLIENT</button></div>
+    </div>
+  </details>
+  <table style="margin-top:10px"><tr><th>Name</th><th>Code</th><th>Baseline</th><th>Activity</th><th>Assigned to</th><th>Actions</th></tr>${rows||`<tr><td colspan="6" style="padding:0;border:none">${emptyState('👥','No clients yet','Add your first client above.','')}</td></tr>`}</table>`;
 }
 window.addClient=async function(){
-  const name=$('#c-name').value.trim(),code=$('#c-code').value.trim();
-  const emailEl=document.getElementById('c-email');
-  const email=emailEl?emailEl.value.trim().toLowerCase():'';
-  const target=Math.max(1,parseInt($('#c-target').value)||25);
-  if(!name||!code){alert('Name and code required');return;}
-  const r=await rpc('fn_add_client',{p_actor:session.code,p_name:name,p_code:code,p_target:target});
-  if(!r.ok){alert(r.err||'Failed');return;}
-  // If email provided, save it too (uses legacy path for now)
-  if(email){
-    try{ await fetch(SB_URL+'/rest/v1/app_clients?code=eq.'+encodeURIComponent(code),{
-      method:'PATCH',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
-      body:JSON.stringify({email})
-    }); }catch(e){}
-  }
+  const getV = id => { const el=document.getElementById(id); return el ? el.value.trim() : ''; };
+  const name = getV('c-name');
+  const code = getV('c-code').toLowerCase();
+  const email = getV('c-email').toLowerCase();
+  const phone = getV('c-phone');
+  const targetRole = getV('c-target-role');
+  const target = Math.max(1, parseInt(getV('c-target')) || 25);
+  const sponsorship = getV('c-sponsorship');
+  const years = parseFloat(getV('c-years')) || 0;
+  const resumeUrl = getV('c-resume-url');
+  const subStart = getV('c-sub-start') || null;
+  const subAmount = parseFloat(getV('c-sub-amount')) || 150;
+  const subCurrency = getV('c-sub-currency') || 'USD';
+  if(!name || !code || !email){ alert('Name, email, and access code are required'); return; }
+  const r = await rpc('fn_a_add_client', {
+    p_name: name, p_code: code, p_target: target,
+    p_email: email, p_phone: phone, p_target_role: targetRole,
+    p_sponsorship: sponsorship, p_years_experience: years,
+    p_base_resume_url: resumeUrl,
+    p_subscription_start: subStart,
+    p_subscription_amount: subAmount,
+    p_subscription_currency: subCurrency
+  });
+  if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
   await refreshAnd(rerender);
-  if(email){
-    if(confirm('Client added. Send invitation email to '+email+' now so they can set their password?')){
-      await sendInvite('client', code, email);
-    }
+  if(email && confirm('Client added. Send invitation email to '+email+' now?')){
+    await sendInvite('client', code, email);
   }
 }
 window.delClient=async function(code){if(!(await askConfirm('Remove client AND all their applications, resumes, and chat? This cannot be undone.')))return;const r=await rpc('fn_del_client',{p_actor:session.code,p_code:code});if(!r.ok){alert(r.err||'Failed');return;}await refreshAnd(rerender);}
 function adminRecruitersView(){return recruitersView();}
 function adminManagersView(){
   const rows=(S.managers||[]).map(m=>{
-    const inv = m.email ? `<button class="btn sm" onclick="sendInvite('manager','${esc(m.code)}','${esc(m.email)}')">📧 Invite</button>` : `<button class="btn sm" onclick="sendInvite('manager','${esc(m.code)}','')">📧 Invite</button>`;
-    return `<tr><td><b>${esc(m.name)}</b>${m.email?`<div class="muted" style="font-size:10px">${esc(m.email)}</div>`:''}</td><td class="mono">${esc(m.code)}</td>
+    const isDeactivated = m.deactivated_at != null;
+    const dimStyle = isDeactivated ? 'opacity:.5;' : '';
+    const dimBadge = isDeactivated ? '<span class="tag" style="background:var(--red-bg);color:var(--red);font-size:9px;margin-left:6px">DEACTIVATED</span>' : '';
+    const inv = `<button class="btn sm" onclick="sendInvite('manager','${esc(m.code)}','${esc(m.email||'')}')">📧</button>`;
+    const toggleBtn = isDeactivated
+      ? `<button class="btn sm" style="background:var(--green);color:#fff" onclick="reactivateMember('manager','${esc(m.code)}')">Reactivate</button>`
+      : `<button class="btn sm" style="background:var(--amber-bg);color:var(--amber)" onclick="deactivateMember('manager','${esc(m.code)}','${esc(m.name)}')">Deactivate</button>`;
+    return `<tr style="${dimStyle}"><td><b>${esc(m.name)}</b>${dimBadge}${m.email?`<div class="muted" style="font-size:10px">${esc(m.email)}</div>`:''}</td><td class="mono">${esc(m.code)}</td>
     <td>${(S.records||[]).filter(r=>r.added_by===m.code).length} entries · ${(leads||[]).filter(l=>l.claimed_by===m.code).length} leads claimed</td>
-    <td style="display:flex;gap:6px">${inv}<button class="btn sm red" onclick="delManager('${esc(m.code)}')">✕</button></td></tr>`;
+    <td style="display:flex;gap:4px;flex-wrap:wrap">${inv}${toggleBtn}</td></tr>`;
   }).join('');
   return `<h2>Operations Managers</h2>
-  <p class="muted">Managers can see all leads, all clients, all recruiters, and can create clients + recruiters + assign clients to recruiters. They cannot create other managers or delete accounts.</p>
-  <div class="row c4" style="margin-top:14px">
-    <div class="field"><label>Manager name</label><input id="m-name"></div>
-    <div class="field"><label>Email <span style="color:var(--text3);font-weight:400">(for invitation)</span></label><input id="m-email" type="email" placeholder="manager@example.com"></div>
-    <div class="field"><label>Access code</label><input id="m-code"></div>
-    <div style="display:flex;align-items:end"><button class="btn blue" onclick="addManager()">ADD MANAGER</button></div>
-  </div>
-  <table style="margin-top:10px"><tr><th>Name</th><th>Code</th><th>Activity</th><th></th></tr>${rows||`<tr><td colspan="4" style="padding:0;border:none">${emptyState('🧭','No managers yet','Managers oversee quality across all clients. Add one when you scale beyond 5 clients.','')}</td></tr>`}</table>`;
+  <p class="muted">Managers can see all leads, all clients, all recruiters, and can create clients + recruiters + assign clients to recruiters. Only admin can add managers.</p>
+  <details open style="background:#f9fcfe;border:0.5px solid var(--border);border-radius:12px;padding:18px;margin:14px 0">
+    <summary style="cursor:pointer;font-weight:600;color:var(--ink);font-size:14px">➕ Add new manager</summary>
+    <div style="margin-top:16px">
+      <div class="row c3">
+        <div class="field"><label>Manager name *</label><input id="m-name" placeholder="e.g. Pooja Ande"></div>
+        <div class="field"><label>Email *</label><input id="m-email" type="email" placeholder="manager@example.com"></div>
+        <div class="field"><label>Phone</label><input id="m-phone" placeholder="+91..."></div>
+      </div>
+      <div class="row c3">
+        <div class="field"><label>Access code *</label><input id="m-code" placeholder="e.g. pooja"></div>
+        <div class="field"></div>
+        <div class="field"></div>
+      </div>
+      <div class="row c3">
+        <div class="field"><label>Payroll amount</label><input id="m-payroll-amount" type="number" step="0.01" value="200"></div>
+        <div class="field"><label>Currency</label>
+          <select id="m-payroll-currency"><option value="USD">USD ($)</option><option value="INR">INR (₹)</option></select>
+        </div>
+        <div class="field"><label>Payment day of month (1-31)</label><input id="m-payroll-day" type="number" min="1" max="31" value="1"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn blue" onclick="addManager()">➕ ADD MANAGER</button></div>
+    </div>
+  </details>
+  <table style="margin-top:10px"><tr><th>Name</th><th>Code</th><th>Activity</th><th>Actions</th></tr>${rows||`<tr><td colspan="4" style="padding:0;border:none">${emptyState('🧭','No managers yet','Add your first manager above.','')}</td></tr>`}</table>`;
 }
 window.addManager=async function(){
-  const name=$('#m-name').value.trim(),code=$('#m-code').value.trim();
-  const emailEl=document.getElementById('m-email');
-  const email=emailEl?emailEl.value.trim().toLowerCase():'';
-  if(!name||!code){alert('Name and code required');return;}
-  const r=await rpc('fn_add_manager',{p_actor:session.code,p_name:name,p_code:code});
-  if(!r.ok){alert(r.err||'Failed');return;}
-  if(email){
-    try{ await fetch(SB_URL+'/rest/v1/app_managers?code=eq.'+encodeURIComponent(code),{
-      method:'PATCH',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
-      body:JSON.stringify({email})
-    }); }catch(e){}
-  }
+  const getV = id => { const el=document.getElementById(id); return el ? el.value.trim() : ''; };
+  const name = getV('m-name');
+  const code = getV('m-code').toLowerCase();
+  const email = getV('m-email').toLowerCase();
+  const phone = getV('m-phone');
+  const payrollAmount = parseFloat(getV('m-payroll-amount')) || 200;
+  const payrollCurrency = getV('m-payroll-currency') || 'USD';
+  const payrollDay = Math.min(31, Math.max(1, parseInt(getV('m-payroll-day')) || 1));
+  if(!name || !code || !email){ alert('Name, email, and access code are required'); return; }
+  const r = await rpc('fn_a_add_manager', {
+    p_name: name, p_code: code, p_email: email, p_phone: phone,
+    p_payroll_amount: payrollAmount,
+    p_payroll_currency: payrollCurrency,
+    p_payroll_cycle_day: payrollDay
+  });
+  if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
   await refreshAnd(rerender);
-  if(email){
-    if(confirm('Manager added. Send invitation email to '+email+' now so they can set their password?')){
-      await sendInvite('manager', code, email);
-    }
+  if(email && confirm('Manager added. Send invitation email to '+email+' now?')){
+    await sendInvite('manager', code, email);
   }
 }
 window.delManager=async function(code){if(!(await askConfirm('Remove this manager? Their past entries stay in the data.')))return;const r=await rpc('fn_del_manager',{p_actor:session.code,p_code:code});if(!r.ok){alert(r.err||'Failed');return;}await refreshAnd(rerender);}
 function recruitersView(){
   const rows=(S.recruiters||[]).map(r=>{
+    const isDeactivated = r.deactivated_at != null;
+    const dimStyle = isDeactivated ? 'opacity:.5;' : '';
+    const dimBadge = isDeactivated ? '<span class="tag" style="background:var(--red-bg);color:var(--red);font-size:9px;margin-left:6px">DEACTIVATED</span>' : '';
     const chips=(S.clients||[]).map(c=>{const on=(r.assigned||[]).includes(c.code);
       return `<span class="chip ${on?'on':''}" onclick="toggleAssign('${esc(r.code)}','${esc(c.code)}')">${on?'✓ ':''}${esc(c.name)}</span>`;}).join('');
-    const inv=`<button class="btn sm" onclick="sendInvite('recruiter','${esc(r.code)}','${esc(r.email||'')}')">📧 Invite</button>`;
-    const del=session.role==='admin'?`<button class="btn sm red" onclick="delRecruiter('${esc(r.code)}')">✕</button>`:'';
-    return `<tr style="cursor:pointer" onclick="showRecruiterDetail('${esc(r.code)}')"><td><b style="color:var(--blue)">${esc(r.name)}</b>${r.email?`<div class="muted" style="font-size:10px">${esc(r.email)}</div>`:''}</td><td class="mono">${esc(r.code)}</td>
-      <td onclick="event.stopPropagation()">${chips||'<span class="muted">No clients exist yet</span>'}</td><td style="display:flex;gap:6px" onclick="event.stopPropagation()">${inv}${del}</td></tr>`;}).join('');
+    const inv=`<button class="btn sm" onclick="sendInvite('recruiter','${esc(r.code)}','${esc(r.email||'')}')">📧</button>`;
+    const toggleBtn = isDeactivated
+      ? `<button class="btn sm" style="background:var(--green);color:#fff" onclick="reactivateMember('recruiter','${esc(r.code)}')">Reactivate</button>`
+      : `<button class="btn sm" style="background:var(--amber-bg);color:var(--amber)" onclick="deactivateMember('recruiter','${esc(r.code)}','${esc(r.name)}')">Deactivate</button>`;
+    return `<tr style="cursor:pointer;${dimStyle}" onclick="showRecruiterDetail('${esc(r.code)}')"><td><b style="color:var(--blue)">${esc(r.name)}</b>${dimBadge}${r.email?`<div class="muted" style="font-size:10px">${esc(r.email)}</div>`:''}</td><td class="mono">${esc(r.code)}</td>
+      <td onclick="event.stopPropagation()">${chips||'<span class="muted">No clients exist yet</span>'}</td><td style="display:flex;gap:4px;flex-wrap:wrap" onclick="event.stopPropagation()">${inv}${toggleBtn}</td></tr>`;}).join('');
   return `<h2>Recruiters</h2>
-  <p class="muted">Click client chips to assign or unassign. Recruiters only see and enter data for clients assigned to them.</p>
-  <div class="row c4" style="margin-top:14px">
-    <div class="field"><label>Recruiter name</label><input id="r-name"></div>
-    <div class="field"><label>Email <span style="color:var(--text3);font-weight:400">(for invitation)</span></label><input id="r-email" type="email" placeholder="recruiter@example.com"></div>
-    <div class="field"><label>Access code</label><input id="r-code"></div>
-    <div style="display:flex;align-items:end"><button class="btn blue" onclick="addRecruiter()">ADD RECRUITER</button></div>
-  </div>
-  <table style="margin-top:10px"><tr><th>Name</th><th>Code</th><th>Assigned clients</th><th>Actions</th>${session.role==='admin'?'<th></th>':''}</tr>${rows||`<tr><td colspan="4" style="padding:0;border:none">${emptyState('👤','No recruiters yet','Add your first recruiter above. Then assign clients to them below.','')}</td></tr>`}</table>`;
+  <p class="muted">Click a row to see recruiter details. Click client chips to assign/unassign.</p>
+  <details open style="background:#f9fcfe;border:0.5px solid var(--border);border-radius:12px;padding:18px;margin:14px 0">
+    <summary style="cursor:pointer;font-weight:600;color:var(--ink);font-size:14px">➕ Add new recruiter</summary>
+    <div style="margin-top:16px">
+      <div class="row c3">
+        <div class="field"><label>Recruiter name *</label><input id="r-name" placeholder="e.g. Sahithi Velugala"></div>
+        <div class="field"><label>Email *</label><input id="r-email" type="email" placeholder="recruiter@example.com"></div>
+        <div class="field"><label>Phone</label><input id="r-phone" placeholder="+91..."></div>
+      </div>
+      <div class="row c3">
+        <div class="field"><label>Access code *</label><input id="r-code" placeholder="e.g. sahithi08"></div>
+        <div class="field"><label>Target roles</label><input id="r-target-roles" placeholder="e.g. Data Engineer, Analyst"></div>
+        <div class="field"></div>
+      </div>
+      <div class="row c3">
+        <div class="field"><label>Payroll amount</label><input id="r-payroll-amount" type="number" step="0.01" value="15000"></div>
+        <div class="field"><label>Currency</label>
+          <select id="r-payroll-currency"><option value="INR">INR (₹)</option><option value="USD">USD ($)</option></select>
+        </div>
+        <div class="field"><label>Payment day of month (1-31)</label><input id="r-payroll-day" type="number" min="1" max="31" value="1"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn blue" onclick="addRecruiter()">➕ ADD RECRUITER</button></div>
+    </div>
+  </details>
+  <table style="margin-top:10px"><tr><th>Name</th><th>Code</th><th>Assigned clients</th><th>Actions</th></tr>${rows||`<tr><td colspan="4" style="padding:0;border:none">${emptyState('👤','No recruiters yet','Add your first recruiter above.','')}</td></tr>`}</table>`;
 }
 window.addRecruiter=async function(){
-  const name=$('#r-name').value.trim(),code=$('#r-code').value.trim();
-  const emailEl=document.getElementById('r-email');
-  const email=emailEl?emailEl.value.trim().toLowerCase():'';
-  if(!name||!code){alert('Name and code required');return;}
-  const r=await rpc('fn_add_recruiter',{p_actor:session.code,p_name:name,p_code:code});
-  if(!r.ok){alert(r.err||'Failed');return;}
-  if(email){
-    try{ await fetch(SB_URL+'/rest/v1/app_recruiters?code=eq.'+encodeURIComponent(code),{
-      method:'PATCH',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=minimal'},
-      body:JSON.stringify({email})
-    }); }catch(e){}
-  }
+  const getV = id => { const el=document.getElementById(id); return el ? el.value.trim() : ''; };
+  const name = getV('r-name');
+  const code = getV('r-code').toLowerCase();
+  const email = getV('r-email').toLowerCase();
+  const phone = getV('r-phone');
+  const targetRoles = getV('r-target-roles');
+  const payrollAmount = parseFloat(getV('r-payroll-amount')) || 15000;
+  const payrollCurrency = getV('r-payroll-currency') || 'INR';
+  const payrollDay = Math.min(31, Math.max(1, parseInt(getV('r-payroll-day')) || 1));
+  if(!name || !code || !email){ alert('Name, email, and access code are required'); return; }
+  const r = await rpc('fn_a_add_recruiter', {
+    p_name: name, p_code: code, p_email: email, p_phone: phone,
+    p_target_roles: targetRoles,
+    p_payroll_amount: payrollAmount,
+    p_payroll_currency: payrollCurrency,
+    p_payroll_cycle_day: payrollDay
+  });
+  if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
   await refreshAnd(rerender);
-  if(email){
-    if(confirm('Recruiter added. Send invitation email to '+email+' now so they can set their password?')){
-      await sendInvite('recruiter', code, email);
-    }
+  if(email && confirm('Recruiter added. Send invitation email to '+email+' now?')){
+    await sendInvite('recruiter', code, email);
   }
 }
 window.delRecruiter=async function(code){if(!(await askConfirm('Remove this recruiter?')))return;const r=await rpc('fn_del_recruiter',{p_actor:session.code,p_code:code});if(!r.ok){alert(r.err||'Failed');return;}await refreshAnd(rerender);}
@@ -948,6 +1047,27 @@ window.closeModal = function(){
   const b = document.getElementById('ad-modal-back');
   if(b) b.remove();
 };
+/* ═══════ DEACTIVATE / REACTIVATE ═══════ */
+window.deactivateMember = async function(type, code, name){
+  if(!(await askConfirm('Deactivate ' + name + '? Their history stays but they cannot log in. You can reactivate anytime.'))) return;
+  try{
+    const r = await rpc('fn_a_deactivate_member', { p_type: type, p_code: code });
+    if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
+    if(type === 'admin'){ adminsList = null; }
+    await refreshAnd(rerender);
+  }catch(e){ alert('Failed: ' + (e.message || e)); }
+};
+
+window.reactivateMember = async function(type, code){
+  try{
+    const r = await rpc('fn_a_reactivate_member', { p_type: type, p_code: code });
+    if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
+    if(type === 'admin'){ adminsList = null; }
+    await refreshAnd(rerender);
+  }catch(e){ alert('Failed: ' + (e.message || e)); }
+};
+
+
 
 /* Payment/Payroll cycle ring SVG.
    Full blue at day 30+, gradually red as day approaches 0 (renewal day). */
@@ -1142,6 +1262,196 @@ window.addNewAdmin = async function(){
   }catch(e){
     alert('Failed: ' + (e.message || e));
   }
+};
+
+
+/* ═══════ TEAM CHATS (WhatsApp-style groups) ═══════ */
+let tcGroups = null;
+let tcActiveGroupId = null;
+let tcGroupData = null;
+let tcAllMembers = null;
+let tcShowCreate = false;
+let tcSelectedMembers = new Set();
+
+async function loadTcGroups(){
+  try{
+    const r = await rpc('fn_a_list_groups', {});
+    tcGroups = (r && r.ok) ? r.groups : [];
+  }catch(e){ tcGroups = []; }
+}
+
+async function loadTcGroupMessages(groupId){
+  try{
+    const r = await rpc('fn_a_group_messages', { p_group_id: groupId });
+    tcGroupData = (r && r.ok) ? r : null;
+  }catch(e){ tcGroupData = null; }
+}
+
+async function loadTcAllMembers(){
+  try{
+    const r = await rpc('fn_a_all_members', {});
+    tcAllMembers = (r && r.ok) ? r : null;
+  }catch(e){ tcAllMembers = null; }
+}
+
+function adminTeamChatsView(){
+  if(tcGroups === null){
+    loadTcGroups().then(function(){ renderAdmin(); });
+    return '<h2>💬 Team chats</h2><p class="muted" style="padding:24px 0">Loading groups...</p>';
+  }
+
+  const groupsList = (tcGroups || []).map(function(g){
+    const active = tcActiveGroupId === g.id ? 'background:var(--blue-bg);border-color:var(--blue)' : '';
+    const lastAt = g.last_message_at ? new Date(g.last_message_at).toLocaleDateString() : '';
+    const icon = g.is_broadcast ? '📢' : '💬';
+    return '<div style="padding:12px 14px;border:0.5px solid var(--border);border-radius:9px;margin-bottom:8px;cursor:pointer;' + active + '" onclick="openTcGroup(' + g.id + ')">' +
+      '<div style="font-weight:600;color:var(--ink);font-size:14px">' + icon + ' ' + esc(g.name) + '</div>' +
+      '<div class="muted" style="font-size:11px;margin-top:2px">' + g.member_count + ' members · ' + g.message_count + ' messages' + (lastAt ? ' · ' + lastAt : '') + '</div>' +
+    '</div>';
+  }).join('');
+
+  const rightPanel = tcActiveGroupId
+    ? renderTcThread()
+    : '<div style="background:#f9fcfe;border:0.5px dashed var(--border-s);border-radius:12px;padding:40px 20px;text-align:center;color:var(--text3)"><h3 style="color:var(--ink);margin-bottom:8px">Select a group</h3><p style="font-size:13px">Pick a group on the left, or create a new one.</p></div>';
+
+  const createBlock = tcShowCreate ? renderTcCreateGroup() : '';
+
+  return '<h2>💬 Team chats</h2>' +
+    '<p class="muted" style="margin-bottom:14px">Send messages to your team. Create groups for specific projects or broadcasts.</p>' +
+    '<div style="display:grid;grid-template-columns:320px 1fr;gap:16px;min-height:500px">' +
+      '<div>' +
+        '<button class="btn blue" style="width:100%;margin-bottom:12px" onclick="tcToggleCreate()">' + (tcShowCreate ? '× Cancel' : '➕ New group') + '</button>' +
+        createBlock +
+        (groupsList || '<p class="muted" style="padding:20px;text-align:center;font-size:13px">No groups yet.</p>') +
+      '</div>' +
+      '<div>' + rightPanel + '</div>' +
+    '</div>';
+}
+
+function renderTcCreateGroup(){
+  if(tcAllMembers === null){
+    loadTcAllMembers().then(function(){ renderAdmin(); });
+    return '<div class="muted" style="padding:12px;font-size:12px">Loading members...</div>';
+  }
+  const buildRows = function(list, label){
+    if(!list || !list.length) return '';
+    const items = list.filter(function(m){ return m.code !== session.code; }).map(function(m){
+      const on = tcSelectedMembers.has(m.code);
+      return '<div style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;background:' + (on ? 'var(--blue-bg)' : 'transparent') + '" onclick="tcToggleMember(\''+esc(m.code)+'\')">' + (on ? '✓ ' : '') + esc(m.name) + '</div>';
+    }).join('');
+    if(!items) return '';
+    return '<div style="margin-bottom:8px"><div class="muted" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 10px">' + label + '</div>' + items + '</div>';
+  };
+  return '<div style="background:#f4f9fe;border:0.5px solid var(--border-s);border-radius:10px;padding:14px;margin-bottom:12px">' +
+    '<input id="tc-new-name" placeholder="Group name" style="margin-bottom:8px">' +
+    '<input id="tc-new-desc" placeholder="Description (optional)" style="margin-bottom:8px">' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;text-transform:none;letter-spacing:normal"><input type="checkbox" id="tc-new-broadcast" style="width:auto"> Broadcast channel (admin-only send)</label>' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:10px;text-transform:none;letter-spacing:normal"><input type="checkbox" id="tc-new-include-clients" style="width:auto"> Include clients</label>' +
+    '<div class="muted" style="font-size:11px;margin-bottom:6px">Add members:</div>' +
+    '<div style="max-height:220px;overflow-y:auto;background:#fff;border:0.5px solid var(--border);border-radius:6px;padding:4px">' +
+      buildRows(tcAllMembers.admins, 'Admins') +
+      buildRows(tcAllMembers.managers, 'Managers') +
+      buildRows(tcAllMembers.recruiters, 'Recruiters') +
+      buildRows(tcAllMembers.clients, 'Clients') +
+    '</div>' +
+    '<button class="btn blue" style="width:100%;margin-top:10px" onclick="tcCreateGroup()">Create group</button>' +
+    '</div>';
+}
+
+function renderTcThread(){
+  if(tcGroupData === null){
+    return '<div class="muted" style="padding:40px;text-align:center">Loading messages...</div>';
+  }
+  const g = tcGroupData.group;
+  const messages = tcGroupData.messages || [];
+  const members = tcGroupData.members || [];
+
+  const bubbles = messages.map(function(m){
+    const mine = m.from_code === session.code;
+    const bg = mine ? 'var(--blue-bg)' : '#fff';
+    const align = mine ? 'margin-left:auto;text-align:right' : 'margin-right:auto';
+    return '<div style="max-width:70%;padding:10px 14px;border-radius:12px;background:' + bg + ';border:0.5px solid var(--border);margin-bottom:8px;' + align + '">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">' + esc(m.from_name || m.from_code) + ' · ' + esc(m.from_role) + '</div>' +
+      '<div style="font-size:13.5px;color:var(--ink);white-space:pre-wrap">' + esc(m.body) + '</div>' +
+      '<div style="font-size:10px;color:var(--text3);margin-top:4px;font-family:JetBrains Mono,monospace">' + new Date(m.created_at).toLocaleString() + '</div>' +
+    '</div>';
+  }).join('');
+
+  return '<div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;display:flex;flex-direction:column;height:600px">' +
+    '<div style="padding:14px 18px;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+      '<div>' +
+        '<h3 style="font-size:15px;margin:0">' + (g.is_broadcast ? '📢 ' : '💬 ') + esc(g.name) + '</h3>' +
+        '<div class="muted" style="font-size:11px;margin-top:2px">' + members.length + ' members' + (g.include_clients ? ' · clients included' : '') + '</div>' +
+      '</div>' +
+      '<div class="muted" style="font-size:11px">Members: ' + members.map(function(m){ return esc(m.name || m.code); }).join(', ') + '</div>' +
+    '</div>' +
+    '<div id="tc-messages" style="flex:1;overflow-y:auto;padding:14px 18px;background:#f9fcfe">' +
+      (bubbles || '<p class="muted" style="text-align:center;padding:40px">No messages yet. Say hello!</p>') +
+    '</div>' +
+    '<div style="padding:12px 14px;border-top:0.5px solid var(--border);display:flex;gap:8px">' +
+      '<textarea id="tc-message-input" placeholder="Type a message..." style="flex:1;min-height:40px;max-height:120px;resize:vertical" onkeydown="if(event.key===\'Enter\' && !event.shiftKey){event.preventDefault();tcSendMessage();}"></textarea>' +
+      '<button class="btn blue" onclick="tcSendMessage()">Send</button>' +
+    '</div>' +
+  '</div>';
+}
+
+window.tcToggleCreate = function(){
+  tcShowCreate = !tcShowCreate;
+  if(tcShowCreate) tcSelectedMembers = new Set();
+  renderAdmin();
+};
+
+window.tcToggleMember = function(code){
+  if(tcSelectedMembers.has(code)) tcSelectedMembers.delete(code);
+  else tcSelectedMembers.add(code);
+  renderAdmin();
+};
+
+window.tcCreateGroup = async function(){
+  const name = document.getElementById('tc-new-name').value.trim();
+  const desc = document.getElementById('tc-new-desc').value.trim();
+  const broadcast = document.getElementById('tc-new-broadcast').checked;
+  const includeClients = document.getElementById('tc-new-include-clients').checked;
+  if(!name){ alert('Group name required'); return; }
+  const members = Array.from(tcSelectedMembers);
+  try{
+    const r = await rpc('fn_a_create_group', {
+      p_name: name, p_description: desc,
+      p_is_broadcast: broadcast,
+      p_include_clients: includeClients,
+      p_member_codes: members
+    });
+    if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
+    tcGroups = null;
+    tcShowCreate = false;
+    tcActiveGroupId = r.group_id;
+    await loadTcGroups();
+    await loadTcGroupMessages(r.group_id);
+    renderAdmin();
+  }catch(e){ alert('Failed: ' + (e.message || e)); }
+};
+
+window.openTcGroup = async function(groupId){
+  tcActiveGroupId = groupId;
+  tcGroupData = null;
+  renderAdmin();
+  await loadTcGroupMessages(groupId);
+  renderAdmin();
+};
+
+window.tcSendMessage = async function(){
+  const inp = document.getElementById('tc-message-input');
+  if(!inp) return;
+  const body = inp.value.trim();
+  if(!body || !tcActiveGroupId) return;
+  inp.value = '';
+  try{
+    const r = await rpc('fn_a_send_group_message', { p_group_id: tcActiveGroupId, p_body: body });
+    if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); inp.value = body; return; }
+    await loadTcGroupMessages(tcActiveGroupId);
+    await loadTcGroups();
+    renderAdmin();
+  }catch(e){ alert('Failed: ' + (e.message || e)); }
 };
 
 /* ═══════ FINANCE (admin only) ═══════ */
