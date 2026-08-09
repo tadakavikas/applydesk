@@ -1531,7 +1531,12 @@ let finState = {
   loading: false,
   showForm: false,
   editingId: null,
-  form: { txn_date: '', txn_type: 'IN', amount: '', currency: 'USD', category: 'Subscription', description: '', related_party: '', fx_rate: '' }
+  form: { txn_date: '', txn_type: 'IN', amount: '', currency: 'USD', category: 'Subscription', description: '', related_party: '', fx_rate: '' },
+  subTab: 'transactions',
+  payrolls: null,
+  subscriptions: null,
+  spends: null,
+  resumeRequests: null
 };
 
 function finDefaultRange() {
@@ -1659,14 +1664,38 @@ function adminFinanceView() {
   if (session.role !== 'admin') {
     return emptyState('🔒','Admin only','Finance is restricted to admin users.','');
   }
+
+  // Sub-tab router
+  const subTabsBar =
+    '<div style="display:flex;gap:2px;border-bottom:0.5px solid var(--border);margin:8px 0 20px;overflow-x:auto">' +
+      finSubTabBtn('transactions', '📊 Transactions') +
+      finSubTabBtn('subscriptions', '🔁 Subscriptions') +
+      finSubTabBtn('payrolls', '💼 Payrolls') +
+      finSubTabBtn('spends', '📉 Spends') +
+      finSubTabBtn('resumes', '📄 Resume Requests') +
+    '</div>';
+
+  if (finState.subTab === 'subscriptions') {
+    return '<h2>💰 Finance</h2>' + subTabsBar + finSubscriptionsView();
+  }
+  if (finState.subTab === 'payrolls') {
+    return '<h2>💰 Finance</h2>' + subTabsBar + finPayrollsView();
+  }
+  if (finState.subTab === 'spends') {
+    return '<h2>💰 Finance</h2>' + subTabsBar + finSpendsView();
+  }
+  if (finState.subTab === 'resumes') {
+    return '<h2>💰 Finance</h2>' + subTabsBar + finResumeRequestsView();
+  }
+
+  // Default: transactions view (the original)
   if (!finState.from && !finState.to) {
     finApplyPreset('month');
   }
-  // Trigger initial load if we have no rows and haven't loaded yet
   if (!finState._loaded) {
     finState._loaded = true;
     finLoad().then(() => renderAdmin());
-    return '<h2>💰 Finance</h2><div class="muted center" style="padding:40px 0">Loading transactions...</div>';
+    return '<h2>💰 Finance</h2>' + subTabsBar + '<div class="muted center" style="padding:40px 0">Loading transactions...</div>';
   }
 
   const s = finState.summary;
@@ -1709,8 +1738,8 @@ function adminFinanceView() {
         </tr>`;
       }).join('');
 
-  return `<h2>💰 Finance</h2>
-  <p class="muted" style="margin-bottom:14px">Admin-only view of all money in and out. Numbers auto-convert to INR at ₹83 = $1.</p>
+  return '<h2>💰 Finance</h2>' + subTabsBar + `
+  <p class="muted" style="margin-bottom:14px">All transactions in and out. Numbers auto-convert to INR at each transaction FX rate.</p>
 
   <div class="card" style="background:#f9fcfe">
     <div class="row c5" style="align-items:end">
@@ -1913,6 +1942,332 @@ window.finDelete = async function(id) {
   } catch(e) {
     alert('Delete failed: ' + (e.message || e));
   }
+};
+
+
+/* ═══════ FINANCE SUB-TABS ═══════ */
+function finSubTabBtn(key, label){
+  const active = finState.subTab === key;
+  const style = active
+    ? 'padding:9px 16px;font-size:13px;color:var(--blue);border-bottom:2px solid var(--blue);cursor:pointer;font-weight:600;white-space:nowrap;transition:all .15s'
+    : 'padding:9px 16px;font-size:13px;color:var(--text2);border-bottom:2px solid transparent;cursor:pointer;font-weight:500;white-space:nowrap;transition:all .15s';
+  return '<div style="' + style + '" onclick="finSetSubTab(\'' + key + '\')">' + label + '</div>';
+}
+
+window.finSetSubTab = function(tab){
+  finState.subTab = tab;
+  // Reset loaded flags so data reloads fresh when switching tabs
+  if (tab === 'payrolls') finState.payrolls = null;
+  if (tab === 'subscriptions') finState.subscriptions = null;
+  if (tab === 'spends') finState.spends = null;
+  if (tab === 'resumes') finState.resumeRequests = null;
+  renderAdmin();
+};
+
+/* ─── SUBSCRIPTIONS SUB-TAB ─── */
+async function loadFinSubscriptions(){
+  try{
+    const r = await rpc('fn_a_finance_subscriptions', {});
+    finState.subscriptions = (r && r.ok) ? r.subscriptions : [];
+  }catch(e){ finState.subscriptions = []; }
+}
+
+function finSubscriptionsView(){
+  if (finState.subscriptions === null){
+    loadFinSubscriptions().then(function(){ renderAdmin(); });
+    return '<div class="muted center" style="padding:40px 0">Loading subscriptions...</div>';
+  }
+  const subs = finState.subscriptions || [];
+  const active = subs.filter(function(s){ return s.active; });
+  const inactive = subs.filter(function(s){ return !s.active; });
+
+  const rowFor = function(s){
+    const cur = s.currency === 'USD' ? '$' : '₹';
+    const urgClass = s.days_until <= 3 ? 'urgent' : (s.days_until <= 10 ? 'warn' : 'safe');
+    const urgLabel = s.days_until <= 3 ? 'URGENT' : (s.days_until <= 10 ? 'SOON' : 'ON TRACK');
+    const badgeStyle = urgClass === 'urgent'
+      ? 'background:var(--red-bg);color:var(--red)'
+      : urgClass === 'warn'
+        ? 'background:var(--amber-bg);color:var(--amber)'
+        : 'background:var(--green-bg);color:var(--green)';
+    return '<tr' + (!s.active ? ' style="opacity:.5"' : '') + '>' +
+      '<td><b>' + esc(s.client_name) + '</b><div class="muted" style="font-size:11px">' + esc(s.client_code) + '</div></td>' +
+      '<td class="mono">' + cur + Number(s.amount).toLocaleString() + '<div class="muted" style="font-size:10px">' + s.currency + '/mo</div></td>' +
+      '<td class="mono">' + esc(s.start_date) + '</td>' +
+      '<td class="mono">' + esc(s.next_due) + '</td>' +
+      '<td><span class="tag" style="' + badgeStyle + ';font-size:10px">' + urgLabel + ' · ' + s.days_until + 'd</span></td>' +
+      '<td class="mono">₹' + Math.round(Number(s.total_paid || 0)).toLocaleString('en-IN') + '</td>' +
+    '</tr>';
+  };
+
+  const activeRows = active.map(rowFor).join('');
+  const inactiveRows = inactive.map(rowFor).join('');
+  const totalMonthlyIn = active.reduce(function(sum, s){
+    return sum + (s.currency === 'USD' ? Number(s.amount) * 88 : Number(s.amount));
+  }, 0);
+
+  return '<h3 style="font-size:16px;margin-bottom:14px">Client subscriptions</h3>' +
+    '<div class="row c3" style="margin-bottom:18px">' +
+      '<div class="stat green"><div class="n">' + active.length + '</div><div class="l">Active subscriptions</div></div>' +
+      '<div class="stat blue"><div class="n">₹' + Math.round(totalMonthlyIn).toLocaleString('en-IN') + '</div><div class="l">Total monthly recurring (INR)</div></div>' +
+      '<div class="stat red"><div class="n">' + inactive.length + '</div><div class="l">Cancelled/deactivated</div></div>' +
+    '</div>' +
+    (active.length > 0
+      ? '<div class="card"><table><tr><th>Client</th><th>Amount</th><th>Started</th><th>Next due</th><th>Status</th><th>Total paid (INR)</th></tr>' + activeRows + '</table></div>'
+      : '<div class="card"><p class="muted center" style="padding:20px">No active subscriptions yet.</p></div>') +
+    (inactiveRows
+      ? '<div style="margin-top:16px"><h4 style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Inactive</h4><div class="card"><table><tr><th>Client</th><th>Amount</th><th>Started</th><th>Next due</th><th>Status</th><th>Total paid</th></tr>' + inactiveRows + '</table></div></div>'
+      : '');
+}
+
+/* ─── PAYROLLS SUB-TAB ─── */
+async function loadFinPayrolls(){
+  try{
+    const r = await rpc('fn_a_finance_payrolls', {});
+    finState.payrolls = (r && r.ok) ? r.payrolls : [];
+  }catch(e){ finState.payrolls = []; }
+}
+
+function finPayrollsView(){
+  if (finState.payrolls === null){
+    loadFinPayrolls().then(function(){ renderAdmin(); });
+    return '<div class="muted center" style="padding:40px 0">Loading payrolls...</div>';
+  }
+  const rolls = finState.payrolls || [];
+  const active = rolls.filter(function(p){ return p.active; });
+
+  const rowFor = function(p){
+    const cur = p.currency === 'USD' ? '$' : '₹';
+    const urgClass = p.days_until <= 3 ? 'urgent' : (p.days_until <= 10 ? 'warn' : 'safe');
+    const urgLabel = p.days_until <= 3 ? 'URGENT' : (p.days_until <= 10 ? 'SOON' : 'ON TRACK');
+    const badgeStyle = urgClass === 'urgent'
+      ? 'background:var(--red-bg);color:var(--red)'
+      : urgClass === 'warn'
+        ? 'background:var(--amber-bg);color:var(--amber)'
+        : 'background:var(--green-bg);color:var(--green)';
+    return '<tr' + (!p.active ? ' style="opacity:.5"' : '') + '>' +
+      '<td><b>' + esc(p.name) + '</b><div class="muted" style="font-size:11px">' + esc(p.code) + '</div></td>' +
+      '<td><span class="tag" style="font-size:10px">' + esc(p.member_type) + '</span></td>' +
+      '<td class="mono">' + cur + Number(p.amount).toLocaleString() + '<div class="muted" style="font-size:10px">day ' + p.cycle_day + ' of month</div></td>' +
+      '<td class="mono">' + esc(p.next_due) + '</td>' +
+      '<td><span class="tag" style="' + badgeStyle + ';font-size:10px">' + urgLabel + ' · ' + p.days_until + 'd</span></td>' +
+      '<td class="mono">₹' + Math.round(Number(p.total_paid || 0)).toLocaleString('en-IN') + '</td>' +
+    '</tr>';
+  };
+
+  const rows = rolls.map(rowFor).join('');
+  const totalMonthlyOut = active.reduce(function(sum, p){
+    return sum + (p.currency === 'USD' ? Number(p.amount) * 88 : Number(p.amount));
+  }, 0);
+
+  return '<h3 style="font-size:16px;margin-bottom:14px">Team payrolls</h3>' +
+    '<div class="row c3" style="margin-bottom:18px">' +
+      '<div class="stat blue"><div class="n">' + active.length + '</div><div class="l">Active on payroll</div></div>' +
+      '<div class="stat red"><div class="n">₹' + Math.round(totalMonthlyOut).toLocaleString('en-IN') + '</div><div class="l">Total monthly outflow (INR)</div></div>' +
+      '<div class="stat green"><div class="n">' + (rolls.filter(function(p){ return p.days_until <= 3; }).length) + '</div><div class="l">Due in next 3 days</div></div>' +
+    '</div>' +
+    (rows
+      ? '<div class="card"><table><tr><th>Team member</th><th>Role</th><th>Amount</th><th>Next due</th><th>Status</th><th>Total paid (INR)</th></tr>' + rows + '</table></div>'
+      : '<div class="card"><p class="muted center" style="padding:20px">No team members on payroll yet.</p></div>');
+}
+
+/* ─── SPENDS SUB-TAB ─── */
+async function loadFinSpends(){
+  try{
+    const r = await rpc('fn_a_finance_spends', {});
+    finState.spends = (r && r.ok) ? r.spends : [];
+  }catch(e){ finState.spends = []; }
+}
+
+function finSpendsView(){
+  if (finState.spends === null){
+    loadFinSpends().then(function(){ renderAdmin(); });
+    return '<div class="muted center" style="padding:40px 0">Loading spends...</div>';
+  }
+  const spends = finState.spends || [];
+
+  const rows = spends.map(function(sp){
+    const cur = sp.currency === 'USD' ? '$' : '₹';
+    return '<tr>' +
+      '<td class="mono">' + esc(sp.txn_date) + '</td>' +
+      '<td><b>' + esc(sp.description || '(no description)') + '</b><div class="muted" style="font-size:11px">' + esc(sp.related_party || '') + '</div></td>' +
+      '<td><span class="tag" style="font-size:10px">' + esc(sp.category) + '</span></td>' +
+      '<td class="mono">' + cur + Number(sp.amount).toFixed(2) + (sp.currency === 'USD' ? '<div class="muted" style="font-size:10px">₹' + Math.round(Number(sp.amount_inr)).toLocaleString('en-IN') + ' @ ₹' + Number(sp.fx_rate).toFixed(2) + '</div>' : '') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // Categorize by category
+  const byCategory = {};
+  spends.forEach(function(sp){
+    byCategory[sp.category] = (byCategory[sp.category] || 0) + Number(sp.amount_inr || 0);
+  });
+  const catRows = Object.keys(byCategory).sort(function(a,b){ return byCategory[b] - byCategory[a]; }).map(function(cat){
+    return '<div style="display:flex;justify-content:space-between;padding:8px 12px;background:#f9fcfe;border-radius:6px;margin-bottom:4px;font-size:13px">' +
+      '<span>' + esc(cat) + '</span>' +
+      '<span class="mono" style="font-weight:600">₹' + Math.round(byCategory[cat]).toLocaleString('en-IN') + '</span>' +
+    '</div>';
+  }).join('');
+
+  const totalInr = Object.values(byCategory).reduce(function(a,b){ return a+b; }, 0);
+
+  return '<h3 style="font-size:16px;margin-bottom:14px">Business spends (non-salary)</h3>' +
+    '<p class="muted" style="font-size:13px;margin-bottom:16px">All operational expenses like hosting, email, domain, tools. Salaries appear under Payrolls.</p>' +
+    '<div class="row c2" style="margin-bottom:18px">' +
+      '<div class="stat red"><div class="n">₹' + Math.round(totalInr).toLocaleString('en-IN') + '</div><div class="l">Total spend (this month, INR)</div></div>' +
+      '<div class="stat blue"><div class="n">' + spends.length + '</div><div class="l">Number of expenses</div></div>' +
+    '</div>' +
+    (catRows
+      ? '<div class="card" style="margin-bottom:14px"><h4 style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">By category</h4>' + catRows + '</div>'
+      : '') +
+    (rows
+      ? '<div class="card"><table><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr>' + rows + '</table></div>'
+      : '<div class="card"><p class="muted center" style="padding:20px">No spends this month.</p></div>');
+}
+
+/* ─── RESUME REQUESTS SUB-TAB ─── */
+async function loadFinResumeRequests(){
+  try{
+    const r = await rpc('fn_a_list_resume_requests', {});
+    finState.resumeRequests = (r && r.ok) ? r.requests : [];
+  }catch(e){ finState.resumeRequests = []; }
+}
+
+function finResumeRequestsView(){
+  if (finState.resumeRequests === null){
+    loadFinResumeRequests().then(function(){ renderAdmin(); });
+    return '<div class="muted center" style="padding:40px 0">Loading resume requests...</div>';
+  }
+  const reqs = finState.resumeRequests || [];
+  const unclaimed = reqs.filter(function(r){ return r.status === 'unclaimed'; });
+  const claimed = reqs.filter(function(r){ return r.status === 'claimed'; });
+  const completed = reqs.filter(function(r){ return r.status === 'completed'; });
+
+  const requestCard = function(r){
+    const cur = r.currency === 'USD' ? '$' : '₹';
+    const badges = {
+      'unclaimed': '<span class="tag" style="background:var(--amber-bg);color:var(--amber);font-size:10px">UNCLAIMED</span>',
+      'claimed': '<span class="tag" style="background:var(--blue-bg);color:var(--blue);font-size:10px">CLAIMED by ' + esc(r.claimed_by_name || r.claimed_by) + '</span>',
+      'completed': '<span class="tag" style="background:var(--green-bg);color:var(--green);font-size:10px">✓ COMPLETED by ' + esc(r.claimed_by_name || r.claimed_by) + '</span>',
+      'cancelled': '<span class="tag" style="background:var(--red-bg);color:var(--red);font-size:10px">CANCELLED</span>'
+    };
+    const isMine = r.claimed_by === session.code;
+    let actions = '';
+    if (r.status === 'unclaimed'){
+      actions = '<button class="btn sm blue" onclick="finClaimResume(' + r.id + ')">Claim this</button>';
+    } else if (r.status === 'claimed' && isMine){
+      actions = '<button class="btn sm green" onclick="finCompleteResume(' + r.id + ')">Mark completed → log payment</button>';
+    }
+
+    return '<div style="background:#fff;border:0.5px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:10px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">' +
+        '<div style="flex:1;min-width:220px">' +
+          '<div style="font-weight:600;color:var(--ink);margin-bottom:4px">' + esc(r.client_name) + '</div>' +
+          '<div class="muted" style="font-size:12px">' + esc(r.client_email) + '</div>' +
+          '<div class="muted" style="font-size:11px;margin-top:4px">Requested ' + new Date(r.requested_at).toLocaleString() + '</div>' +
+          (r.notes ? '<div style="font-size:12px;color:var(--text2);margin-top:6px;font-style:italic">Note: ' + esc(r.notes) + '</div>' : '') +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div style="font-size:20px;font-weight:700;color:var(--ink)">' + cur + Number(r.amount).toFixed(2) + '</div>' +
+          '<div style="margin-top:6px">' + (badges[r.status] || '') + '</div>' +
+          (actions ? '<div style="margin-top:10px">' + actions + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  };
+
+  const totalEarned = completed.reduce(function(sum, r){
+    return sum + (r.currency === 'USD' ? Number(r.amount) * 88 : Number(r.amount));
+  }, 0);
+
+  return '<h3 style="font-size:16px;margin-bottom:14px">Resume rewrite requests</h3>' +
+    '<p class="muted" style="font-size:13px;margin-bottom:16px">Admins can claim requests. When claimed and completed, the amount logs to Transactions with your name attached.</p>' +
+    '<div class="row c3" style="margin-bottom:18px">' +
+      '<div class="stat amber"><div class="n">' + unclaimed.length + '</div><div class="l">Unclaimed</div></div>' +
+      '<div class="stat blue"><div class="n">' + claimed.length + '</div><div class="l">In progress</div></div>' +
+      '<div class="stat green"><div class="n">₹' + Math.round(totalEarned).toLocaleString('en-IN') + '</div><div class="l">Total completed (INR)</div></div>' +
+    '</div>' +
+    '<button class="btn blue" style="margin-bottom:14px" onclick="finShowAddResumeRequest()">➕ Manually add resume request</button>' +
+    (finState.showAddResume ? finAddResumeRequestForm() : '') +
+    (unclaimed.length > 0 ? '<h4 style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 10px">Unclaimed (' + unclaimed.length + ')</h4>' + unclaimed.map(requestCard).join('') : '') +
+    (claimed.length > 0 ? '<h4 style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 10px">In progress (' + claimed.length + ')</h4>' + claimed.map(requestCard).join('') : '') +
+    (completed.length > 0 ? '<h4 style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 10px">Completed (' + completed.length + ')</h4>' + completed.map(requestCard).join('') : '') +
+    (reqs.length === 0 ? '<div class="card"><p class="muted center" style="padding:24px">No resume requests yet.</p></div>' : '');
+}
+
+function finAddResumeRequestForm(){
+  return '<div style="background:#f9fcfe;border:0.5px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px">' +
+    '<h4 style="font-size:14px;margin-bottom:12px">Add resume request</h4>' +
+    '<div class="row c2" style="margin-bottom:8px">' +
+      '<div class="field"><label>Client name *</label><input id="rr-name" placeholder="Full name"></div>' +
+      '<div class="field"><label>Client email *</label><input id="rr-email" type="email" placeholder="client@example.com"></div>' +
+    '</div>' +
+    '<div class="row c2">' +
+      '<div class="field"><label>Amount</label><input id="rr-amount" type="number" step="0.01" value="100"></div>' +
+      '<div class="field"><label>Currency</label>' +
+        '<select id="rr-currency"><option value="USD">USD ($)</option><option value="INR">INR (₹)</option></select>' +
+      '</div>' +
+    '</div>' +
+    '<div class="field"><label>Notes (optional)</label><input id="rr-notes" placeholder="e.g. urgent, wants senior format"></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
+      '<button class="btn" onclick="finCancelAddResumeRequest()">Cancel</button>' +
+      '<button class="btn blue" onclick="finSaveResumeRequest()">Add request</button>' +
+    '</div>' +
+  '</div>';
+}
+
+window.finShowAddResumeRequest = function(){
+  finState.showAddResume = true;
+  renderAdmin();
+};
+
+window.finCancelAddResumeRequest = function(){
+  finState.showAddResume = false;
+  renderAdmin();
+};
+
+window.finSaveResumeRequest = async function(){
+  const getV = id => { const el=document.getElementById(id); return el ? el.value.trim() : ''; };
+  const name = getV('rr-name');
+  const email = getV('rr-email').toLowerCase();
+  const amount = parseFloat(getV('rr-amount')) || 100;
+  const currency = getV('rr-currency');
+  const notes = getV('rr-notes');
+  if(!name || !email){ alert('Name and email required'); return; }
+  try{
+    const r = await rpc('fn_a_create_resume_request', {
+      p_client_name: name, p_client_email: email,
+      p_amount: amount, p_currency: currency, p_notes: notes
+    });
+    if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
+    finState.showAddResume = false;
+    finState.resumeRequests = null;
+    renderAdmin();
+  }catch(e){ alert('Failed: ' + (e.message || e)); }
+};
+
+window.finClaimResume = async function(id){
+  try{
+    const r = await rpc('fn_a_claim_resume_request', { p_id: id });
+    if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
+    finState.resumeRequests = null;
+    renderAdmin();
+  }catch(e){ alert('Failed: ' + (e.message || e)); }
+};
+
+window.finCompleteResume = async function(id){
+  const rate = prompt('Exchange rate at completion (INR per 1 USD)? (Enter 1 if INR):', '88');
+  if (rate === null) return;
+  const fxRate = parseFloat(rate) || 88;
+  if(fxRate <= 0){ alert('Rate must be positive'); return; }
+  if(!confirm('Mark completed and log ' + (fxRate === 1 ? 'INR ' : '$') + ' payment to Transactions?')) return;
+  try{
+    const r = await rpc('fn_a_complete_resume_request', { p_id: id, p_fx_rate: fxRate });
+    if(!r || !r.ok){ alert('Failed: ' + ((r && r.err) || 'unknown')); return; }
+    alert('Completed! Payment logged in Transactions tab.');
+    finState.resumeRequests = null;
+    finState._loaded = false;
+    renderAdmin();
+  }catch(e){ alert('Failed: ' + (e.message || e)); }
 };
 
 /* ═══════ MANAGER ═══════ */
