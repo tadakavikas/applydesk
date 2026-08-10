@@ -2332,6 +2332,7 @@ function visibleGroups(){
 let clientThreadsCache = null;
 let threadMessagesCache = {}; // { client_code: [messages] }
 let threadsAttempted = false;
+let groupsAttempted = false;
 
 async function loadClientThreads(){
   try{
@@ -2363,8 +2364,19 @@ function renderTeamChats(){
     return `<div class="page-header"><h1 class="page-title">Chat</h1></div><div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading conversations...</h3></div>`;
   }
 
+  // Background-load groups + roster for the Team section (non-blocking)
+  if(groupsList === null && !groupsAttempted){
+    groupsAttempted = true;
+    loadGroups().then(() => renderShell()).catch(() => {});
+  }
+  if(chatPeopleCache === null && !chatPeopleAttempted){
+    loadChatPeople().then(() => renderShell()).catch(() => {});
+  }
+
   const threads = clientThreadsCache || [];
-  const selectedClientCode = viewState.selectedThreadClient || (threads.length ? threads[0].client_code : null);
+  const teamPeople = getChatablePeople().filter(p => p.role !== 'client');
+  const selectedTeamCode = viewState.selectedTeamPerson || null;
+  const selectedClientCode = selectedTeamCode ? null : (viewState.selectedThreadClient || (threads.length ? threads[0].client_code : null));
 
   // Left sidebar: list of client threads
   const threadItems = threads.map(t => {
@@ -2383,9 +2395,25 @@ function renderTeamChats(){
     </div>`;
   }).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No client threads yet.</div>`;
 
-  // Right side: selected thread
+  // Team section items (direct chats with admins, managers, recruiters)
+  const teamItems = teamPeople.map(p => {
+    const isActive = p.code === selectedTeamCode;
+    const roleClass = p.role === 'admin' ? 'warning' : p.role === 'manager' ? 'success' : '';
+    return `<div onclick="selectTeamChat('${esc(p.code)}')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;cursor:pointer;margin-bottom:4px;background:${isActive ? 'var(--bg-coral-light)' : 'transparent'};transition:background .15s ease">
+      <div class="avatar sm ${roleClass}">${esc(initials(p.name))}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">${esc(p.role)}</div>
+      </div>
+    </div>`;
+  }).join('') || `<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">No team members yet.</div>`;
+
+  // Right side: selected team chat or client thread
   let threadHtml;
-  if(!selectedClientCode){
+  if(selectedTeamCode){
+    const person = teamPeople.find(p => p.code === selectedTeamCode);
+    threadHtml = person ? renderDirectChat(person) : `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a conversation</h3></div>`;
+  } else if(!selectedClientCode){
     threadHtml = `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a client thread</h3><p class="empty-text">Pick a client from the left to view the conversation.</p></div>`;
   } else {
     threadHtml = renderClientThread(selectedClientCode);
@@ -2399,6 +2427,8 @@ function renderTeamChats(){
     <div class="split-list" style="padding:12px">
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:4px 8px 8px 8px">Client threads (${threads.length})</div>
       ${threadItems}
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:16px 8px 8px 8px">Team (${teamPeople.length})</div>
+      ${teamItems}
     </div>
     <div class="split-detail">${threadHtml}</div>
   </div>`;
@@ -2447,8 +2477,16 @@ function renderClientThread(clientCode){
 
 window.selectThread = function(clientCode){
   viewState.selectedThreadClient = clientCode;
+  viewState.selectedTeamPerson = null;
   // Force reload of messages for the newly selected thread
   delete threadMessagesCache[clientCode];
+  renderShell();
+};
+
+window.selectTeamChat = function(code){
+  viewState.selectedTeamPerson = code;
+  viewState.selectedThreadClient = null;
+  viewState.groupMessages = null;
   renderShell();
 };
 
@@ -2456,6 +2494,10 @@ window.refreshThreads = function(){
   clientThreadsCache = null;
   threadMessagesCache = {};
   threadsAttempted = false;
+  groupsList = null;
+  groupsAttempted = false;
+  chatPeopleCache = null;
+  chatPeopleAttempted = false;
   renderShell();
 };
 
@@ -2519,6 +2561,7 @@ window.startDirectChat = async function(targetCode, targetName){
     const r = await rpc('fn_a_start_direct_chat', { p_target_code: targetCode });
     if(r && r.ok){
       groupsList = null;
+      groupsAttempted = false;
       viewState.selectedChatKey = 'group:' + r.group_id;
       viewState.groupMessages = null;
       toast('Chat started with ' + targetName, 'success');
@@ -2570,7 +2613,7 @@ window.openCreateGroup = function(){
     if(!name){ toast('Group name required', 'error'); return; }
     try{
       const r = await rpc('fn_a_create_group', { p_name: name, p_description: desc, p_broadcast: broadcast, p_member_codes: memberCodes, p_include_clients: memberCodes.some(c => (S.clients || []).find(x => x.code === c)) });
-      if(r && r.ok){ groupsList = null; toast('Group created', 'success'); cleanup(); renderShell(); }
+      if(r && r.ok){ groupsList = null; groupsAttempted = false; toast('Group created', 'success'); cleanup(); renderShell(); }
       else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
     }catch(e){ toast('Failed: ' + e.message, 'error'); }
   };
