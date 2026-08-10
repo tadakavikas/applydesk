@@ -3418,12 +3418,12 @@ function renderApplicationsPage(){
           const latestStatus = Array.isArray(a.status_json) && a.status_json.length ? a.status_json[a.status_json.length - 1] : null;
           const statusLabel = latestStatus ? latestStatus.status : 'Applied';
           const statusClass = statusLabel.toLowerCase().includes('reject') ? 'danger' : statusLabel.toLowerCase().includes('interview') || statusLabel.toLowerCase().includes('call') ? 'warning' : statusLabel.toLowerCase().includes('offer') ? 'success' : 'teal';
-          const recruiter = (S.recruiters || []).find(r => r.code === a.recruiter_code);
+          const recruiterDisplay = a.recruiter_name || (S.recruiters || []).find(r => r.code === a.recruiter_code)?.name || '';
           const timeStr = a.applied_at ? new Date(a.applied_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
           return `<div onclick="openAppDetail(${a.id})" style="display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:14px 16px;border-bottom:${i < clientApps.length - 1 ? '1px solid var(--bg-primary)' : 'none'};cursor:pointer;transition:background .15s ease">
             <div style="min-width:0">
               <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.job_title || 'Untitled')}</div>
-              <div style="font-size:13px;color:var(--text-body)">${esc(a.company || 'Unknown company')}${a.source ? ' · ' + esc(a.source) : ''}${recruiter ? ' · via ' + esc(recruiter.name) : ''}</div>
+              <div style="font-size:13px;color:var(--text-body)">${esc(a.company || 'Unknown company')}${a.source ? ' · ' + esc(a.source) : ''}${recruiterDisplay ? ' · via ' + esc(recruiterDisplay) : ''}</div>
             </div>
             <div style="font-size:11px;color:var(--text-muted);text-align:right;white-space:nowrap">${esc(timeStr)}</div>
             <span class="tag ${statusClass}">${esc(statusLabel)}</span>
