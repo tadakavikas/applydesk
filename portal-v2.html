@@ -1736,10 +1736,10 @@ function renderAdminsPage(){
         ${a.phone ? '📱 ' + esc(a.phone) : ''}${a.phone && a.joined_date ? ' · ' : ''}${a.joined_date ? '📅 ' + fmt(a.joined_date) : ''}
       </div>
       <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
-        <button class="btn ghost sm" onclick="openEditAdmin('${esc(a.code)}')">✏️ Edit</button>
-        ${a.email && !isMe && a.active ? `<button class="btn ghost sm" onclick="sendGenericInvite('admin','${esc(a.code)}','${esc(a.email)}')">📧 Invite</button>` : ''}
-        ${!isMe ? (a.active ? `<button class="btn ghost sm" onclick="deactivateAdmin('${esc(a.code)}','${esc(a.name)}')" style="color:var(--color-danger);border-color:#F5C8D3">Deactivate</button>` : `<button class="btn ghost sm" onclick="reactivateAdmin('${esc(a.code)}')" style="color:var(--color-success)">Reactivate</button>`) : ''}
-        ${!isMe ? `<button class="btn ghost sm" onclick="deleteMember('admin','${esc(a.code)}','${esc(a.name)}')" style="color:#fff;background:var(--color-danger);border-color:var(--color-danger)">🗑️ Delete</button>` : ''}
+        <button class="btn ghost sm" onclick="openEditAdmin('${esc(a.code)}')" title="Edit">✏️</button>
+        ${a.email && !isMe && a.active ? `<button class="btn ghost sm" onclick="sendGenericInvite('admin','${esc(a.code)}','${esc(a.email)}')" title="Invite">📧</button>` : ''}
+        ${!isMe ? (a.active ? `<button class="btn ghost sm" onclick="deactivateAdmin('${esc(a.code)}','${esc(a.name)}')" title="Deactivate" style="color:var(--color-danger)">✕</button>` : `<button class="btn ghost sm" onclick="reactivateAdmin('${esc(a.code)}')" title="Reactivate" style="color:var(--color-success)">↺</button>`) : ''}
+        ${!isMe ? `<button class="btn ghost sm" onclick="deleteMember('admin','${esc(a.code)}','${esc(a.name)}')" title="Delete" style="color:#fff;background:var(--color-danger);border-color:var(--color-danger)">🗑</button>` : ''}
       </div>
     </div>`;
   }).join('') || '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👑</div><h3 class="empty-title">No admins yet</h3></div>';
@@ -2185,9 +2185,9 @@ function renderTeamChats(){
     loadGroups().then(() => renderShell());
     return `<div class="page-header"><h1 class="page-title">Chat</h1></div><div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading conversations...</h3></div>`;
   }
-  // Auto-load admins list so we can show admins in people list
-  if(session.role === 'admin' && adminsList === null){
-    loadAdmins().then(() => renderShell());
+  // Load full team roster (all roles do this - not just admin)
+  if(chatPeopleCache === null){
+    loadChatPeople().then(() => renderShell());
   }
 
   const people = getChatablePeople();
@@ -2590,7 +2590,7 @@ function renderRecruiterDashboard(){
         </div>
         <div class="progress" style="margin-bottom:8px"><div class="progress-fill" style="width:${Math.floor(Math.random() * 60 + 20)}%"></div></div>
         <div style="display:flex;gap:6px">
-          <button class="btn primary sm" style="flex:1" onclick="setView('log')">Dispatch app</button>
+          <button class="btn primary sm" style="flex:1" onclick="setView('log')" title="Log a new application you have submitted to a company for this client">Dispatch app</button>
           <button class="btn ghost sm" onclick="setView('chats')">Chat</button>
         </div>
       </div>`).join('')}
@@ -2671,7 +2671,7 @@ function renderClientDashboard(){
           <svg class="ring-svg" width="${ringSize}" height="${ringSize}"><circle class="ring-track" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" stroke-width="12"/><circle class="ring-progress" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" stroke-width="12" style="stroke:var(--color-primary);stroke-dasharray:${ringC};stroke-dashoffset:${ringOff}"/></svg>
           <div class="ring-center"><div class="ring-value" style="font-size:32px">${pct}%</div><div class="ring-label">COMPLETE</div></div>
         </div>
-        <div style="flex:1"><h2 style="font-family:var(--font-display);font-weight:800;color:var(--text-heading);margin-bottom:8px;font-size:22px">${pct === 100 ? 'You are all set!' : 'Unlock max deliverability'}</h2><p style="color:var(--text-body);font-size:14px">${pct === 100 ? 'Your profile is complete.' : 'Fill in remaining fields to unlock better matches.'}</p></div>
+        <div style="flex:1"><h2 style="font-family:var(--font-display);font-weight:800;color:var(--text-heading);margin-bottom:8px;font-size:22px">${pct === 100 ? 'You are all set!' : 'Unlock max deliverability'}</h2><p style="color:var(--text-body);font-size:14px;margin-bottom:12px">${pct === 100 ? 'Your profile is complete.' : 'Fill in remaining fields to unlock better matches.'}</p><button class="btn primary sm" onclick="openEditOwnProfile()">✏️ Edit my profile</button></div>
       </div>
     </div>
     <div class="card">
@@ -2682,13 +2682,263 @@ function renderClientDashboard(){
       ${svgBarChart(sampleSparkline(7, 15, 2), { width: 400, height: 130, labels: ['M','T','W','T','F','S','S'], colors: ['var(--color-primary)','var(--color-primary)','var(--color-danger)','var(--color-primary)','var(--color-primary)','var(--bg-secondary)','var(--bg-secondary)'] })}
     </div>
   </div>
-  <div class="card"><div class="card-title">Your subscription</div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : ''}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}<dt>Status</dt><dd><span class="tag success">Active</span></dd></dl></div>`;
+  <div class="card" style="margin-bottom:20px"><div class="card-title">Your subscription <button class="btn ghost sm" onclick="openPayModal()">💳 Renew / pay</button></div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : ''}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}<dt>Status</dt><dd><span class="tag success">Active</span></dd></dl></div>
+  <div class="card" id="client-apps-section">
+    <div class="card-title">Application history <button class="btn ghost sm" onclick="refreshClientApps()">↻ Refresh</button></div>
+    <div id="client-apps-list">${renderClientApplicationsList()}</div>
+  </div>`;
 }
+
+/* ═══════ CLIENT SELF EDIT ═══════ */
+window.openEditOwnProfile = function(){
+  const me = (S.clients || []).find(c => c.code === session.code) || {};
+  openEditModal('Edit my profile', [
+    { id:'name', label:'Full name', value:me.name },
+    { id:'phone', label:'Phone', type:'tel', value:me.phone },
+    { id:'target_role', label:'Target role', value:me.target_role },
+    { id:'years_experience', label:'Years of experience', type:'number', value:me.years_experience },
+    { id:'sponsorship', label:'Visa sponsorship', type:'select', value:me.sponsorship_status || 'US Citizen', options:[
+      {value:'US Citizen',label:'US Citizen'},{value:'Green Card',label:'Green Card'},{value:'H1B',label:'H1B'},{value:'OPT',label:'OPT'},{value:'H4 EAD',label:'H4 EAD'},{value:'Needs Sponsorship',label:'Needs Sponsorship'}
+    ] },
+    { id:'base_resume_url', label:'Resume URL (Google Drive/Dropbox)', value:me.base_resume_url }
+  ], async (v) => {
+    try{
+      const res = await rpc('fn_a_edit_own_client', {
+        p_name: v.name || null, p_phone: v.phone || null, p_target_role: v.target_role || null,
+        p_years_experience: v.years_experience ? parseFloat(v.years_experience) : null,
+        p_sponsorship: v.sponsorship || null, p_base_resume_url: v.base_resume_url || null
+      });
+      if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
+      await refresh();
+      toast('Profile updated', 'success');
+      renderShell();
+      return true;
+    }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
+  });
+};
+
+/* ═══════ CLIENT APPLICATIONS ═══════ */
+let clientAppsCache = null;
+function renderClientApplicationsList(){
+  if(clientAppsCache === null){
+    rpc('fn_a_list_client_applications', {}).then(r => {
+      clientAppsCache = (r && r.ok) ? (r.applications || []) : [];
+      const container = document.getElementById('client-apps-list');
+      if(container) container.innerHTML = renderClientApplicationsList();
+    }).catch(() => { clientAppsCache = []; });
+    return `<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">⏳ Loading applications...</div>`;
+  }
+  if(!clientAppsCache.length){
+    return `<div class="empty-state" style="padding:24px"><div class="empty-icon">📄</div><h3 class="empty-title">No applications yet</h3><p class="empty-text">Your recruiter will start logging applications soon.</p></div>`;
+  }
+  return clientAppsCache.map(a => {
+    const latestStatus = Array.isArray(a.status_json) && a.status_json.length ? a.status_json[a.status_json.length - 1] : null;
+    const statusLabel = latestStatus ? latestStatus.status : 'Applied';
+    const statusClass = statusLabel.toLowerCase().includes('reject') ? 'danger' : statusLabel.toLowerCase().includes('interview') || statusLabel.toLowerCase().includes('call') ? 'warning' : statusLabel.toLowerCase().includes('offer') ? 'success' : 'teal';
+    return `<div style="padding:14px 0;border-bottom:1px solid var(--bg-secondary);cursor:pointer" onclick="openAppDetail(${a.id})">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px">
+        <div style="flex:1;min-width:0"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:15px">${esc(a.job_title || 'Untitled role')}</div><div style="font-size:13px;color:var(--text-body)">${esc(a.company || 'Unknown company')}</div></div>
+        <span class="tag ${statusClass}">${esc(statusLabel)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+        <span>Applied ${timeAgo(a.applied_at)}</span>
+        <span>${Array.isArray(a.status_json) ? a.status_json.length : 0} update${Array.isArray(a.status_json) && a.status_json.length !== 1 ? 's' : ''}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.refreshClientApps = function(){
+  clientAppsCache = null;
+  const container = document.getElementById('client-apps-list');
+  if(container) container.innerHTML = renderClientApplicationsList();
+};
+
+/* ═══════ APPLICATION DETAIL MODAL WITH STATUS TIMELINE ═══════ */
+window.openAppDetail = async function(recordId){
+  const apps = clientAppsCache || [];
+  const app = apps.find(a => a.id === recordId);
+  if(!app){ toast('Application not found', 'error'); return; }
+
+  const statuses = Array.isArray(app.status_json) ? app.status_json : [];
+  const statusRows = statuses.length ? statuses.map(s => `<div style="padding:10px 12px;border-left:3px solid var(--color-primary);margin-bottom:8px;background:var(--bg-primary);border-radius:0 8px 8px 0">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+      <b style="color:var(--text-heading);font-size:14px">${esc(s.status)}</b>
+      <span style="font-size:11px;color:var(--text-muted)">${timeAgo(s.at)}</span>
+    </div>
+    <div style="font-size:12px;color:var(--text-body);margin-bottom:2px">${esc(s.by || 'Unknown')} · <span class="tag muted" style="font-size:10px">${esc(s.role || '')}</span></div>
+    ${s.note ? `<div style="font-size:13px;color:var(--text-body);margin-top:4px">${esc(s.note)}</div>` : ''}
+    ${s.screenshot_url ? `<a href="${esc(s.screenshot_url)}" target="_blank" style="font-size:12px;color:var(--color-primary);display:inline-block;margin-top:4px">📎 View screenshot</a>` : ''}
+  </div>`).join('') : '<div style="color:var(--text-muted);font-size:13px">No status updates yet.</div>';
+
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal-inner" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+    <h3>${esc(app.job_title || 'Application')}</h3>
+    <div style="color:var(--text-body);font-size:14px;margin-bottom:16px"><b>${esc(app.company || 'Unknown company')}</b>${app.source ? ' · ' + esc(app.source) : ''}${app.applied_at ? ' · Applied ' + fmt(app.applied_at) : ''}</div>
+    ${app.job_url ? `<div style="margin-bottom:12px"><a href="${esc(app.job_url)}" target="_blank" class="btn ghost sm">🔗 View job posting</a></div>` : ''}
+    ${app.job_description ? `<details style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:600;color:var(--text-heading)">Job description</summary><div style="font-size:13px;color:var(--text-body);margin-top:8px;white-space:pre-wrap;max-height:200px;overflow-y:auto">${esc(app.job_description)}</div></details>` : ''}
+    ${app.screenshot_url ? `<div style="margin-bottom:16px"><a href="${esc(app.screenshot_url)}" target="_blank" class="btn ghost sm">📎 View original screenshot</a></div>` : ''}
+    <div style="border-top:1px solid var(--bg-secondary);padding-top:16px;margin-bottom:12px">
+      <h4 style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Status Timeline</h4>
+      <div style="max-height:280px;overflow-y:auto">${statusRows}</div>
+    </div>
+    <div style="border-top:1px solid var(--bg-secondary);padding-top:16px">
+      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Recruiter called me</option><option>Vendor emailed</option><option>Phone screen scheduled</option><option>Technical interview scheduled</option><option>Onsite scheduled</option><option>Rejected</option><option>Offer received</option><option>Accepted offer</option><option>Withdrew</option><option>Follow-up sent</option></select></div>
+      <div class="field"><textarea id="apd-note" placeholder="Notes (e.g. 'Recruiter said next round is Tuesday at 3pm')" rows="2"></textarea></div>
+      <div class="field"><input id="apd-screenshot" type="url" placeholder="Screenshot URL (paste Google Photos/Imgur link, optional)"></div>
+    </div>
+    <div class="modal-actions"><button class="btn ghost" id="apd-close">Close</button><button class="btn primary" id="apd-add">Add status update</button></div>
+  </div>`;
+  document.body.appendChild(back);
+  const cleanup = () => back.remove();
+  back.querySelector('#apd-close').onclick = cleanup;
+  back.onclick = e => { if(e.target === back) cleanup(); };
+  back.querySelector('#apd-add').onclick = async () => {
+    const status = document.getElementById('apd-status').value;
+    const note = document.getElementById('apd-note').value;
+    const screenshotUrl = document.getElementById('apd-screenshot').value;
+    if(!status){ toast('Choose a status first', 'error'); return; }
+    try{
+      const r = await rpc('fn_a_add_application_status', { p_record_id: recordId, p_status: status, p_note: note || null, p_screenshot_url: screenshotUrl || null });
+      if(r && r.ok){
+        clientAppsCache = null;
+        toast('Status added', 'success');
+        cleanup();
+        renderShell();
+      } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+    }catch(e){ toast('Failed: ' + e.message, 'error'); }
+  };
+};
+
+/* ═══════ PAY MODAL - WhatsApp/email link for subscription renewal ═══════ */
+window.openPayModal = function(){
+  const me = (S.clients || []).find(c => c.code === session.code) || {};
+  const amount = me.subscription_amount ? money(me.subscription_amount, me.subscription_currency) : 'your subscription';
+  const message = encodeURIComponent(`Hi ApplyDesk team, I want to renew my subscription (${amount}). Please share payment details.`);
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal-inner" style="max-width:480px">
+    <h3>💳 Renew subscription</h3>
+    <p style="color:var(--text-body);font-size:14px;margin-bottom:16px">Choose your preferred way to reach us and we will send payment instructions right away.</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <a href="https://wa.me/919000000000?text=${message}" target="_blank" class="btn primary" style="text-align:center;text-decoration:none">💬 Chat on WhatsApp</a>
+      <a href="mailto:hello@getapplydesk.com?subject=Subscription%20renewal&body=${message}" class="btn secondary" style="text-align:center;text-decoration:none">📧 Email us</a>
+    </div>
+    <p style="color:var(--text-muted);font-size:12px;margin-top:16px;text-align:center">Payment methods accepted: Zelle (USD), PhonePe/UPI (INR), bank transfer.</p>
+    <div class="modal-actions"><button class="btn ghost" id="pay-close">Close</button></div>
+  </div>`;
+  document.body.appendChild(back);
+  const cleanup = () => back.remove();
+  back.querySelector('#pay-close').onclick = cleanup;
+  back.onclick = e => { if(e.target === back) cleanup(); };
+};
 
 /* Simple stubs for less-critical screens */
 function renderMyProfile(){ return `<div class="page-header"><h1 class="page-title">My Profile</h1></div><div class="card"><div class="card-title">Profile</div><dl class="detail-grid"><dt>Name</dt><dd>${esc(session.name)}</dd><dt>Role</dt><dd>${esc(roleLabel(session.role))}</dd><dt>Code</dt><dd style="font-family:monospace">${esc(session.code)}</dd>${session.email ? `<dt>Email</dt><dd>${esc(session.email)}</dd>` : ''}</dl></div>`; }
 function renderMyClients(){ const cs = S.clients || []; return `<div class="page-header"><h1 class="page-title">My Clients</h1></div>${cs.length ? '<div class="card-grid">' + cs.map(c => `<div class="item-card"><div class="avatar coral">${esc(initials(c.name))}</div><h4 style="margin-top:12px">${esc(c.name)}</h4><p style="font-size:12px;color:var(--text-muted)">${esc(c.target_role || 'No target role')}</p></div>`).join('') + '</div>' : '<div class="empty-state"><div class="empty-icon">👥</div><h3 class="empty-title">No clients yet</h3></div>'}`; }
-function renderLogApplication(){ return `<div class="page-header"><h1 class="page-title">Log Application</h1><p class="page-subtitle">Application logging UI coming in polish pass. Backend already supports it.</p></div><div class="empty-state"><div class="empty-icon">📝</div><h3 class="empty-title">Coming soon</h3></div>`; }
+function renderLogApplication(){
+  const myClients = (S.clients || []).filter(c => !c.deactivated_at);
+  const dispatchedToday = viewState.dispatchedToday || 0;
+
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div>
+      <h1 style="font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--text-heading);letter-spacing:-0.02em;text-transform:uppercase;margin:0">Dispatch Application</h1>
+      <p style="color:var(--text-body);font-size:13px;margin-top:4px">Log an application you just submitted for a client. <b>Dispatch</b> = you sent this application to the company on the client's behalf.</p>
+    </div>
+    <span class="tag coral">DISPATCHED TODAY · ${dispatchedToday}</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📝 New application submission</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="field"><label>Client *</label><select id="app-client" required><option value="">— Choose client —</option>${myClients.map(c => `<option value="${esc(c.code)}">${esc(c.name)}${c.target_role ? ' · ' + esc(c.target_role) : ''}</option>`).join('')}</select></div>
+      <div class="field"><label>Application source</label><select id="app-source"><option value="">— Choose source —</option><option>LinkedIn</option><option>Indeed</option><option>Company website</option><option>Recruiter referral</option><option>Dice</option><option>Glassdoor</option><option>ZipRecruiter</option><option>Wellfound</option><option>Other</option></select></div>
+    </div>
+    <div class="field"><label>Company *</label><input id="app-company" type="text" placeholder="e.g. Stripe, Google, Netflix" required></div>
+    <div class="field"><label>Job title *</label><input id="app-job-title" type="text" placeholder="e.g. Senior Data Engineer" required></div>
+    <div class="field"><label>Job posting URL (optional)</label><input id="app-job-url" type="url" placeholder="https://..."></div>
+    <div class="field"><label>Job description (optional, paste from posting)</label><textarea id="app-job-desc" rows="4" placeholder="Paste the JD here so you can reference it later..."></textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="field"><label>Resume used</label><select id="app-resume"><option value="Base resume">Base resume</option><option value="Tailored - technical">Tailored - technical</option><option value="Tailored - leadership">Tailored - leadership</option><option value="Tailored - other">Tailored - other</option></select></div>
+      <div class="field"><label>Screenshot URL (of confirmation email/page)</label><input id="app-screenshot" type="url" placeholder="Paste image URL (optional)"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn primary" onclick="submitApplication()">✓ Dispatch and log</button>
+      <button class="btn ghost" onclick="clearAppForm()">Clear form</button>
+    </div>
+    <p style="color:var(--text-muted);font-size:12px;margin-top:16px;line-height:1.5">
+      <b>Note:</b> "Dispatch and log" means you have already submitted the application to the company. This creates a record so admin/manager/client can track progress. If you receive a callback or interview email, come back to this record and add a status update.
+    </p>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <div class="card-title">📋 Recent dispatches</div>
+    <div id="recent-apps-list">${renderRecentApplicationsList()}</div>
+  </div>`;
+}
+
+let recentAppsCache = null;
+function renderRecentApplicationsList(){
+  if(recentAppsCache === null){
+    rpc('fn_a_list_client_applications', {}).then(r => {
+      recentAppsCache = (r && r.ok) ? (r.applications || []) : [];
+      const container = document.getElementById('recent-apps-list');
+      if(container) container.innerHTML = renderRecentApplicationsList();
+    }).catch(() => { recentAppsCache = []; });
+    return `<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">⏳ Loading...</div>`;
+  }
+  if(!recentAppsCache.length){
+    return `<div style="color:var(--text-muted);font-size:13px;padding:12px 0">No applications logged yet. Dispatch your first one above.</div>`;
+  }
+  return recentAppsCache.slice(0, 10).map(a => {
+    const latestStatus = Array.isArray(a.status_json) && a.status_json.length ? a.status_json[a.status_json.length - 1] : null;
+    const statusLabel = latestStatus ? latestStatus.status : 'Applied';
+    const client = (S.clients || []).find(c => c.code === a.client_code);
+    return `<div style="padding:12px 0;border-bottom:1px solid var(--bg-secondary);cursor:pointer;display:flex;align-items:center;gap:12px" onclick="openAppDetail(${a.id})">
+      <div class="avatar sm coral">${esc(initials(client ? client.name : ''))}</div>
+      <div style="flex:1;min-width:0"><div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px">${esc(a.job_title || 'Untitled')} · ${esc(a.company || '')}</div><div style="font-size:11px;color:var(--text-muted)">${esc(client ? client.name : a.client_code)} · Applied ${timeAgo(a.applied_at)}</div></div>
+      <span class="tag ${statusLabel.toLowerCase().includes('reject') ? 'danger' : statusLabel.toLowerCase().includes('interview') || statusLabel.toLowerCase().includes('call') ? 'warning' : statusLabel.toLowerCase().includes('offer') ? 'success' : 'teal'}">${esc(statusLabel)}</span>
+    </div>`;
+  }).join('');
+}
+
+window.submitApplication = async function(){
+  const clientCode = document.getElementById('app-client').value;
+  const company = document.getElementById('app-company').value.trim();
+  const jobTitle = document.getElementById('app-job-title').value.trim();
+  const jobUrl = document.getElementById('app-job-url').value.trim();
+  const jobDesc = document.getElementById('app-job-desc').value.trim();
+  const source = document.getElementById('app-source').value;
+  const resumeUsed = document.getElementById('app-resume').value;
+  const screenshotUrl = document.getElementById('app-screenshot').value.trim();
+
+  if(!clientCode){ toast('Choose a client first', 'error'); return; }
+  if(!company){ toast('Company name is required', 'error'); return; }
+  if(!jobTitle){ toast('Job title is required', 'error'); return; }
+
+  try{
+    const r = await rpc('fn_a_add_application', {
+      p_client_code: clientCode, p_company: company, p_job_title: jobTitle,
+      p_job_description: jobDesc || null, p_job_url: jobUrl || null,
+      p_source: source || null, p_resume_used: resumeUsed || null, p_screenshot_url: screenshotUrl || null
+    });
+    if(r && r.ok){
+      toast('Application dispatched!', 'success');
+      recentAppsCache = null;
+      viewState.dispatchedToday = (viewState.dispatchedToday || 0) + 1;
+      clearAppForm();
+      renderShell();
+    } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
+
+window.clearAppForm = function(){
+  ['app-client','app-company','app-job-title','app-job-url','app-job-desc','app-source','app-resume','app-screenshot'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = id === 'app-resume' ? 'Base resume' : '';
+  });
+};
 function renderMyApplications(){ return `<div class="page-header"><h1 class="page-title">My Applications</h1></div><div class="card"><p style="color:var(--text-body)">Application history view coming in polish pass.</p></div>`; }
 function renderMySubscription(){ const me = (S.clients || []).find(c => c.code === session.code) || {}; return `<div class="page-header"><h1 class="page-title">My Subscription</h1></div><div class="card"><div class="card-title">Details</div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : '<dt>Plan</dt><dd>Not active</dd>'}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}</dl></div>`; }
 
@@ -2886,24 +3136,47 @@ window.openAssignClients = function(recruiterCode){
 };
 
 /* ═══════ WHATSAPP-STYLE CHAT WITH PEOPLE LIST ═══════ */
+// Cache the full team roster fetched via fn_list_chat_people
+let chatPeopleCache = null;
+async function loadChatPeople(){
+  if(chatPeopleCache) return chatPeopleCache;
+  try{
+    const r = await rpc('fn_list_chat_people', {});
+    if(r && r.ok){
+      chatPeopleCache = r;
+      return r;
+    }
+  }catch(e){}
+  chatPeopleCache = { admins:[], managers:[], recruiters:[], clients:[] };
+  return chatPeopleCache;
+}
+
 function getChatablePeople(){
-  // Returns list of {code, name, role, email} the current user can chat with
-  const cs = (S.clients || []).filter(c => !c.deactivated_at);
-  const rs = (S.recruiters || []).filter(r => !r.deactivated_at);
-  const ms = (S.managers || []).filter(m => !m.deactivated_at);
-  const admins = (adminsList || []).filter(a => a.active);
+  // Prefer the full roster from fn_list_chat_people if loaded
+  const roster = chatPeopleCache;
+  let admins, managers, recruiters, clients;
 
-  const all = [
-    ...admins.map(a => ({ code: a.code, name: a.name, role: 'admin', email: a.email })),
-    ...ms.map(m => ({ code: m.code, name: m.name, role: 'manager', email: m.email })),
-    ...rs.map(r => ({ code: r.code, name: r.name, role: 'recruiter', email: r.email })),
-    ...cs.map(c => ({ code: c.code, name: c.name, role: 'client', email: c.email }))
-  ];
+  if(roster){
+    admins = (roster.admins || []).map(a => ({ code: a.code, name: a.name, role: 'admin' }));
+    managers = (roster.managers || []).map(m => ({ code: m.code, name: m.name, role: 'manager' }));
+    recruiters = (roster.recruiters || []).map(r => ({ code: r.code, name: r.name, role: 'recruiter' }));
+    clients = (roster.clients || []).map(c => ({ code: c.code, name: c.name, role: 'client' }));
+  } else {
+    // Fallback: use whatever's already in state (limited for non-admins)
+    const cs = (S.clients || []).filter(c => !c.deactivated_at);
+    const rs = (S.recruiters || []).filter(r => !r.deactivated_at);
+    const ms = (S.managers || []).filter(m => !m.deactivated_at);
+    const adminsL = (adminsList || []).filter(a => a.active);
+    admins = adminsL.map(a => ({ code: a.code, name: a.name, role: 'admin' }));
+    managers = ms.map(m => ({ code: m.code, name: m.name, role: 'manager' }));
+    recruiters = rs.map(r => ({ code: r.code, name: r.name, role: 'recruiter' }));
+    clients = cs.map(c => ({ code: c.code, name: c.name, role: 'client' }));
+  }
 
-  // Exclude self
+  const all = [...admins, ...managers, ...recruiters, ...clients];
   const withoutSelf = all.filter(p => p.code !== session.code);
 
-  // Client can only see admin/manager/recruiter (not other clients)
+  // Client can only see admin/manager/recruiter (NOT other clients)
   if(session.role === 'client'){
     return withoutSelf.filter(p => p.role !== 'client');
   }
