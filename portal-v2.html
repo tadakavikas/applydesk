@@ -640,7 +640,6 @@ const NAV_ITEMS = {
     { key:'leads', label:'Leads', icon:'🔥' },
     { key:'clients', label:'Clients', icon:'👥' },
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
-    { key:'managers', label:'Managers', icon:'🧭' },
     { key:'admins', label:'Admins', icon:'👑' },
     { key:'applications', label:'Applications', icon:'📄' },
     { key:'chats', label:'Chat', icon:'💬' },
@@ -2191,9 +2190,13 @@ function renderTeamChats(){
     loadGroups().then(() => renderShell());
     return `<div class="page-header"><h1 class="page-title">Chat</h1></div><div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading conversations...</h3></div>`;
   }
-  // Load full team roster (all roles do this - not just admin)
-  if(chatPeopleCache === null){
+  // Try RPC once - if it fails, we use S data fallback
+  if(chatPeopleCache === null && !chatPeopleAttempted){
     loadChatPeople().then(() => renderShell());
+  }
+  // Also load admins for admin fallback path
+  if(session.role === 'admin' && adminsList === null){
+    loadAdmins().then(() => renderShell());
   }
 
   const people = getChatablePeople();
@@ -3226,31 +3229,40 @@ window.openAssignClients = function(recruiterCode){
 /* ═══════ WHATSAPP-STYLE CHAT WITH PEOPLE LIST ═══════ */
 // Cache the full team roster fetched via fn_list_chat_people
 let chatPeopleCache = null;
+let chatPeopleAttempted = false;
+
 async function loadChatPeople(){
   if(chatPeopleCache) return chatPeopleCache;
+  chatPeopleAttempted = true;
   try{
     const r = await rpc('fn_list_chat_people', {});
     if(r && r.ok){
       chatPeopleCache = r;
       return r;
     }
-  }catch(e){}
-  chatPeopleCache = { admins:[], managers:[], recruiters:[], clients:[] };
-  return chatPeopleCache;
+  }catch(e){ console.warn('loadChatPeople failed:', e); }
+  return null; // Don't cache empty - let fallback kick in
 }
 
 function getChatablePeople(){
-  // Prefer the full roster from fn_list_chat_people if loaded
+  // Prefer the full roster from fn_list_chat_people if loaded and non-empty
   const roster = chatPeopleCache;
-  let admins, managers, recruiters, clients;
+  let admins = [], managers = [], recruiters = [], clients = [];
 
-  if(roster){
+  const rosterHasPeople = roster && (
+    (roster.admins || []).length +
+    (roster.managers || []).length +
+    (roster.recruiters || []).length +
+    (roster.clients || []).length > 0
+  );
+
+  if(rosterHasPeople){
     admins = (roster.admins || []).map(a => ({ code: a.code, name: a.name, role: 'admin' }));
     managers = (roster.managers || []).map(m => ({ code: m.code, name: m.name, role: 'manager' }));
     recruiters = (roster.recruiters || []).map(r => ({ code: r.code, name: r.name, role: 'recruiter' }));
     clients = (roster.clients || []).map(c => ({ code: c.code, name: c.name, role: 'client' }));
   } else {
-    // Fallback: use whatever's already in state (limited for non-admins)
+    // Fallback: use S data (works for admin since fn_get_state returns full roster)
     const cs = (S.clients || []).filter(c => !c.deactivated_at);
     const rs = (S.recruiters || []).filter(r => !r.deactivated_at);
     const ms = (S.managers || []).filter(m => !m.deactivated_at);
@@ -3351,7 +3363,6 @@ function renderApplicationsPage(){
     allAppsCache = 'loading';
     rpc('fn_a_list_all_applications', {
       p_client_code: filterClient || null,
-      p_source: filterSource || null,
       p_from_date: filterFrom || null,
       p_to_date: filterTo || null
     }).then(r => {
@@ -3362,10 +3373,18 @@ function renderApplicationsPage(){
   }
   if(allAppsCache === 'loading') return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading...</h3></div>`;
 
-  const apps = allAppsCache || [];
+  // Filter apps by latest status client-side (filterSource is actually status now)
+  let apps = allAppsCache || [];
+  if(filterSource){
+    apps = apps.filter(a => {
+      const statuses = Array.isArray(a.status_json) ? a.status_json : [];
+      const latest = statuses.length ? statuses[statuses.length - 1] : null;
+      const statusLabel = latest ? latest.status : 'Applied';
+      return statusLabel === filterSource;
+    });
+  }
   const clientOptions = (S.clients || []).map(c => `<option value="${esc(c.code)}" ${filterClient === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-  const uniqueSources = [...new Set(apps.map(a => a.source).filter(Boolean))];
-  const sourceOptions = uniqueSources.map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
+  const statusOptions = ['Applied','Recruiter called me','Vendor emailed','Phone screen scheduled','Technical interview scheduled','Onsite scheduled','Rejected','Offer received','Accepted offer','Withdrew'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
 
   // Stats
   const totalApps = apps.length;
@@ -3425,7 +3444,7 @@ function renderApplicationsPage(){
   <!-- Filters -->
   <div style="background:var(--bg-card);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;gap:12px;align-items:end;flex-wrap:wrap">
     ${session.role !== 'recruiter' ? `<div style="min-width:180px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Client</label><select id="app-filter-client"><option value="">All clients</option>${clientOptions}</select></div>` : ''}
-    <div style="min-width:140px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Source</label><select id="app-filter-source"><option value="">All sources</option>${sourceOptions}</select></div>
+    <div style="min-width:140px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Status</label><select id="app-filter-source"><option value="">All statuses</option>${statusOptions}</select></div>
     <div style="min-width:130px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">From</label><input type="date" id="app-filter-from" value="${esc(filterFrom)}"></div>
     <div style="min-width:130px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">To</label><input type="date" id="app-filter-to" value="${esc(filterTo)}"></div>
     <button class="btn primary" onclick="applyAppFilter()">🔍 Filter</button>
