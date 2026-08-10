@@ -2069,6 +2069,7 @@ function renderFinSubscriptions(){
       <td>${fmt(s.next_due)}</td>
       <td><span class="tag ${urgClass}">${s.days_until}d</span></td>
       <td><b>₹${Math.round(Number(s.total_paid || 0)).toLocaleString('en-IN')}</b></td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" onclick="openEditClient('${esc(s.client_code)}')" title="Edit subscription">✏️</button></td>
     </tr>`;
   }).join('');
 
@@ -2078,7 +2079,7 @@ function renderFinSubscriptions(){
     <div class="stat-card"><div class="stat-label">Total in period</div><div class="stat-value">${active.length}</div></div>
   </div>
   <div class="card">
-    ${subs.length ? `<table class="data-table"><tr><th>Client</th><th>Amount</th><th>Started</th><th>Next due</th><th>Days</th><th>Total paid</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">🔁</div><h3 class="empty-title">No subscriptions in this range</h3><p class="empty-text">Try adjusting the date filter or clear it.</p></div>'}
+    ${subs.length ? `<table class="data-table"><tr><th>Client</th><th>Amount</th><th>Started</th><th>Next due</th><th>Days</th><th>Total paid</th><th></th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">🔁</div><h3 class="empty-title">No subscriptions in this range</h3><p class="empty-text">Try adjusting the date filter or clear it.</p></div>'}
   </div>`;
 }
 
@@ -2105,6 +2106,7 @@ function renderFinPayrolls(){
 
   const rows = rolls.map(p => {
     const urgClass = p.days_until <= 3 ? 'danger' : p.days_until <= 7 ? 'warning' : 'success';
+    const editFn = p.member_type === 'manager' ? `openEditManager('${esc(p.code)}')` : p.member_type === 'admin' ? `openEditAdmin('${esc(p.code)}')` : `openEditRecruiter('${esc(p.code)}')`;
     return `<tr style="${!p.active ? 'opacity:.5' : ''}">
       <td><b>${esc(p.name)}</b><div style="font-size:11px;color:var(--text-muted);font-family:monospace">${esc(p.code)}</div></td>
       <td><span class="tag muted">${esc(p.member_type)}</span></td>
@@ -2112,6 +2114,7 @@ function renderFinPayrolls(){
       <td>${fmt(p.next_due)}</td>
       <td><span class="tag ${urgClass}">${p.days_until}d</span></td>
       <td><b>₹${Math.round(Number(p.total_paid || 0)).toLocaleString('en-IN')}</b></td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" onclick="${editFn}" title="Edit payroll">✏️</button></td>
     </tr>`;
   }).join('');
 
@@ -2121,7 +2124,7 @@ function renderFinPayrolls(){
     <div class="stat-card"><div class="stat-label">Due next 3 days</div><div class="stat-value">${rolls.filter(p => p.days_until <= 3).length}</div></div>
   </div>
   <div class="card">
-    ${rolls.length ? `<table class="data-table"><tr><th>Team member</th><th>Role</th><th>Amount</th><th>Next due</th><th>Days</th><th>Total paid</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">💼</div><h3 class="empty-title">No payrolls in this range</h3></div>'}
+    ${rolls.length ? `<table class="data-table"><tr><th>Team member</th><th>Role</th><th>Amount</th><th>Next due</th><th>Days</th><th>Total paid</th><th></th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">💼</div><h3 class="empty-title">No payrolls in this range</h3></div>'}
   </div>`;
 }
 
@@ -2150,16 +2153,100 @@ function renderFinSpends(){
     <td><b>${esc(s.description || '(no description)')}</b><div style="font-size:11px;color:var(--text-muted)">${esc(s.related_party || '')}</div></td>
     <td><span class="tag muted">${esc(s.category)}</span></td>
     <td><b>${money(s.amount, s.currency)}</b>${s.currency === 'USD' ? `<div style="font-size:11px;color:var(--text-muted)">₹${Math.round(Number(s.amount_inr)).toLocaleString('en-IN')}</div>` : ''}</td>
+    <td style="text-align:right;white-space:nowrap">
+      <button class="btn ghost sm" onclick='openEditSpend(${JSON.stringify(s).replace(/"/g,"&quot;")})' title="Edit">✏️</button>
+      <button class="btn ghost sm" onclick="deleteSpend(${s.id}, '${esc((s.description||'this expense').replace(/'/g,"\\'"))}')" title="Delete" style="color:var(--color-danger)">🗑</button>
+    </td>
   </tr>`).join('');
 
-  return `<div class="stat-grid g2" style="margin-bottom:24px">
-    <div class="stat-card"><div class="stat-label">Total spend (INR)</div><div class="stat-value">₹${Math.round(total).toLocaleString('en-IN')}</div></div>
-    <div class="stat-card"><div class="stat-label">Number of expenses</div><div class="stat-value">${spends.length}</div></div>
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div class="stat-grid g2" style="flex:1;margin-right:16px">
+      <div class="stat-card"><div class="stat-label">Total spend (INR)</div><div class="stat-value">₹${Math.round(total).toLocaleString('en-IN')}</div></div>
+      <div class="stat-card"><div class="stat-label">Number of expenses</div><div class="stat-value">${spends.length}</div></div>
+    </div>
+    <button class="btn primary" onclick="openAddSpend()">➕ Add spend</button>
   </div>
   <div class="card">
-    ${spends.length ? `<table class="data-table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">📉</div><h3 class="empty-title">No spends in this range</h3><p class="empty-text">Adjust the date filter or clear it to see all spends.</p></div>'}
+    ${spends.length ? `<table class="data-table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">📉</div><h3 class="empty-title">No spends in this range</h3><p class="empty-text">Adjust the date filter or clear it to see all spends.</p></div>'}
   </div>`;
 }
+
+/* ═══════ SPEND ADD/EDIT/DELETE ═══════ */
+window.openAddSpend = function(){
+  openSpendModal(null);
+};
+window.openEditSpend = function(spendJson){
+  // Parse the passed spend (JSON-encoded via JSON.stringify)
+  const spend = typeof spendJson === 'string' ? JSON.parse(spendJson.replace(/&quot;/g,'"')) : spendJson;
+  openSpendModal(spend);
+};
+
+function openSpendModal(spend){
+  const isEdit = !!spend;
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal-inner" style="max-width:520px">
+    <h3>${isEdit ? '✏️ Edit spend' : '➕ Add spend'}</h3>
+    <div class="field"><label>Date *</label><input id="sp-date" type="date" value="${esc(isEdit && spend.txn_date ? spend.txn_date : new Date().toISOString().slice(0,10))}"></div>
+    <div class="field"><label>Description *</label><input id="sp-desc" type="text" placeholder="e.g. Netlify hosting, Google Ads" value="${esc(isEdit ? (spend.description||'') : '')}"></div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+      <div class="field"><label>Category</label><select id="sp-cat"><option>Infrastructure</option><option>Marketing</option><option>Tools</option><option>Contractors</option><option>Legal</option><option>Office</option><option>Other</option></select></div>
+      <div class="field"><label>Related party</label><input id="sp-party" type="text" placeholder="Vendor name" value="${esc(isEdit ? (spend.related_party||'') : '')}"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+      <div class="field"><label>Amount *</label><input id="sp-amt" type="number" step="0.01" placeholder="0.00" value="${esc(isEdit ? spend.amount : '')}"></div>
+      <div class="field"><label>Currency</label><select id="sp-cur"><option value="INR" ${isEdit && spend.currency==='INR' ? 'selected' : ''}>INR</option><option value="USD" ${isEdit && spend.currency==='USD' ? 'selected' : ''}>USD</option></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="sp-cancel">Cancel</button>
+      <button class="btn primary" id="sp-save">${isEdit ? 'Save changes' : 'Add spend'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  // Set category if editing
+  if(isEdit && spend.category){
+    setTimeout(() => { const sel = document.getElementById('sp-cat'); if(sel) sel.value = spend.category; }, 10);
+  }
+  const cleanup = () => back.remove();
+  back.querySelector('#sp-cancel').onclick = cleanup;
+  back.onclick = e => { if(e.target === back) cleanup(); };
+  back.querySelector('#sp-save').onclick = async () => {
+    const txnDate = document.getElementById('sp-date').value;
+    const desc = document.getElementById('sp-desc').value.trim();
+    const cat = document.getElementById('sp-cat').value;
+    const party = document.getElementById('sp-party').value.trim();
+    const amt = parseFloat(document.getElementById('sp-amt').value);
+    const cur = document.getElementById('sp-cur').value;
+    if(!txnDate){ toast('Date required', 'error'); return; }
+    if(!desc){ toast('Description required', 'error'); return; }
+    if(!amt || isNaN(amt) || amt <= 0){ toast('Enter a valid amount', 'error'); return; }
+    try{
+      const args = { p_txn_date: txnDate, p_description: desc, p_category: cat, p_related_party: party || null, p_amount: amt, p_currency: cur };
+      if(isEdit){ args.p_id = spend.id; }
+      const fn = isEdit ? 'fn_a_fin_update' : 'fn_a_fin_add';
+      const r = await rpc(fn, args);
+      if(r && r.ok){
+        toast(isEdit ? 'Spend updated' : 'Spend added', 'success');
+        viewState.financeData = null;
+        cleanup();
+        renderShell();
+      } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+    }catch(e){ toast('Failed: ' + e.message, 'error'); }
+  };
+}
+
+window.deleteSpend = async function(id, description){
+  const ok = await askConfirm(`Delete "${description}"? This cannot be undone.`, 'Delete spend?');
+  if(!ok) return;
+  try{
+    const r = await rpc('fn_a_fin_delete', { p_id: id });
+    if(r && r.ok){
+      toast('Spend deleted', 'success');
+      viewState.financeData = null;
+      renderShell();
+    } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
 
 function renderFinResumes(){
   if(viewState.financeData === null || viewState.financeData === undefined){
