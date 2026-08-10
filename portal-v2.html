@@ -269,7 +269,7 @@ async function rpc(fn, args){
     let useArgs = Object.assign({}, args || {});
     let useAuth = 'Bearer ' + SB_KEY;
     if (authMode === 'supabase') {
-      const legacyReads = ['fn_get_state','fn_login','fn_get_public_stats','fn_submit_lead'];
+      const legacyReads = ['fn_get_state','fn_login','fn_get_public_stats','fn_submit_lead','fn_list_chat_people'];
       const isDirectAuth = fn.indexOf('fn_a_') === 0;
       const shouldRewrite = legacyReads.indexOf(fn) === -1 && !isDirectAuth;
       if (shouldRewrite || isDirectAuth) {
