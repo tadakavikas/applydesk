@@ -642,6 +642,7 @@ const NAV_ITEMS = {
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
     { key:'managers', label:'Managers', icon:'🧭' },
     { key:'admins', label:'Admins', icon:'👑' },
+    { key:'applications', label:'Applications', icon:'📄' },
     { key:'chats', label:'Chat', icon:'💬' },
     { key:'finance', label:'Finance', icon:'💰' },
     { key:'notifications', label:'Notifications', icon:'🔔' },
@@ -652,6 +653,7 @@ const NAV_ITEMS = {
     { key:'leads', label:'Leads', icon:'🔥' },
     { key:'clients', label:'All Clients', icon:'👥' },
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
+    { key:'applications', label:'Applications', icon:'📄' },
     { key:'chats', label:'Chat', icon:'💬' },
     { key:'notifications', label:'Notifications', icon:'🔔' },
     { key:'settings', label:'Settings', icon:'⚙️' }
@@ -660,6 +662,7 @@ const NAV_ITEMS = {
     { key:'dashboard', label:'Dashboard', icon:'⚡' },
     { key:'my-clients', label:'My Clients', icon:'👥' },
     { key:'log', label:'Log Application', icon:'📝' },
+    { key:'applications', label:'My Applications', icon:'📄' },
     { key:'chats', label:'Chat', icon:'💬' },
     { key:'profile', label:'My Profile', icon:'👤' },
     { key:'settings', label:'Settings', icon:'⚙️' }
@@ -705,16 +708,19 @@ function renderShell(){
     admin: {
       dashboard: renderAdminDashboard, leads: renderLeadsPage, clients: renderClientsPage,
       recruiters: renderRecruitersPage, managers: renderManagersPage, admins: renderAdminsPage,
+      applications: renderApplicationsPage,
       chats: renderTeamChats, finance: renderFinancePage, notifications: renderNotificationsPage,
       settings: renderSettingsPage
     },
     manager: {
       dashboard: renderManagerDashboard, leads: renderLeadsPage, clients: renderClientsPage,
-      recruiters: renderRecruitersPage, chats: renderTeamChats, notifications: renderNotificationsPage,
+      recruiters: renderRecruitersPage, applications: renderApplicationsPage,
+      chats: renderTeamChats, notifications: renderNotificationsPage,
       settings: renderSettingsPage
     },
     recruiter: {
       dashboard: renderRecruiterDashboard, 'my-clients': renderMyClients, log: renderLogApplication,
+      applications: renderApplicationsPage,
       chats: renderTeamChats, profile: renderMyProfile, settings: renderSettingsPage
     },
     client: {
@@ -2756,8 +2762,22 @@ window.refreshClientApps = function(){
 
 /* ═══════ APPLICATION DETAIL MODAL WITH STATUS TIMELINE ═══════ */
 window.openAppDetail = async function(recordId){
-  const apps = clientAppsCache || [];
-  const app = apps.find(a => a.id === recordId);
+  // Check any cache we have that might contain this app
+  const allCaches = [clientAppsCache, allAppsCache, recentAppsCache].filter(c => Array.isArray(c));
+  let app = null;
+  for(const cache of allCaches){
+    app = cache.find(a => a.id === recordId);
+    if(app) break;
+  }
+  if(!app){
+    // Fetch fresh
+    try{
+      const r = await rpc('fn_a_list_all_applications', {});
+      if(r && r.ok){
+        app = (r.applications || []).find(a => a.id === recordId);
+      }
+    }catch(e){}
+  }
   if(!app){ toast('Application not found', 'error'); return; }
 
   const statuses = Array.isArray(app.status_json) ? app.status_json : [];
@@ -2776,9 +2796,11 @@ window.openAppDetail = async function(recordId){
   back.innerHTML = `<div class="modal-inner" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
     <h3>${esc(app.job_title || 'Application')}</h3>
     <div style="color:var(--text-body);font-size:14px;margin-bottom:16px"><b>${esc(app.company || 'Unknown company')}</b>${app.source ? ' · ' + esc(app.source) : ''}${app.applied_at ? ' · Applied ' + fmt(app.applied_at) : ''}</div>
-    ${app.job_url ? `<div style="margin-bottom:12px"><a href="${esc(app.job_url)}" target="_blank" class="btn ghost sm">🔗 View job posting</a></div>` : ''}
-    ${app.job_description ? `<details style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:600;color:var(--text-heading)">Job description</summary><div style="font-size:13px;color:var(--text-body);margin-top:8px;white-space:pre-wrap;max-height:200px;overflow-y:auto">${esc(app.job_description)}</div></details>` : ''}
-    ${app.screenshot_url ? `<div style="margin-bottom:16px"><a href="${esc(app.screenshot_url)}" target="_blank" class="btn ghost sm">📎 View original screenshot</a></div>` : ''}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      ${app.job_url ? `<a href="${esc(app.job_url)}" target="_blank" class="btn ghost sm">🔗 View job posting</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No job posting link</span>'}
+      ${app.resume_used ? `<a href="${esc(app.resume_used)}" target="_blank" download class="btn ghost sm">📄 Download resume used</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No resume attached</span>'}
+      ${app.screenshot_url ? `<a href="${esc(app.screenshot_url)}" target="_blank" class="btn ghost sm">📎 Original screenshot</a>` : ''}
+    </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px;margin-bottom:12px">
       <h4 style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Status Timeline</h4>
       <div style="max-height:280px;overflow-y:auto">${statusRows}</div>
@@ -2786,7 +2808,7 @@ window.openAppDetail = async function(recordId){
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px">
       <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Recruiter called me</option><option>Vendor emailed</option><option>Phone screen scheduled</option><option>Technical interview scheduled</option><option>Onsite scheduled</option><option>Rejected</option><option>Offer received</option><option>Accepted offer</option><option>Withdrew</option><option>Follow-up sent</option></select></div>
       <div class="field"><textarea id="apd-note" placeholder="Notes (e.g. 'Recruiter said next round is Tuesday at 3pm')" rows="2"></textarea></div>
-      <div class="field"><input id="apd-screenshot" type="url" placeholder="Screenshot URL (paste Google Photos/Imgur link, optional)"></div>
+      <div class="field"><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Screenshot of email/message (optional)</label><input id="apd-screenshot-file" type="file" accept="image/*" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
     </div>
     <div class="modal-actions"><button class="btn ghost" id="apd-close">Close</button><button class="btn primary" id="apd-add">Add status update</button></div>
   </div>`;
@@ -2797,12 +2819,31 @@ window.openAppDetail = async function(recordId){
   back.querySelector('#apd-add').onclick = async () => {
     const status = document.getElementById('apd-status').value;
     const note = document.getElementById('apd-note').value;
-    const screenshotUrl = document.getElementById('apd-screenshot').value;
+    const screenshotFileInput = document.getElementById('apd-screenshot-file');
+    const screenshotFile = screenshotFileInput ? screenshotFileInput.files[0] : null;
     if(!status){ toast('Choose a status first', 'error'); return; }
+
+    let screenshotUrl = null;
+    if(screenshotFile){
+      if(screenshotFile.size > 5 * 1024 * 1024){ toast('Screenshot must be under 5 MB', 'error'); return; }
+      if(!screenshotFile.type.startsWith('image/')){ toast('Screenshot must be an image', 'error'); return; }
+      toast('Uploading screenshot...', 'success');
+      const clientCode = app.client_code || 'unknown';
+      const timestamp = Date.now();
+      const safeName = screenshotFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${clientCode}/${timestamp}-status-${safeName}`;
+      const { data: shotUpload, error: shotError } = await sb.storage.from('client-resumes').upload(path, screenshotFile);
+      if(shotError){ toast('Screenshot upload failed: ' + shotError.message, 'error'); return; }
+      const { data: signedData } = await sb.storage.from('client-resumes').createSignedUrl(shotUpload.path, 60 * 60 * 24 * 365);
+      screenshotUrl = signedData ? signedData.signedUrl : shotUpload.path;
+    }
+
     try{
-      const r = await rpc('fn_a_add_application_status', { p_record_id: recordId, p_status: status, p_note: note || null, p_screenshot_url: screenshotUrl || null });
+      const r = await rpc('fn_a_add_application_status', { p_record_id: recordId, p_status: status, p_note: note || null, p_screenshot_url: screenshotUrl });
       if(r && r.ok){
         clientAppsCache = null;
+        allAppsCache = null;
+        recentAppsCache = null;
         toast('Status added', 'success');
         cleanup();
         renderShell();
@@ -2857,11 +2898,10 @@ function renderLogApplication(){
     </div>
     <div class="field"><label>Company *</label><input id="app-company" type="text" placeholder="e.g. Stripe, Google, Netflix" required></div>
     <div class="field"><label>Job title *</label><input id="app-job-title" type="text" placeholder="e.g. Senior Data Engineer" required></div>
-    <div class="field"><label>Job posting URL (optional)</label><input id="app-job-url" type="url" placeholder="https://..."></div>
-    <div class="field"><label>Job description (optional, paste from posting)</label><textarea id="app-job-desc" rows="4" placeholder="Paste the JD here so you can reference it later..."></textarea></div>
+    <div class="field"><label>Job posting URL</label><input id="app-job-url" type="url" placeholder="https://careers.company.com/..."></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="field"><label>Resume used</label><select id="app-resume"><option value="Base resume">Base resume</option><option value="Tailored - technical">Tailored - technical</option><option value="Tailored - leadership">Tailored - leadership</option><option value="Tailored - other">Tailored - other</option></select></div>
-      <div class="field"><label>Screenshot URL (of confirmation email/page)</label><input id="app-screenshot" type="url" placeholder="Paste image URL (optional)"></div>
+      <div class="field"><label>Resume file (PDF/DOC) *</label><input id="app-resume" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
+      <div class="field"><label>Screenshot file (of confirmation email/page)</label><input id="app-screenshot" type="file" accept="image/*,.png,.jpg,.jpeg,.webp" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn primary" onclick="submitApplication()">✓ Dispatch and log</button>
@@ -2908,24 +2948,70 @@ window.submitApplication = async function(){
   const company = document.getElementById('app-company').value.trim();
   const jobTitle = document.getElementById('app-job-title').value.trim();
   const jobUrl = document.getElementById('app-job-url').value.trim();
-  const jobDesc = document.getElementById('app-job-desc').value.trim();
   const source = document.getElementById('app-source').value;
-  const resumeUsed = document.getElementById('app-resume').value;
-  const screenshotUrl = document.getElementById('app-screenshot').value.trim();
+  const resumeFileInput = document.getElementById('app-resume');
+  const resumeFile = resumeFileInput ? resumeFileInput.files[0] : null;
+  const screenshotFileInput = document.getElementById('app-screenshot');
+  const screenshotFile = screenshotFileInput ? screenshotFileInput.files[0] : null;
 
   if(!clientCode){ toast('Choose a client first', 'error'); return; }
   if(!company){ toast('Company name is required', 'error'); return; }
   if(!jobTitle){ toast('Job title is required', 'error'); return; }
+  if(!resumeFile){ toast('Please attach a resume file', 'error'); return; }
+
+  // Validate resume
+  if(resumeFile.size > 10 * 1024 * 1024){ toast('Resume must be under 10 MB', 'error'); return; }
+  const allowedResume = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  if(!allowedResume.includes(resumeFile.type) && !/\.(pdf|doc|docx)$/i.test(resumeFile.name)){
+    toast('Only PDF, DOC, or DOCX resumes allowed', 'error'); return;
+  }
+
+  // Validate screenshot if provided
+  if(screenshotFile){
+    if(screenshotFile.size > 5 * 1024 * 1024){ toast('Screenshot must be under 5 MB', 'error'); return; }
+    if(!screenshotFile.type.startsWith('image/')){ toast('Screenshot must be an image file', 'error'); return; }
+  }
 
   try{
+    toast('Uploading files...', 'success');
+
+    // Step 1: Upload resume to Supabase Storage
+    const timestamp = Date.now();
+    const safeResumeName = resumeFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const resumePath = `${clientCode}/${timestamp}-resume-${safeResumeName}`;
+    const { data: resumeUpload, error: resumeError } = await sb.storage.from('client-resumes').upload(resumePath, resumeFile);
+    if(resumeError){
+      toast('Resume upload failed: ' + resumeError.message + '. Check the client-resumes bucket exists.', 'error');
+      return;
+    }
+    const { data: resumeSignedData } = await sb.storage.from('client-resumes').createSignedUrl(resumeUpload.path, 60 * 60 * 24 * 365);
+    const resumeUrl = resumeSignedData ? resumeSignedData.signedUrl : resumeUpload.path;
+
+    // Step 2: Upload screenshot if provided (uses same bucket, different subfolder)
+    let screenshotUrl = null;
+    if(screenshotFile){
+      const safeScreenshotName = screenshotFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const screenshotPath = `${clientCode}/${timestamp}-screenshot-${safeScreenshotName}`;
+      const { data: shotUpload, error: shotError } = await sb.storage.from('client-resumes').upload(screenshotPath, screenshotFile);
+      if(shotError){
+        toast('Screenshot upload failed: ' + shotError.message, 'error');
+        return;
+      }
+      const { data: shotSignedData } = await sb.storage.from('client-resumes').createSignedUrl(shotUpload.path, 60 * 60 * 24 * 365);
+      screenshotUrl = shotSignedData ? shotSignedData.signedUrl : shotUpload.path;
+    }
+
+    // Step 3: Create the application record
     const r = await rpc('fn_a_add_application', {
       p_client_code: clientCode, p_company: company, p_job_title: jobTitle,
-      p_job_description: jobDesc || null, p_job_url: jobUrl || null,
-      p_source: source || null, p_resume_used: resumeUsed || null, p_screenshot_url: screenshotUrl || null
+      p_job_description: null, p_job_url: jobUrl || null,
+      p_source: source || null, p_resume_used: resumeUrl, p_screenshot_url: screenshotUrl
     });
     if(r && r.ok){
-      toast('Application dispatched!', 'success');
+      toast('Application dispatched with resume' + (screenshotUrl ? ' and screenshot' : '') + '!', 'success');
       recentAppsCache = null;
+      allAppsCache = null;
+      clientAppsCache = null;
       viewState.dispatchedToday = (viewState.dispatchedToday || 0) + 1;
       clearAppForm();
       renderShell();
@@ -2934,12 +3020,14 @@ window.submitApplication = async function(){
 };
 
 window.clearAppForm = function(){
-  ['app-client','app-company','app-job-title','app-job-url','app-job-desc','app-source','app-resume','app-screenshot'].forEach(id => {
+  ['app-client','app-company','app-job-title','app-job-url','app-source','app-screenshot'].forEach(id => {
     const el = document.getElementById(id);
-    if(el) el.value = id === 'app-resume' ? 'Base resume' : '';
+    if(el) el.value = '';
   });
+  const rf = document.getElementById('app-resume');
+  if(rf) rf.value = '';
 };
-function renderMyApplications(){ return `<div class="page-header"><h1 class="page-title">My Applications</h1></div><div class="card"><p style="color:var(--text-body)">Application history view coming in polish pass.</p></div>`; }
+function renderMyApplications(){ return renderApplicationsPage(); }
 function renderMySubscription(){ const me = (S.clients || []).find(c => c.code === session.code) || {}; return `<div class="page-header"><h1 class="page-title">My Subscription</h1></div><div class="card"><div class="card-title">Details</div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : '<dt>Plan</dt><dd>Not active</dd>'}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}</dl></div>`; }
 
 /* ═══════ EDIT MODALS ═══════ */
@@ -3248,6 +3336,117 @@ window.applyFinanceFilter = function(){
 };
 window.clearFinanceFilter = function(){
   viewState.financeDateFrom = ''; viewState.financeDateTo = '';
+  renderShell();
+};
+
+/* ═══════ APPLICATIONS PAGE (admin/manager/recruiter) ═══════ */
+let allAppsCache = null;
+function renderApplicationsPage(){
+  const filterClient = viewState.appFilterClient || '';
+  const filterSource = viewState.appFilterSource || '';
+  const filterFrom = viewState.appFilterFrom || '';
+  const filterTo = viewState.appFilterTo || '';
+
+  if(allAppsCache === null){
+    allAppsCache = 'loading';
+    rpc('fn_a_list_all_applications', {
+      p_client_code: filterClient || null,
+      p_source: filterSource || null,
+      p_from_date: filterFrom || null,
+      p_to_date: filterTo || null
+    }).then(r => {
+      allAppsCache = (r && r.ok) ? (r.applications || []) : [];
+      renderShell();
+    }).catch(() => { allAppsCache = []; renderShell(); });
+    return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading applications...</h3></div>`;
+  }
+  if(allAppsCache === 'loading') return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading...</h3></div>`;
+
+  const apps = allAppsCache || [];
+  const clientOptions = (S.clients || []).map(c => `<option value="${esc(c.code)}" ${filterClient === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  const uniqueSources = [...new Set(apps.map(a => a.source).filter(Boolean))];
+  const sourceOptions = uniqueSources.map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
+
+  // Stats
+  const totalApps = apps.length;
+  const statusBreakdown = {};
+  apps.forEach(a => {
+    const latest = Array.isArray(a.status_json) && a.status_json.length ? a.status_json[a.status_json.length - 1] : null;
+    const status = latest ? latest.status : 'Applied';
+    statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+  });
+  const responses = apps.filter(a => Array.isArray(a.status_json) && a.status_json.some(s => /call|interview|offer|screen/i.test(s.status || ''))).length;
+  const responseRate = totalApps > 0 ? Math.round((responses / totalApps) * 100) : 0;
+
+  // Group applications by client for cleaner display
+  const byClient = {};
+  apps.forEach(a => {
+    const key = a.client_code || 'unknown';
+    if(!byClient[key]) byClient[key] = [];
+    byClient[key].push(a);
+  });
+
+  const clientCards = Object.entries(byClient).map(([clientCode, clientApps]) => {
+    const client = (S.clients || []).find(c => c.code === clientCode);
+    const clientName = client ? client.name : clientCode;
+    return `<div style="margin-bottom:24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:0 4px">
+        <div class="avatar sm coral">${esc(initials(clientName))}</div>
+        <div style="flex:1"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:15px">${esc(clientName)}</div><div style="font-size:11px;color:var(--text-muted)">${clientApps.length} application${clientApps.length !== 1 ? 's' : ''}</div></div>
+      </div>
+      <div style="background:var(--bg-card);border-radius:12px;overflow:hidden">
+        ${clientApps.map((a, i) => {
+          const latestStatus = Array.isArray(a.status_json) && a.status_json.length ? a.status_json[a.status_json.length - 1] : null;
+          const statusLabel = latestStatus ? latestStatus.status : 'Applied';
+          const statusClass = statusLabel.toLowerCase().includes('reject') ? 'danger' : statusLabel.toLowerCase().includes('interview') || statusLabel.toLowerCase().includes('call') ? 'warning' : statusLabel.toLowerCase().includes('offer') ? 'success' : 'teal';
+          const recruiter = (S.recruiters || []).find(r => r.code === a.recruiter_code);
+          const timeStr = a.applied_at ? new Date(a.applied_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+          return `<div onclick="openAppDetail(${a.id})" style="display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:14px 16px;border-bottom:${i < clientApps.length - 1 ? '1px solid var(--bg-primary)' : 'none'};cursor:pointer;transition:background .15s ease">
+            <div style="min-width:0">
+              <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.job_title || 'Untitled')}</div>
+              <div style="font-size:13px;color:var(--text-body)">${esc(a.company || 'Unknown company')}${a.source ? ' · ' + esc(a.source) : ''}${recruiter ? ' · via ' + esc(recruiter.name) : ''}</div>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);text-align:right;white-space:nowrap">${esc(timeStr)}</div>
+            <span class="tag ${statusClass}">${esc(statusLabel)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('') || `<div class="empty-state" style="padding:48px"><div class="empty-icon">📄</div><h3 class="empty-title">No applications yet</h3><p class="empty-text">${session.role === 'recruiter' ? 'Log your first application from the "Log Application" tab.' : 'Applications will appear here once recruiters start logging them.'}</p></div>`;
+
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:16px;flex-wrap:wrap">
+    <div>
+      <h1 style="font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--text-heading);letter-spacing:-0.02em;text-transform:uppercase;margin:0">${session.role === 'recruiter' ? 'My Applications' : 'All Applications'}</h1>
+      <p style="color:var(--text-body);font-size:13px;margin-top:4px">${totalApps} application${totalApps !== 1 ? 's' : ''} · ${responses} response${responses !== 1 ? 's' : ''} · ${responseRate}% response rate</p>
+    </div>
+    ${session.role === 'recruiter' ? `<button class="btn primary" onclick="setView('log')">➕ Dispatch new</button>` : ''}
+  </div>
+
+  <!-- Filters -->
+  <div style="background:var(--bg-card);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+    ${session.role !== 'recruiter' ? `<div style="min-width:180px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Client</label><select id="app-filter-client"><option value="">All clients</option>${clientOptions}</select></div>` : ''}
+    <div style="min-width:140px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Source</label><select id="app-filter-source"><option value="">All sources</option>${sourceOptions}</select></div>
+    <div style="min-width:130px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">From</label><input type="date" id="app-filter-from" value="${esc(filterFrom)}"></div>
+    <div style="min-width:130px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">To</label><input type="date" id="app-filter-to" value="${esc(filterTo)}"></div>
+    <button class="btn primary" onclick="applyAppFilter()">🔍 Filter</button>
+    ${(filterClient || filterSource || filterFrom || filterTo) ? '<button class="btn ghost" onclick="clearAppFilter()">Clear</button>' : ''}
+  </div>
+
+  ${clientCards}`;
+}
+
+window.applyAppFilter = function(){
+  const cf = document.getElementById('app-filter-client');
+  viewState.appFilterClient = cf ? cf.value : '';
+  viewState.appFilterSource = document.getElementById('app-filter-source').value;
+  viewState.appFilterFrom = document.getElementById('app-filter-from').value;
+  viewState.appFilterTo = document.getElementById('app-filter-to').value;
+  allAppsCache = null;
+  renderShell();
+};
+window.clearAppFilter = function(){
+  viewState.appFilterClient = viewState.appFilterSource = viewState.appFilterFrom = viewState.appFilterTo = '';
+  allAppsCache = null;
   renderShell();
 };
 
