@@ -554,12 +554,13 @@ window.doLogin = async function(){
 };
 
 window.doReset = function(){
+  const prefilledEmail = (session && session.email) ? session.email : '';
   const back = document.createElement('div');
   back.className = 'modal-back';
   back.innerHTML = `<div class="modal-inner" style="max-width:440px">
     <h3>🔑 Reset your password</h3>
-    <p style="color:var(--text-body);font-size:14px;margin-bottom:16px">Enter your email and we will send you a link to set a new password.</p>
-    <div class="field"><label>Email</label><input id="rst-email" type="email" placeholder="you@example.com" autocomplete="email"></div>
+    <p style="color:var(--text-body);font-size:14px;margin-bottom:16px">${prefilledEmail ? 'We will send a reset link to your email on file:' : 'Enter your email and we will send you a link to set a new password.'}</p>
+    ${prefilledEmail ? `<div style="background:var(--bg-primary);padding:14px;border-radius:8px;margin-bottom:16px"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Email</div><div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading)">${esc(prefilledEmail)}</div></div><input type="hidden" id="rst-email" value="${esc(prefilledEmail)}">` : `<div class="field"><label>Email</label><input id="rst-email" type="email" placeholder="you@example.com" autocomplete="email"></div>`}
     <p id="rst-msg" style="font-size:13px;margin:8px 0;min-height:1em"></p>
     <div class="modal-actions">
       <button class="btn ghost" id="rst-cancel">Cancel</button>
@@ -570,7 +571,7 @@ window.doReset = function(){
   const cleanup = () => back.remove();
   back.querySelector('#rst-cancel').onclick = cleanup;
   back.onclick = e => { if(e.target === back) cleanup(); };
-  setTimeout(() => { const el = document.getElementById('rst-email'); if(el) el.focus(); }, 100);
+  if(!prefilledEmail) setTimeout(() => { const el = document.getElementById('rst-email'); if(el) el.focus(); }, 100);
   back.querySelector('#rst-send').onclick = async () => {
     const email = (document.getElementById('rst-email').value || '').trim().toLowerCase();
     const msg = document.getElementById('rst-msg');
@@ -581,7 +582,7 @@ window.doReset = function(){
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/portal-v2.html' });
       if(error){ msg.style.color = 'var(--color-danger)'; msg.textContent = error.message || 'Could not send.'; return; }
       msg.style.color = 'var(--color-success)';
-      msg.textContent = '✓ If that email is registered, a reset link is on its way. Check your inbox in a few minutes.';
+      msg.textContent = '✓ Reset link sent! Check your inbox in a few minutes.';
       setTimeout(cleanup, 2500);
     }catch(e){ msg.style.color = 'var(--color-danger)'; msg.textContent = 'Could not send reset email right now.'; }
   };
@@ -1074,14 +1075,36 @@ function renderLeadDetail(l){
   if(l.claimed_by){
     const r = (S.recruiters || []).find(x => x.code === l.claimed_by);
     const m = (S.managers || []).find(x => x.code === l.claimed_by);
-    claimedByName = r ? r.name : m ? m.name : (l.claimed_by === session.code ? 'You' : l.claimed_by);
+    const a = (adminsList || []).find(x => x.code === l.claimed_by);
+    claimedByName = r ? r.name : m ? m.name : a ? a.name : (l.claimed_by === session.code ? 'You' : l.claimed_by);
   }
 
-  return `<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+  // Assignee options for admin/manager
+  const canReassign = session.role === 'admin' || session.role === 'manager';
+  const assignOptions = [
+    ...(S.managers || []).filter(m => !m.deactivated_at).map(m => ({ code: m.code, name: m.name, role: 'manager' })),
+    ...(S.recruiters || []).filter(r => !r.deactivated_at).map(r => ({ code: r.code, name: r.name, role: 'recruiter' }))
+  ];
+
+  return `<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">
     <div class="avatar lg coral">${esc(initials(dispName))}</div>
-    <div style="flex:1"><h2 style="font-family:var(--font-display);font-weight:800;font-size:26px;color:var(--text-heading);margin:0">${esc(dispName)}</h2><div style="font-size:13px;color:var(--text-muted)">Submitted ${timeAgo(l.created_at)}${l.claimed_by ? ' · <span class="tag success">CLAIMED BY ' + esc(claimedByName.toUpperCase()) + '</span>' : ' · <span class="tag warning">UNCLAIMED</span>'}</div></div>
-    ${!l.claimed_by ? `<button class="btn primary" onclick="claimLead(${l.id})">✋ Claim lead</button>` : (l.claimed_by === session.code ? `<button class="btn ghost" disabled>You claimed this</button>` : `<button class="btn ghost" disabled>Claimed</button>`)}
+    <div style="flex:1;min-width:200px"><h2 style="font-family:var(--font-display);font-weight:800;font-size:26px;color:var(--text-heading);margin:0">${esc(dispName)}</h2><div style="font-size:13px;color:var(--text-muted)">Submitted ${timeAgo(l.created_at)}${l.claimed_by ? ' · <span class="tag success">CLAIMED BY ' + esc(claimedByName.toUpperCase()) + '</span>' : ' · <span class="tag warning">UNCLAIMED</span>'}</div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${!l.claimed_by ? `<button class="btn primary" onclick="claimLead(${l.id})">✋ Claim</button>` : ''}
+      ${session.role === 'admin' ? `<button class="btn ghost sm" onclick="deleteLead(${l.id}, '${esc(dispName.replace(/'/g, ''))}')" style="color:#fff;background:var(--color-danger);border-color:var(--color-danger)">🗑️ Delete lead</button>` : ''}
+    </div>
   </div>
+  ${canReassign ? `<div class="card" style="margin-bottom:16px;padding:14px 18px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Assign to</div>
+      <select id="lead-assign-select" style="flex:1;min-width:200px;max-width:300px">
+        <option value="">— Choose team member —</option>
+        ${assignOptions.map(o => `<option value="${esc(o.code)}" ${l.claimed_by === o.code ? 'selected' : ''}>${esc(o.name)} (${esc(o.role)})</option>`).join('')}
+      </select>
+      <button class="btn primary sm" onclick="assignLead(${l.id})">Assign</button>
+      ${l.claimed_by ? `<button class="btn ghost sm" onclick="unassignLead(${l.id})">Unassign</button>` : ''}
+    </div>
+  </div>` : ''}
   <div class="card" style="margin-bottom:16px">
     <div class="card-subtitle">Contact info</div>
     <dl class="detail-grid">
@@ -1102,6 +1125,44 @@ function renderLeadDetail(l){
   </div>`;
 }
 
+window.deleteLead = async function(id, name){
+  const ok = await askConfirm('Permanently delete this lead? All notes and history for ' + name + ' will be lost. This cannot be undone.', 'Delete lead forever?');
+  if(!ok) return;
+  try{
+    const r = await rpc('fn_a_delete_lead', { p_id: id });
+    if(r && r.ok){
+      viewState.selectedLead = null;
+      await loadLeads();
+      toast('Lead deleted', 'success');
+      renderShell();
+    } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
+
+window.assignLead = async function(id){
+  const code = document.getElementById('lead-assign-select').value;
+  if(!code){ toast('Choose a team member first', 'error'); return; }
+  try{
+    const r = await rpc('fn_a_assign_lead', { p_id: id, p_assignee_code: code });
+    if(r && r.ok){
+      await loadLeads();
+      toast('Lead assigned', 'success');
+      renderShell();
+    } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
+
+window.unassignLead = async function(id){
+  try{
+    const r = await rpc('fn_a_assign_lead', { p_id: id, p_assignee_code: null });
+    if(r && r.ok){
+      await loadLeads();
+      toast('Lead unassigned', 'success');
+      renderShell();
+    } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
+
 window.claimLead = async function(id){
   try{
     const r = await rpc('fn_claim_lead', { p_actor: session.code, p_id: id });
@@ -1113,11 +1174,18 @@ window.claimLead = async function(id){
 window.addLeadNote = async function(id){
   const input = document.getElementById('lead-note-input');
   const text = (input.value || '').trim();
-  if(!text) return;
+  if(!text){ toast('Please type a note first', 'error'); return; }
   try{
-    const r = await rpc('fn_add_lead_note', { p_actor: session.code, p_id: id, p_text: text });
-    if(r && r.ok){ await loadLeads(); toast('Note added', 'success'); renderShell(); }
-    else toast('Could not add note (backend may not support notes yet)', 'error');
+    // Note: fn_add_lead_note gets rewritten to fn_a_add_lead_note by auth-mode routing
+    // The SQL function takes only p_id and p_text (no p_actor)
+    const r = await rpc('fn_add_lead_note', { p_id: id, p_text: text });
+    if(r && r.ok){
+      input.value = '';
+      await loadLeads();
+      toast('Note added', 'success');
+      renderShell();
+    }
+    else toast('Could not add note: ' + ((r && r.err) || 'unknown'), 'error');
   }catch(e){ toast('Failed: ' + e.message, 'error'); }
 };
 
@@ -1519,8 +1587,8 @@ function renderRecruiterDetailPage(){
         </dl>
       </div>
       <div class="card">
-        <div class="card-title">Assigned clients (${assignedClients.length})</div>
-        ${assignedClients.length ? assignedClients.map(c => `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--bg-secondary)" onclick="openClientDetail('${esc(c.code)}')" style="cursor:pointer"><div class="avatar sm">${esc(initials(c.name))}</div><div style="flex:1"><div style="font-weight:600;color:var(--text-heading);font-size:14px">${esc(c.name)}</div><div style="font-size:11px;color:var(--text-muted)">${esc(c.code)}</div></div><button class="btn ghost sm">View →</button></div>`).join('') : '<div style="color:var(--text-muted);font-style:italic;padding:12px 0">No clients assigned yet.</div>'}
+        <div class="card-title">Assigned clients (${assignedClients.length}) <button class="btn primary sm" onclick="openAssignClients('${esc(r.code)}')">➕ Manage assignments</button></div>
+        ${assignedClients.length ? assignedClients.map(c => `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--bg-secondary);cursor:pointer" onclick="openClientDetail('${esc(c.code)}')"><div class="avatar sm">${esc(initials(c.name))}</div><div style="flex:1"><div style="font-weight:600;color:var(--text-heading);font-size:14px">${esc(c.name)}</div><div style="font-size:11px;color:var(--text-muted)">${esc(c.code)}</div></div><button class="btn ghost sm">View →</button></div>`).join('') : '<div style="color:var(--text-muted);font-style:italic;padding:12px 0">No clients assigned yet. Click "Manage assignments" above.</div>'}
       </div>
     </div>
     <div>
@@ -1667,11 +1735,11 @@ function renderAdminsPage(){
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
         ${a.phone ? '📱 ' + esc(a.phone) : ''}${a.phone && a.joined_date ? ' · ' : ''}${a.joined_date ? '📅 ' + fmt(a.joined_date) : ''}
       </div>
-      <div style="display:flex;gap:6px;justify-content:flex-end">
-        <button class="btn secondary sm" onclick="openEditAdmin('${esc(a.code)}')">✏️ Edit</button>
+      <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn ghost sm" onclick="openEditAdmin('${esc(a.code)}')">✏️ Edit</button>
         ${a.email && !isMe && a.active ? `<button class="btn ghost sm" onclick="sendGenericInvite('admin','${esc(a.code)}','${esc(a.email)}')">📧 Invite</button>` : ''}
-        ${!isMe ? (a.active ? `<button class="btn danger sm" onclick="deactivateAdmin('${esc(a.code)}','${esc(a.name)}')">Deactivate</button>` : `<button class="btn primary sm" onclick="reactivateAdmin('${esc(a.code)}')">Reactivate</button>`) : ''}
-        ${!isMe ? `<button class="btn danger sm" onclick="deleteMember('admin','${esc(a.code)}','${esc(a.name)}')" style="background:var(--color-danger);color:#fff;border-color:var(--color-danger)">🗑️ Delete</button>` : ''}
+        ${!isMe ? (a.active ? `<button class="btn ghost sm" onclick="deactivateAdmin('${esc(a.code)}','${esc(a.name)}')" style="color:var(--color-danger);border-color:#F5C8D3">Deactivate</button>` : `<button class="btn ghost sm" onclick="reactivateAdmin('${esc(a.code)}')" style="color:var(--color-success)">Reactivate</button>`) : ''}
+        ${!isMe ? `<button class="btn ghost sm" onclick="deleteMember('admin','${esc(a.code)}','${esc(a.name)}')" style="color:#fff;background:var(--color-danger);border-color:var(--color-danger)">🗑️ Delete</button>` : ''}
       </div>
     </div>`;
   }).join('') || '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👑</div><h3 class="empty-title">No admins yet</h3></div>';
@@ -1830,7 +1898,83 @@ function renderFinancePage(){
 window.setFinanceTab = function(t){ viewState.financeTab = t; viewState.financeData = null; renderShell(); };
 
 function renderFinTransactions(){
-  return `<div class="card"><div class="card-title">📊 Transactions</div><p style="color:var(--text-body);font-size:14px">Full transaction log wiring coming in polish pass. Use the sub-tabs above for subscription/payroll/spend/resume breakdowns.</p></div>`;
+  // Combined view: load all 3 finance data sources and merge into unified transaction list
+  if(viewState.financeData === null || viewState.financeData === undefined){
+    viewState.financeData = 'loading';
+    Promise.all([
+      rpc('fn_a_finance_subscriptions', {}).catch(() => ({ ok: false })),
+      rpc('fn_a_finance_payrolls', {}).catch(() => ({ ok: false })),
+      rpc('fn_a_finance_spends', {}).catch(() => ({ ok: false }))
+    ]).then(([subsR, rollsR, spendsR]) => {
+      const combined = [];
+      ((subsR && subsR.subscriptions) || []).forEach(s => {
+        combined.push({
+          date: s.start_date || s.next_due,
+          description: 'Subscription: ' + (s.client_name || s.client_code),
+          category: 'Subscription',
+          direction: 'in',
+          amount: s.amount, currency: s.currency, amount_inr: s.currency === 'USD' ? Number(s.amount) * 88 : Number(s.amount),
+          client_code: s.client_code
+        });
+      });
+      ((rollsR && rollsR.payrolls) || []).forEach(p => {
+        combined.push({
+          date: p.next_due,
+          description: 'Payroll: ' + (p.name || p.code),
+          category: (p.member_type || 'Team') + ' payroll',
+          direction: 'out',
+          amount: p.amount, currency: p.currency, amount_inr: p.currency === 'USD' ? Number(p.amount) * 88 : Number(p.amount),
+          member_code: p.code
+        });
+      });
+      ((spendsR && spendsR.spends) || []).forEach(s => {
+        combined.push({
+          date: s.txn_date,
+          description: s.description || '(no description)',
+          category: s.category || 'Other',
+          direction: 'out',
+          amount: s.amount, currency: s.currency, amount_inr: Number(s.amount_inr || 0),
+          related_party: s.related_party
+        });
+      });
+      combined.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      viewState.financeData = combined;
+      renderShell();
+    }).catch(() => { viewState.financeData = []; renderShell(); });
+    return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading transactions...</h3></div>`;
+  }
+  if(viewState.financeData === 'loading') return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading...</h3></div>`;
+
+  let txns = viewState.financeData || [];
+  const df = viewState.financeDateFrom, dt = viewState.financeDateTo;
+  if(df || dt){
+    txns = txns.filter(t => {
+      if(!t.date) return false;
+      if(df && t.date < df) return false;
+      if(dt && t.date > dt) return false;
+      return true;
+    });
+  }
+
+  const totalIn = txns.filter(t => t.direction === 'in').reduce((s, t) => s + Number(t.amount_inr || 0), 0);
+  const totalOut = txns.filter(t => t.direction === 'out').reduce((s, t) => s + Number(t.amount_inr || 0), 0);
+  const net = totalIn - totalOut;
+
+  const rows = txns.map(t => `<tr>
+    <td>${fmt(t.date)}</td>
+    <td><b>${esc(t.description)}</b>${t.related_party ? `<div style="font-size:11px;color:var(--text-muted)">${esc(t.related_party)}</div>` : ''}</td>
+    <td><span class="tag ${t.direction === 'in' ? 'success' : 'danger'}">${esc(t.category)}</span></td>
+    <td style="color:${t.direction === 'in' ? 'var(--color-success)' : 'var(--color-danger)'};font-weight:700">${t.direction === 'in' ? '+' : '-'}${money(t.amount, t.currency)}</td>
+  </tr>`).join('');
+
+  return `<div class="stat-grid g3" style="margin-bottom:24px">
+    <div class="stat-card"><div class="stat-label" style="color:var(--color-success)">↓ In (INR)</div><div class="stat-value">₹${Math.round(totalIn).toLocaleString('en-IN')}</div></div>
+    <div class="stat-card"><div class="stat-label" style="color:var(--color-danger)">↑ Out (INR)</div><div class="stat-value">₹${Math.round(totalOut).toLocaleString('en-IN')}</div></div>
+    <div class="stat-card"><div class="stat-label">Net (INR)</div><div class="stat-value" style="color:${net >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}">₹${Math.round(net).toLocaleString('en-IN')}</div></div>
+  </div>
+  <div class="card">
+    ${txns.length ? `<table class="data-table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">📊</div><h3 class="empty-title">No transactions in this range</h3><p class="empty-text">Try clearing the date filter or adjusting the range.</p></div>'}
+  </div>`;
 }
 
 function renderFinSubscriptions(){
@@ -1840,7 +1984,18 @@ function renderFinSubscriptions(){
     return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading subscriptions...</h3></div>`;
   }
   if(viewState.financeData === 'loading') return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading...</h3></div>`;
-  const subs = viewState.financeData || [];
+  let subs = viewState.financeData || [];
+  // Apply date filter
+  const df = viewState.financeDateFrom, dt = viewState.financeDateTo;
+  if(df || dt){
+    subs = subs.filter(s => {
+      const d = s.start_date || s.created_at;
+      if(!d) return false;
+      if(df && d < df) return false;
+      if(dt && d > dt) return false;
+      return true;
+    });
+  }
   const active = subs.filter(s => s.active);
   const totalIn = active.reduce((sum, s) => sum + (s.currency === 'USD' ? Number(s.amount) * 88 : Number(s.amount)), 0);
 
@@ -1857,12 +2012,12 @@ function renderFinSubscriptions(){
   }).join('');
 
   return `<div class="stat-grid g3" style="margin-bottom:24px">
-    <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value">${active.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Matching</div><div class="stat-value">${subs.length}</div></div>
     <div class="stat-card"><div class="stat-label">Monthly recurring (INR)</div><div class="stat-value">₹${Math.round(totalIn).toLocaleString('en-IN')}</div></div>
-    <div class="stat-card"><div class="stat-label">Deactivated</div><div class="stat-value">${subs.length - active.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Total in period</div><div class="stat-value">${active.length}</div></div>
   </div>
   <div class="card">
-    ${subs.length ? `<table class="data-table"><tr><th>Client</th><th>Amount</th><th>Started</th><th>Next due</th><th>Days</th><th>Total paid</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">🔁</div><h3 class="empty-title">No subscriptions yet</h3></div>'}
+    ${subs.length ? `<table class="data-table"><tr><th>Client</th><th>Amount</th><th>Started</th><th>Next due</th><th>Days</th><th>Total paid</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">🔁</div><h3 class="empty-title">No subscriptions in this range</h3><p class="empty-text">Try adjusting the date filter or clear it.</p></div>'}
   </div>`;
 }
 
@@ -1873,7 +2028,17 @@ function renderFinPayrolls(){
     return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading payrolls...</h3></div>`;
   }
   if(viewState.financeData === 'loading') return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading...</h3></div>`;
-  const rolls = viewState.financeData || [];
+  let rolls = viewState.financeData || [];
+  const df = viewState.financeDateFrom, dt = viewState.financeDateTo;
+  if(df || dt){
+    rolls = rolls.filter(p => {
+      const d = p.next_due || p.created_at;
+      if(!d) return false;
+      if(df && d < df) return false;
+      if(dt && d > dt) return false;
+      return true;
+    });
+  }
   const active = rolls.filter(p => p.active);
   const totalOut = active.reduce((sum, p) => sum + (p.currency === 'USD' ? Number(p.amount) * 88 : Number(p.amount)), 0);
 
@@ -1890,12 +2055,12 @@ function renderFinPayrolls(){
   }).join('');
 
   return `<div class="stat-grid g3" style="margin-bottom:24px">
-    <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value">${active.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Matching</div><div class="stat-value">${rolls.length}</div></div>
     <div class="stat-card"><div class="stat-label">Monthly outflow (INR)</div><div class="stat-value">₹${Math.round(totalOut).toLocaleString('en-IN')}</div></div>
     <div class="stat-card"><div class="stat-label">Due next 3 days</div><div class="stat-value">${rolls.filter(p => p.days_until <= 3).length}</div></div>
   </div>
   <div class="card">
-    ${rolls.length ? `<table class="data-table"><tr><th>Team member</th><th>Role</th><th>Amount</th><th>Next due</th><th>Days</th><th>Total paid</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">💼</div><h3 class="empty-title">No payrolls yet</h3></div>'}
+    ${rolls.length ? `<table class="data-table"><tr><th>Team member</th><th>Role</th><th>Amount</th><th>Next due</th><th>Days</th><th>Total paid</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">💼</div><h3 class="empty-title">No payrolls in this range</h3></div>'}
   </div>`;
 }
 
@@ -1906,7 +2071,17 @@ function renderFinSpends(){
     return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading spends...</h3></div>`;
   }
   if(viewState.financeData === 'loading') return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading...</h3></div>`;
-  const spends = viewState.financeData || [];
+  let spends = viewState.financeData || [];
+  const df = viewState.financeDateFrom, dt = viewState.financeDateTo;
+  if(df || dt){
+    spends = spends.filter(s => {
+      const d = s.txn_date;
+      if(!d) return false;
+      if(df && d < df) return false;
+      if(dt && d > dt) return false;
+      return true;
+    });
+  }
   const total = spends.reduce((sum, s) => sum + Number(s.amount_inr || 0), 0);
 
   const rows = spends.map(s => `<tr>
@@ -1921,7 +2096,7 @@ function renderFinSpends(){
     <div class="stat-card"><div class="stat-label">Number of expenses</div><div class="stat-value">${spends.length}</div></div>
   </div>
   <div class="card">
-    ${spends.length ? `<table class="data-table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">📉</div><h3 class="empty-title">No spends this month</h3></div>'}
+    ${spends.length ? `<table class="data-table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr>${rows}</table>` : '<div class="empty-state" style="padding:32px"><div class="empty-icon">📉</div><h3 class="empty-title">No spends in this range</h3><p class="empty-text">Adjust the date filter or clear it to see all spends.</p></div>'}
   </div>`;
 }
 
@@ -2010,36 +2185,121 @@ function renderTeamChats(){
     loadGroups().then(() => renderShell());
     return `<div class="page-header"><h1 class="page-title">Chat</h1></div><div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading conversations...</h3></div>`;
   }
-  const list = visibleGroups();
-  const selected = viewState.selectedGroup ? list.find(g => g.id === viewState.selectedGroup) : list[0];
-  if(selected && !viewState.selectedGroup) viewState.selectedGroup = selected.id;
+  // Auto-load admins list so we can show admins in people list
+  if(session.role === 'admin' && adminsList === null){
+    loadAdmins().then(() => renderShell());
+  }
 
-  const items = list.map(g => `<div style="padding:12px;border-radius:10px;background:${selected && selected.id === g.id ? 'var(--bg-coral-light)' : 'transparent'};cursor:pointer;margin-bottom:6px" onclick="selectGroup(${g.id})">
-    <div style="display:flex;align-items:center;gap:12px">
-      <div class="avatar sm ${g.broadcast ? 'warning' : ''}">${g.broadcast ? '📢' : esc(initials(g.name))}</div>
+  const people = getChatablePeople();
+  const groups = visibleGroups();
+  const chatTab = viewState.chatTab || 'people';
+  const selected = viewState.selectedChatKey;
+
+  // Left side: tabs (People / Groups)
+  const peopleItems = people.map(p => {
+    const key = 'person:' + p.code;
+    const isActive = selected === key;
+    const roleColor = p.role === 'admin' ? 'warning' : p.role === 'manager' ? 'success' : p.role === 'recruiter' ? 'coral' : '';
+    return `<div onclick="selectChat('${esc(key)}')" style="padding:12px;border-radius:10px;background:${isActive ? 'var(--bg-coral-light)' : 'transparent'};cursor:pointer;margin-bottom:4px;display:flex;align-items:center;gap:12px">
+      <div class="avatar ${roleColor}">${esc(initials(p.name))}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">${esc(p.role)}</div>
+      </div>
+    </div>`;
+  }).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No one to chat with yet.</div>`;
+
+  const groupItems = groups.map(g => {
+    const key = 'group:' + g.id;
+    const isActive = selected === key;
+    return `<div onclick="selectChat('${esc(key)}')" style="padding:12px;border-radius:10px;background:${isActive ? 'var(--bg-coral-light)' : 'transparent'};cursor:pointer;margin-bottom:4px;display:flex;align-items:center;gap:12px">
+      <div class="avatar ${g.broadcast ? 'warning' : ''}">${g.broadcast ? '📢' : esc(initials(g.name))}</div>
       <div style="flex:1;min-width:0">
         <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g.name)}</div>
-        <div style="font-size:11px;color:var(--text-muted)">${g.member_count || 0} member${g.member_count !== 1 ? 's' : ''}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${g.member_count || 0} members${g.broadcast ? ' · Broadcast' : ''}</div>
       </div>
-    </div>
-  </div>`).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No conversations yet.${session.role === 'admin' ? '<br>Click "New group" to create one.' : ''}</div>`;
+    </div>`;
+  }).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No groups yet.</div>`;
 
-  const detail = selected ? renderGroupThread(selected) : `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a conversation</h3><p class="empty-text">Pick a chat from the list to start messaging.</p></div>`;
+  const canCreateGroup = session.role === 'admin';
 
-  // Only admin can create groups
-  const canCreate = session.role === 'admin';
+  // Right side: show selected conversation
+  let detailHtml;
+  if(!selected){
+    detailHtml = `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a conversation</h3><p class="empty-text">Pick a person or group from the left to start messaging.</p></div>`;
+  } else if(selected.startsWith('person:')){
+    const code = selected.slice(7);
+    const person = people.find(p => p.code === code);
+    detailHtml = person ? renderDirectChat(person) : '<div class="empty-state"><div class="empty-icon">?</div><h3 class="empty-title">Person not found</h3></div>';
+  } else if(selected.startsWith('group:')){
+    const groupId = parseInt(selected.slice(6));
+    const group = groups.find(g => g.id === groupId);
+    detailHtml = group ? renderGroupThread(group) : '<div class="empty-state"><div class="empty-icon">?</div><h3 class="empty-title">Group not found</h3></div>';
+  } else {
+    detailHtml = '<div class="empty-state"><div class="empty-icon">?</div><h3 class="empty-title">Unknown chat</h3></div>';
+  }
 
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <h1 class="page-title" style="margin:0">Chat</h1>
-    ${canCreate ? '<button class="btn primary" onclick="openCreateGroup()">➕ New group</button>' : ''}
+    ${canCreateGroup ? '<button class="btn primary" onclick="openCreateGroup()">➕ New group</button>' : ''}
   </div>
   <div class="split-view">
-    <div class="split-list">${items}</div>
-    <div class="split-detail">${detail}</div>
+    <div class="split-list" style="padding:12px">
+      <div style="display:flex;gap:6px;margin-bottom:12px;padding:0 4px">
+        <button class="filter-chip ${chatTab === 'people' ? 'active' : ''}" onclick="setChatTab('people')" style="flex:1">People (${people.length})</button>
+        <button class="filter-chip ${chatTab === 'groups' ? 'active' : ''}" onclick="setChatTab('groups')" style="flex:1">Groups (${groups.length})</button>
+      </div>
+      ${chatTab === 'people' ? peopleItems : groupItems}
+    </div>
+    <div class="split-detail">${detailHtml}</div>
   </div>`;
 }
 
-window.selectGroup = function(id){ viewState.selectedGroup = id; viewState.groupMessages = null; renderShell(); };
+window.setChatTab = function(tab){ viewState.chatTab = tab; renderShell(); };
+window.selectChat = function(key){ viewState.selectedChatKey = key; viewState.groupMessages = null; viewState.directMessages = null; renderShell(); };
+// Keep old selectGroup working for backward compat
+window.selectGroup = function(id){ viewState.selectedChatKey = 'group:' + id; viewState.groupMessages = null; renderShell(); };
+
+function renderDirectChat(person){
+  // Find or offer to create a 2-person group with this person
+  const existingGroup = (groupsList || []).find(g => {
+    const members = g.member_codes || [];
+    return !g.broadcast && members.length === 2 && members.includes(session.code) && members.includes(person.code);
+  });
+
+  if(!existingGroup){
+    return `<div style="display:flex;flex-direction:column;height:100%">
+      <div style="border-bottom:1px solid var(--bg-secondary);padding-bottom:12px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="avatar lg ${person.role === 'admin' ? 'warning' : person.role === 'manager' ? 'success' : 'coral'}">${esc(initials(person.name))}</div>
+          <div><div style="font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--text-heading)">${esc(person.name)}</div><div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">${esc(person.role)}</div></div>
+        </div>
+      </div>
+      <div class="empty-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <div class="empty-icon">💬</div>
+        <h3 class="empty-title">Start a conversation with ${esc(person.name.split(' ')[0])}</h3>
+        <p class="empty-text">Send your first message to open a direct chat.</p>
+        <button class="btn primary" onclick="startDirectChat('${esc(person.code)}','${esc(person.name.replace(/'/g, ''))}')">💬 Start chat</button>
+      </div>
+    </div>`;
+  }
+
+  return renderGroupThread(existingGroup);
+}
+
+window.startDirectChat = async function(targetCode, targetName){
+  try{
+    // Create a 2-person group with self + target
+    const r = await rpc('fn_a_start_direct_chat', { p_target_code: targetCode });
+    if(r && r.ok){
+      groupsList = null;
+      viewState.selectedChatKey = 'group:' + r.group_id;
+      viewState.groupMessages = null;
+      toast('Chat started with ' + targetName, 'success');
+      renderShell();
+    } else toast('Could not start chat: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
 
 window.openCreateGroup = function(){
   if(session.role !== 'admin'){ toast('Only admins can create groups', 'error'); return; }
@@ -2580,7 +2840,76 @@ window.openComposeNotification = function(){
   };
 };
 
-/* ═══════ DELETE MEMBER (permanent) ═══════ */
+/* ═══════ ASSIGN CLIENTS TO RECRUITER ═══════ */
+window.openAssignClients = function(recruiterCode){
+  const rec = (S.recruiters || []).find(x => x.code === recruiterCode);
+  if(!rec) return;
+  const allClients = (S.clients || []).filter(c => !c.deactivated_at);
+  const currentAssignments = new Set(rec.assigned || []);
+
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  const clientRows = allClients.map(c => `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;background:var(--bg-primary);margin-bottom:6px">
+    <input type="checkbox" class="asn-client" value="${esc(c.code)}" ${currentAssignments.has(c.code) ? 'checked' : ''} style="width:auto">
+    <div class="avatar sm coral">${esc(initials(c.name))}</div>
+    <div style="flex:1"><div style="font-weight:600;font-size:14px;color:var(--text-heading)">${esc(c.name)}</div><div style="font-size:11px;color:var(--text-muted)">${esc(c.target_role || 'No target role')}</div></div>
+  </label>`).join('') || '<div style="color:var(--text-muted);font-size:13px">No active clients yet.</div>';
+
+  back.innerHTML = `<div class="modal-inner" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column">
+    <h3>Assign clients to ${esc(rec.name)}</h3>
+    <p style="color:var(--text-body);font-size:13px;margin-bottom:14px">Check the clients this recruiter will handle. Unchecking removes them.</p>
+    <div style="flex:1;overflow-y:auto;max-height:400px;padding:4px">${clientRows}</div>
+    <div class="modal-actions"><button class="btn ghost" id="asn-cancel">Cancel</button><button class="btn primary" id="asn-save">Save assignments</button></div>
+  </div>`;
+  document.body.appendChild(back);
+  const cleanup = () => back.remove();
+  back.querySelector('#asn-cancel').onclick = cleanup;
+  back.onclick = e => { if(e.target === back) cleanup(); };
+  back.querySelector('#asn-save').onclick = async () => {
+    const newAssignments = Array.from(document.querySelectorAll('.asn-client:checked')).map(el => el.value);
+    // Determine adds and removes
+    const toAdd = newAssignments.filter(c => !currentAssignments.has(c));
+    const toRemove = Array.from(currentAssignments).filter(c => !newAssignments.includes(c));
+    try{
+      for(const clientCode of toAdd){
+        await rpc('fn_a_toggle_assign', { p_recruiter_code: recruiterCode, p_client_code: clientCode, p_assign: true });
+      }
+      for(const clientCode of toRemove){
+        await rpc('fn_a_toggle_assign', { p_recruiter_code: recruiterCode, p_client_code: clientCode, p_assign: false });
+      }
+      await refresh();
+      toast('Assignments updated', 'success');
+      cleanup();
+      renderShell();
+    }catch(e){ toast('Failed: ' + e.message, 'error'); }
+  };
+};
+
+/* ═══════ WHATSAPP-STYLE CHAT WITH PEOPLE LIST ═══════ */
+function getChatablePeople(){
+  // Returns list of {code, name, role, email} the current user can chat with
+  const cs = (S.clients || []).filter(c => !c.deactivated_at);
+  const rs = (S.recruiters || []).filter(r => !r.deactivated_at);
+  const ms = (S.managers || []).filter(m => !m.deactivated_at);
+  const admins = (adminsList || []).filter(a => a.active);
+
+  const all = [
+    ...admins.map(a => ({ code: a.code, name: a.name, role: 'admin', email: a.email })),
+    ...ms.map(m => ({ code: m.code, name: m.name, role: 'manager', email: m.email })),
+    ...rs.map(r => ({ code: r.code, name: r.name, role: 'recruiter', email: r.email })),
+    ...cs.map(c => ({ code: c.code, name: c.name, role: 'client', email: c.email }))
+  ];
+
+  // Exclude self
+  const withoutSelf = all.filter(p => p.code !== session.code);
+
+  // Client can only see admin/manager/recruiter (not other clients)
+  if(session.role === 'client'){
+    return withoutSelf.filter(p => p.role !== 'client');
+  }
+  // Everyone else sees all
+  return withoutSelf;
+}
 window.deleteMember = async function(type, code, name){
   const ok = await askConfirm('PERMANENTLY DELETE ' + name + '?\n\nThis removes the record. Their historical activity may still show in reports if referenced. This cannot be undone.\n\nType-safe alternative: use Deactivate instead.', 'Delete ' + name + ' forever?');
   if(!ok) return;
