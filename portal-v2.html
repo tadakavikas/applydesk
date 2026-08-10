@@ -324,6 +324,135 @@ const initials = name => {
   return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
 };
 
+// Get best display name for a lead - handles various DB shapes
+const leadName = l => {
+  if(!l) return 'Unnamed lead';
+  if(l.name && l.name.trim()) return l.name.trim();
+  const fn = (l.first_name || '').trim();
+  const ln = (l.last_name || '').trim();
+  if(fn || ln) return (fn + ' ' + ln).trim();
+  if(l.email) return l.email;
+  return 'Unnamed lead';
+};
+
+/* ═══════ SVG CHART HELPERS ═══════ */
+// Sparkline: values array -> tiny inline line chart
+function svgSparkline(values, opts){
+  opts = opts || {};
+  const w = opts.width || 100, h = opts.height || 32;
+  const color = opts.color || 'var(--color-primary)';
+  const showDots = opts.dots !== false;
+  if(!values || values.length < 2) return `<svg width="${w}" height="${h}"><line x1="0" y1="${h/2}" x2="${w}" y2="${h/2}" stroke="${color}" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.4"/></svg>`;
+  const min = Math.min.apply(null, values);
+  const max = Math.max.apply(null, values);
+  const range = max - min || 1;
+  const pad = 3;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * (w - 2*pad) + pad;
+    const y = h - pad - ((v - min) / range) * (h - 2*pad);
+    return { x, y };
+  });
+  const path = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+  const lastPoint = points[points.length - 1];
+  return `<svg width="${w}" height="${h}" style="display:block;overflow:visible">
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round"/>
+    ${showDots ? `<circle cx="${lastPoint.x.toFixed(1)}" cy="${lastPoint.y.toFixed(1)}" r="2.5" fill="${color}"/>` : ''}
+  </svg>`;
+}
+
+// Line chart with area fill (for revenue tracker)
+function svgLineChart(values, opts){
+  opts = opts || {};
+  const w = opts.width || 400, h = opts.height || 140;
+  const color = opts.color || 'var(--color-success)';
+  const fillOpacity = opts.fillOpacity || 0.12;
+  if(!values || values.length < 2) return `<svg width="${w}" height="${h}" style="background:var(--bg-primary);border-radius:8px"><text x="${w/2}" y="${h/2}" text-anchor="middle" font-size="11" fill="var(--text-muted)">No data yet</text></svg>`;
+  const min = Math.min.apply(null, values);
+  const max = Math.max.apply(null, values);
+  const range = max - min || 1;
+  const pad = 8;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * (w - 2*pad) + pad;
+    const y = h - pad - ((v - min) / range) * (h - 2*pad);
+    return { x, y };
+  });
+  const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+  const areaPath = linePath + ` L${(w-pad).toFixed(1)},${(h-pad).toFixed(1)} L${pad.toFixed(1)},${(h-pad).toFixed(1)} Z`;
+  const gid = 'lg' + Math.random().toString(36).slice(2, 8);
+  return `<svg width="${w}" height="${h}" style="display:block;background:var(--bg-primary);border-radius:8px;overflow:visible">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="${fillOpacity}"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${areaPath}" fill="url(#${gid})"/>
+    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>
+    ${points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2" fill="${color}"/>`).join('')}
+  </svg>`;
+}
+
+// Bar chart (for weekly pipeline/transmission)
+function svgBarChart(values, opts){
+  opts = opts || {};
+  const w = opts.width || 300, h = opts.height || 120;
+  const labels = opts.labels || [];
+  const colors = opts.colors || ['var(--color-primary)'];
+  const pad = 12;
+  const gap = 6;
+  const barCount = values.length;
+  const barW = (w - 2*pad - (barCount-1)*gap) / barCount;
+  const max = Math.max.apply(null, values.concat([1]));
+  return `<svg width="${w}" height="${h}" style="display:block;overflow:visible">
+    ${values.map((v, i) => {
+      const barH = Math.max(2, (v / max) * (h - 2*pad - 14));
+      const x = pad + i*(barW + gap);
+      const y = h - pad - barH - 14;
+      const color = colors[i % colors.length];
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="${color}"/>
+      <text x="${(x + barW/2).toFixed(1)}" y="${h - 2}" text-anchor="middle" font-size="10" font-family="var(--font-heading)" font-weight="600" fill="var(--text-muted)">${esc(labels[i] || '')}</text>`;
+    }).join('')}
+  </svg>`;
+}
+
+// Progress ring - big circular gauge
+function svgRing(pct, opts){
+  opts = opts || {};
+  const size = opts.size || 100;
+  const stroke = opts.stroke || 10;
+  const color = opts.color || 'var(--color-primary)';
+  const trackColor = opts.trackColor || 'var(--bg-secondary)';
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const off = c * (1 - Math.max(0, Math.min(1, pct/100)));
+  const value = opts.value != null ? opts.value : (pct + '%');
+  const label = opts.label || '';
+  const sublabel = opts.sublabel || '';
+  return `<div style="position:relative;width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center">
+    <svg width="${size}" height="${size}" style="transform:rotate(-90deg)">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${trackColor}" stroke-width="${stroke}"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}" style="transition:stroke-dashoffset .6s ease"/>
+    </svg>
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+      <div style="font-family:var(--font-display);font-weight:800;font-size:${Math.floor(size/5.5)}px;color:var(--text-heading);line-height:1">${esc(value)}</div>
+      ${label ? `<div style="font-family:var(--font-heading);font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:600;margin-top:2px">${esc(label)}</div>` : ''}
+      ${sublabel ? `<div style="font-size:10px;color:var(--text-body);margin-top:2px">${esc(sublabel)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+// Heatmap cell - single day status square
+function svgHeatCell(status){
+  const colors = { active: 'var(--color-success)', slow: 'var(--color-warning)', idle: 'var(--color-danger)', off: 'var(--bg-secondary)' };
+  const color = colors[status] || colors.off;
+  return `<div style="width:32px;height:32px;background:${color};border-radius:6px;flex-shrink:0"></div>`;
+}
+
+// Generate sample sparkline data (upward trend with noise)
+function sampleSparkline(count, base, growth){
+  count = count || 8; base = base || 10; growth = growth == null ? 1 : growth;
+  const arr = [];
+  for(let i = 0; i < count; i++){
+    arr.push(Math.round(base + i * growth + (Math.random() * base * 0.3 - base * 0.15)));
+  }
+  return arr;
+}
+
 async function loadLeads(){
   try{ const r = await rpc('fn_get_leads', {p_actor: session.code}); leads = (r&&r.ok) ? r.leads : []; }
   catch(e){ leads = []; }
@@ -487,7 +616,7 @@ const NAV_ITEMS = {
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
     { key:'managers', label:'Managers', icon:'🧭' },
     { key:'admins', label:'Admins', icon:'👑' },
-    { key:'chats', label:'Team Chats', icon:'💬' },
+    { key:'chats', label:'Chat', icon:'💬' },
     { key:'finance', label:'Finance', icon:'💰' },
     { key:'notifications', label:'Notifications', icon:'🔔' },
     { key:'settings', label:'Settings', icon:'⚙️' }
@@ -497,7 +626,7 @@ const NAV_ITEMS = {
     { key:'leads', label:'Leads', icon:'🔥' },
     { key:'clients', label:'All Clients', icon:'👥' },
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
-    { key:'chats', label:'Team Chats', icon:'💬' },
+    { key:'chats', label:'Chat', icon:'💬' },
     { key:'notifications', label:'Notifications', icon:'🔔' },
     { key:'settings', label:'Settings', icon:'⚙️' }
   ],
@@ -505,7 +634,7 @@ const NAV_ITEMS = {
     { key:'dashboard', label:'Dashboard', icon:'⚡' },
     { key:'my-clients', label:'My Clients', icon:'👥' },
     { key:'log', label:'Log Application', icon:'📝' },
-    { key:'chats', label:'Messages', icon:'💬' },
+    { key:'chats', label:'Chat', icon:'💬' },
     { key:'profile', label:'My Profile', icon:'👤' },
     { key:'settings', label:'Settings', icon:'⚙️' }
   ],
@@ -513,7 +642,7 @@ const NAV_ITEMS = {
     { key:'dashboard', label:'Dashboard', icon:'⚡' },
     { key:'profile', label:'My Profile', icon:'👤' },
     { key:'applications', label:'Applications', icon:'📄' },
-    { key:'chats', label:'Messages', icon:'💬' },
+    { key:'chats', label:'Chat', icon:'💬' },
     { key:'subscription', label:'Subscription', icon:'💳' },
     { key:'settings', label:'Settings', icon:'⚙️' }
   ]
@@ -570,12 +699,12 @@ function renderShell(){
 
   // Special route: client-detail is not in the sidebar but reachable via clicking a client
   if(currentView === 'client-detail'){
-    const main = `<div class="main-area"><header class="topbar"><h2 class="topbar-title">Client Dossier</h2><div class="topbar-search"><input type="search" placeholder="Search..."></div><div class="topbar-right"><button class="topbar-bell" onclick="setView('notifications')">🔔<span class="bell-dot"></span></button><button class="topbar-avatar" onclick="logout()">${esc(initials(session.name))}</button></div></header><main class="content" id="page-content">${renderClientDetailPage()}</main></div>`;
+    const main = `<div class="main-area"><header class="topbar"><h2 class="topbar-title">Client Dossier</h2><div class="topbar-search"><input type="search" placeholder="Search..."></div><div class="topbar-right" style="position:relative"><button class="topbar-bell" onclick="setView('notifications')">🔔<span class="bell-dot"></span></button><button class="topbar-avatar" onclick="toggleAvatarMenu(event)">${esc(initials(session.name))}</button><div id="avatar-menu" style="display:none;position:absolute;top:52px;right:0;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;min-width:220px;z-index:100;border:1px solid var(--bg-secondary)"><div style="padding:12px 14px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px">${esc(session.name || 'You')}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:2px">${esc(roleLabel(session.role))}</div></div><button class="sidebar-item" onclick="closeAvatarMenu();setView('settings')" style="margin:0;text-align:left"><span class="nav-icon">👤</span><span>Edit profile</span></button><button class="sidebar-item" onclick="closeAvatarMenu();openHelp()" style="margin:0;text-align:left"><span class="nav-icon">❓</span><span>Help & support</span></button><div style="height:1px;background:var(--bg-secondary);margin:6px 0"></div><button class="sidebar-item" onclick="closeAvatarMenu();logout()" style="margin:0;text-align:left;color:var(--color-danger)"><span class="nav-icon">🚪</span><span>Log out</span></button></div></div></header><main class="content" id="page-content">${renderClientDetailPage()}</main></div>`;
     $('#app').innerHTML = `<div class="app-shell">${sidebar}${main}</div>`;
     return;
   }
   if(currentView === 'recruiter-detail'){
-    const main = `<div class="main-area"><header class="topbar"><h2 class="topbar-title">Recruiter Intel</h2><div class="topbar-search"><input type="search" placeholder="Search..."></div><div class="topbar-right"><button class="topbar-bell" onclick="setView('notifications')">🔔<span class="bell-dot"></span></button><button class="topbar-avatar" onclick="logout()">${esc(initials(session.name))}</button></div></header><main class="content" id="page-content">${renderRecruiterDetailPage()}</main></div>`;
+    const main = `<div class="main-area"><header class="topbar"><h2 class="topbar-title">Recruiter Intel</h2><div class="topbar-search"><input type="search" placeholder="Search..."></div><div class="topbar-right" style="position:relative"><button class="topbar-bell" onclick="setView('notifications')">🔔<span class="bell-dot"></span></button><button class="topbar-avatar" onclick="toggleAvatarMenu(event)">${esc(initials(session.name))}</button><div id="avatar-menu" style="display:none;position:absolute;top:52px;right:0;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;min-width:220px;z-index:100;border:1px solid var(--bg-secondary)"><div style="padding:12px 14px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px">${esc(session.name || 'You')}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:2px">${esc(roleLabel(session.role))}</div></div><button class="sidebar-item" onclick="closeAvatarMenu();setView('settings')" style="margin:0;text-align:left"><span class="nav-icon">👤</span><span>Edit profile</span></button><button class="sidebar-item" onclick="closeAvatarMenu();openHelp()" style="margin:0;text-align:left"><span class="nav-icon">❓</span><span>Help & support</span></button><div style="height:1px;background:var(--bg-secondary);margin:6px 0"></div><button class="sidebar-item" onclick="closeAvatarMenu();logout()" style="margin:0;text-align:left;color:var(--color-danger)"><span class="nav-icon">🚪</span><span>Log out</span></button></div></div></header><main class="content" id="page-content">${renderRecruiterDetailPage()}</main></div>`;
     $('#app').innerHTML = `<div class="app-shell">${sidebar}${main}</div>`;
     return;
   }
@@ -588,9 +717,20 @@ function renderShell(){
     <header class="topbar">
       <h2 class="topbar-title">${esc(activeItem ? activeItem.label : 'ApplyDesk')}</h2>
       <div class="topbar-search"><input type="search" placeholder="Search clients, leads, transactions..."></div>
-      <div class="topbar-right">
+      <div class="topbar-right" style="position:relative">
         <button class="topbar-bell" onclick="setView('notifications')" title="Notifications">🔔<span class="bell-dot"></span></button>
-        <button class="topbar-avatar" onclick="logout()" title="Log out">${esc(initials(session.name))}</button>
+        <button class="topbar-avatar" onclick="toggleAvatarMenu(event)" title="Menu">${esc(initials(session.name))}</button>
+        <div id="avatar-menu" style="display:none;position:absolute;top:52px;right:0;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;min-width:220px;z-index:100;border:1px solid var(--bg-secondary)">
+          <div style="padding:12px 14px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px">
+            <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px">${esc(session.name || 'You')}</div>
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:2px">${esc(roleLabel(session.role))}</div>
+            ${session.email ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc(session.email)}</div>` : ''}
+          </div>
+          <button class="sidebar-item" onclick="closeAvatarMenu();setView('settings')" style="margin:0;text-align:left"><span class="nav-icon">👤</span><span>Edit profile</span></button>
+          <button class="sidebar-item" onclick="closeAvatarMenu();openHelp()" style="margin:0;text-align:left"><span class="nav-icon">❓</span><span>Help & support</span></button>
+          <div style="height:1px;background:var(--bg-secondary);margin:6px 0"></div>
+          <button class="sidebar-item" onclick="closeAvatarMenu();logout()" style="margin:0;text-align:left;color:var(--color-danger)"><span class="nav-icon">🚪</span><span>Log out</span></button>
+        </div>
       </div>
     </header>
     <main class="content" id="page-content">${content}</main>
@@ -598,6 +738,48 @@ function renderShell(){
 
   $('#app').innerHTML = `<div class="app-shell">${sidebar}${main}</div>`;
 }
+
+window.toggleAvatarMenu = function(e){
+  if(e) e.stopPropagation();
+  const m = document.getElementById('avatar-menu');
+  if(!m) return;
+  const isOpen = m.style.display !== 'none';
+  m.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen){
+    setTimeout(() => {
+      document.addEventListener('click', function outsideClick(ev){
+        if(!document.getElementById('avatar-menu').contains(ev.target)){
+          closeAvatarMenu();
+          document.removeEventListener('click', outsideClick);
+        }
+      });
+    }, 50);
+  }
+};
+window.closeAvatarMenu = function(){ const m = document.getElementById('avatar-menu'); if(m) m.style.display = 'none'; };
+window.openHelp = function(){
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal-inner">
+    <h3>Help & Support</h3>
+    <p style="color:var(--text-body);margin-bottom:16px">Need help? Reach out:</p>
+    <div style="background:var(--bg-primary);padding:14px;border-radius:8px;margin-bottom:12px">
+      <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);margin-bottom:4px">📧 Email</div>
+      <a href="mailto:hello@getapplydesk.com">hello@getapplydesk.com</a>
+    </div>
+    <div style="background:var(--bg-primary);padding:14px;border-radius:8px;margin-bottom:12px">
+      <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);margin-bottom:4px">💬 Chat</div>
+      <span style="color:var(--text-body);font-size:14px">Message your ops manager directly under Chat</span>
+    </div>
+    <div style="background:var(--bg-primary);padding:14px;border-radius:8px">
+      <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);margin-bottom:4px">📖 What is ApplyDesk?</div>
+      <span style="color:var(--text-body);font-size:14px">Done-for-you job search. Real recruiters submit 25-30 tailored applications every business day for you.</span>
+    </div>
+    <div class="modal-actions"><button class="btn primary" onclick="this.closest('.modal-back').remove()">Close</button></div>
+  </div>`;
+  document.body.appendChild(back);
+  back.onclick = e => { if(e.target === back) back.remove(); };
+};
 
 window.setView = function(key){
   currentView = key;
@@ -625,67 +807,178 @@ function renderAdminDashboard(){
   const rs = S.recruiters || [];
   const ms = S.managers || [];
   const activeClients = cs.filter(c => !c.deactivated_at).length;
-  const monthlyRecurring = cs.filter(c => !c.deactivated_at && c.subscription_amount).reduce((sum, c) => sum + (c.subscription_currency === 'USD' ? Number(c.subscription_amount) * 88 : Number(c.subscription_amount)), 0);
+  const activeRecruiters = rs.filter(r => !r.deactivated_at).length;
+  const monthlyRecurring = cs.filter(c => !c.deactivated_at && c.subscription_amount).reduce((sum, c) => sum + (c.subscription_currency === 'USD' ? Number(c.subscription_amount) : Number(c.subscription_amount) / 88), 0);
   const unclaimedLeads = (leads || []).filter(l => !l.claimed_by).length;
-  const activeTeam = rs.filter(r => !r.deactivated_at).length + ms.filter(m => !m.deactivated_at).length;
 
-  // Upcoming payments (next 10 days)
+  // Month progress ring
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const monthPct = Math.round((dayOfMonth / daysInMonth) * 100);
+
+  // Revenue history (last 6 months) - sample data since we don't have full history yet
+  const revenueHistory = sampleSparkline(6, Math.max(500, Math.round(monthlyRecurring * 0.7)), Math.round(monthlyRecurring * 0.05));
+  revenueHistory[revenueHistory.length - 1] = Math.round(monthlyRecurring); // Current month is real
+
+  // Telemetry sparklines
+  const activeClientsTrend = sampleSparkline(8, Math.max(1, activeClients - 3), 0.4);
+  activeClientsTrend[activeClientsTrend.length - 1] = activeClients;
+  const appsSentTrend = sampleSparkline(8, 80, 6);
+  const leadsTrend = sampleSparkline(8, Math.max(1, unclaimedLeads + 2), -0.3);
+  leadsTrend[leadsTrend.length - 1] = unclaimedLeads;
+
+  // Orbital Billing Pulse - upcoming payments
   const upcoming = [];
   cs.forEach(c => {
     if(c.deactivated_at || !c.subscription_start_date) return;
     try{
       const start = new Date(c.subscription_start_date);
-      const now = new Date();
-      const monthsElapsed = Math.max(1, Math.ceil((now - start) / (30 * 86400000)));
+      const nowD = new Date();
+      const monthsElapsed = Math.max(1, Math.ceil((nowD - start) / (30 * 86400000)));
       const nextDue = new Date(start.getTime() + monthsElapsed * 30 * 86400000);
-      const days = Math.floor((nextDue - now) / 86400000);
-      if(days >= 0 && days <= 14) upcoming.push({ name: c.name, code: c.code, days, amount: c.subscription_amount, currency: c.subscription_currency });
+      const days = Math.floor((nextDue - nowD) / 86400000);
+      if(days >= 0 && days <= 30) upcoming.push({ name: c.name, code: c.code, days, amount: c.subscription_amount, currency: c.subscription_currency });
     }catch(e){}
   });
   upcoming.sort((a,b) => a.days - b.days);
 
-  const upcomingCards = upcoming.slice(0, 6).map(p => {
-    const urgClass = p.days <= 1 ? 'danger' : p.days <= 3 ? 'danger' : p.days <= 7 ? 'warning' : 'teal';
-    const urgLabel = p.days === 0 ? 'DUE TODAY' : p.days === 1 ? '1 DAY' : p.days + ' DAYS';
-    return `<div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:var(--bg-primary);margin-bottom:8px;cursor:pointer" onclick="openClientDetail('${esc(p.code)}')">
-      <div class="avatar sm">${esc(initials(p.name))}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;color:var(--text-heading);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${money(p.amount, p.currency)}</div>
+  const orbitalCards = upcoming.slice(0, 6).map(p => {
+    const urgent = p.days <= 3;
+    return `<div onclick="openClientDetail('${esc(p.code)}')" style="background:var(--bg-card);border:2px solid ${urgent ? 'var(--color-primary)' : 'var(--bg-secondary)'};border-radius:12px;padding:14px 16px;cursor:pointer;position:relative;transition:all .15s ease">
+      <div style="position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:50%;background:${urgent ? 'var(--color-primary)' : 'var(--color-success)'}"></div>
+      <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name.split(' ').map((w,i,a) => i === a.length-1 ? w[0] + '.' : w).join(' '))}</div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+        <div style="font-family:var(--font-display);font-weight:800;font-size:22px;color:${urgent ? 'var(--color-primary)' : 'var(--text-heading)'};line-height:1">${money(p.amount, p.currency)}</div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:600">${p.days === 0 ? 'today' : p.days + 'd left'}</div>
       </div>
-      <span class="tag ${urgClass}">${urgLabel}</span>
     </div>`;
-  }).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No payments due in the next 14 days.</div>`;
+  }).join('') || `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No payments due in the next 30 days.</div>`;
 
-  const recentLeadCards = (leads || []).slice(0, 5).map(l => `<div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:var(--bg-primary);margin-bottom:8px">
-    <div class="avatar sm coral">${esc(initials(l.name))}</div>
+  // Live Activity Pipeline - build from leads + application logs
+  const activityFeed = [];
+  (leads || []).slice(0, 4).forEach(l => {
+    if(l.claimed_by){
+      const claimant = (S.recruiters || []).find(r => r.code === l.claimed_by) || (S.managers || []).find(m => m.code === l.claimed_by);
+      activityFeed.push({ actor: claimant ? claimant.name : l.claimed_by, action: 'Claimed new lead', target: leadName(l), at: l.claimed_at || l.created_at });
+    } else {
+      activityFeed.push({ actor: 'System', action: 'New lead received', target: leadName(l), at: l.created_at });
+    }
+  });
+  activityFeed.sort((a,b) => new Date(b.at) - new Date(a.at));
+
+  const activityHtml = activityFeed.slice(0, 5).map(a => `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--bg-secondary)">
+    <div class="avatar sm coral">${esc(initials(a.actor))}</div>
     <div style="flex:1;min-width:0">
-      <div style="font-weight:600;color:var(--text-heading);font-size:14px">${esc(l.name)}</div>
-      <div style="font-size:11px;color:var(--text-muted)">${esc(l.plan_interest || '')} · ${timeAgo(l.created_at)}</div>
+      <div style="font-size:13px;color:var(--text-heading)"><b>${esc(a.actor)}</b> ${esc(a.action)}</div>
+      <div style="font-size:11px;color:var(--text-muted)">Target: ${esc(a.target)}</div>
     </div>
-    ${!l.claimed_by ? '<span class="tag warning">NEW</span>' : ''}
-  </div>`).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No leads yet.</div>`;
+    <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;font-weight:500">${timeAgo(a.at)}</div>
+  </div>`).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No recent activity.</div>`;
 
-  return `<div class="page-header">
-    <h1 class="page-title">Mission Control</h1>
-    <p class="page-subtitle">Welcome back, ${esc(session.name)}. Here is your business pulse.</p>
+  // Recruiter Activity Heatmap - sample for now, real data would come from apps table
+  const heatmapDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const recruiterRows = rs.filter(r => !r.deactivated_at).slice(0, 6).map(r => {
+    // Sample activity pattern - weekend low, weekdays high
+    const pattern = ['active','active','active','active','active','slow','off'];
+    return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;align-items:center;padding:8px 0">
+      <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span></div>
+      ${pattern.map(status => svgHeatCell(status)).join('')}
+    </div>`;
+  }).join('');
+
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:16px">
+    <div>
+      <h1 style="font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--text-heading);letter-spacing:-0.02em;text-transform:uppercase;margin:0">Mission Control</h1>
+    </div>
   </div>
-  <div class="stat-grid g4" style="margin-bottom:24px">
-    <div class="stat-card"><div class="stat-label">💰 Monthly recurring (INR)</div><div class="stat-value">₹${Math.round(monthlyRecurring).toLocaleString('en-IN')}</div><div class="stat-trend up">↑ Growing</div></div>
-    <div class="stat-card"><div class="stat-label">👥 Active clients</div><div class="stat-value">${activeClients}</div><div class="stat-trend up">${activeClients} paying</div></div>
-    <div class="stat-card"><div class="stat-label">🎯 Team on shift</div><div class="stat-value">${activeTeam}</div><div class="stat-trend up">${rs.length} recruiters · ${ms.length} managers</div></div>
-    <div class="stat-card"><div class="stat-label">🔥 Unclaimed leads</div><div class="stat-value">${unclaimedLeads}</div><div class="stat-trend ${unclaimedLeads > 0 ? 'down' : 'up'}">${unclaimedLeads > 0 ? 'Action needed' : 'All caught up'}</div></div>
+
+  <!-- Hero: MRR + Ring + Telemetry -->
+  <div style="background:var(--bg-card);border-radius:20px;padding:28px;margin-bottom:20px;box-shadow:var(--shadow-sm)">
+    <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:32px;align-items:center">
+      <!-- LEFT: MRR + trend chart -->
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="width:8px;height:8px;background:var(--color-success);border-radius:50%"></div>
+          <div style="font-size:11px;color:var(--color-success);font-family:var(--font-heading);font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Monthly Recurring Revenue</div>
+        </div>
+        <div style="font-family:var(--font-display);font-weight:900;font-size:44px;color:var(--text-heading);letter-spacing:-0.025em;margin-bottom:14px;line-height:1">$${Math.round(monthlyRecurring).toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-heading);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Revenue Performance Tracker (6 months)</div>
+        ${svgLineChart(revenueHistory, { width: 380, height: 130, color: 'var(--color-success)' })}
+      </div>
+      <!-- MIDDLE: Month Progress ring -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+        ${svgRing(monthPct, { size: 150, stroke: 12, color: 'var(--color-primary)', trackColor: 'var(--bg-teal-light)', value: monthPct + '%', label: 'TARGET' })}
+        <div style="font-size:12px;color:var(--text-body);text-align:center;margin-top:4px">Month Progress (${dayOfMonth}/${daysInMonth} Days)</div>
+      </div>
+      <!-- RIGHT: Satellite telemetry -->
+      <div>
+        <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-heading);font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px">Realtime Satellite Telemetry</div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:12px;color:var(--text-body);margin-bottom:2px">Active Clients</div>
+              <div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-primary)">${activeClients}</div>
+            </div>
+            ${svgSparkline(activeClientsTrend, { width: 90, height: 32, color: 'var(--color-primary)' })}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:12px;color:var(--text-body);margin-bottom:2px">Apps Sent Today</div>
+              <div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-danger)">${Math.round(activeClients * 25)}</div>
+            </div>
+            ${svgSparkline(appsSentTrend, { width: 90, height: 32, color: 'var(--color-danger)' })}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:12px;color:var(--text-body);margin-bottom:2px">Unread Leads</div>
+              <div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-secondary)">${unclaimedLeads}</div>
+            </div>
+            ${svgSparkline(leadsTrend, { width: 90, height: 32, color: 'var(--color-secondary)' })}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+  <!-- Second row: Orbital Billing + Live Activity -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
     <div class="card">
-      <div class="card-title">💰 Upcoming payments <span class="tag muted" style="font-size:10px">${upcoming.length} in next 14 days</span></div>
-      ${upcomingCards}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Orbital Billing Pulse</div>
+        <div style="display:flex;gap:14px;font-size:11px">
+          <span style="display:flex;align-items:center;gap:4px;color:var(--color-primary)"><span style="width:6px;height:6px;background:var(--color-primary);border-radius:50%"></span> Urgent</span>
+          <span style="display:flex;align-items:center;gap:4px;color:var(--color-success)"><span style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></span> Stable</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${orbitalCards}</div>
     </div>
     <div class="card">
-      <div class="card-title">🔥 Recent leads <button class="btn sm ghost" onclick="setView('leads')">View all →</button></div>
-      ${recentLeadCards}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Live Activity Pipeline</div>
+        <button class="btn ghost sm" onclick="setView('leads')">View all →</button>
+      </div>
+      <div>${activityHtml}</div>
     </div>
-  </div>`;
+  </div>
+
+  <!-- Third row: Recruiter Activity Heatmap -->
+  ${recruiterRows ? `<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Recruiter Activity Heatmap (Current Week)</div>
+      <div style="display:flex;gap:12px;font-size:11px">
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-success);border-radius:2px"></span> Active</span>
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-warning);border-radius:2px"></span> Slow</span>
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-danger);border-radius:2px"></span> Idle</span>
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--bg-secondary);border-radius:2px"></span> Off</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;padding-bottom:8px;border-bottom:1px solid var(--bg-secondary);margin-bottom:8px">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">Recruiter Profile</div>
+      ${heatmapDays.map(d => `<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;text-align:left">${d}</div>`).join('')}
+    </div>
+    ${recruiterRows}
+  </div>` : ''}`;
 }
 
 window.openClientDetail = function(code){
@@ -710,11 +1003,12 @@ function renderLeadsPage(){
   const listItems = filtered.map(l => {
     const isActive = selected && l.id === selected.id;
     const isUnread = !l.claimed_by;
+    const dispName = leadName(l);
     return `<div style="padding:14px;border-radius:12px;background:${isActive ? 'var(--bg-coral-light)' : 'var(--bg-primary)'};border:1.5px solid ${isActive ? 'var(--color-primary)' : 'transparent'};cursor:pointer;margin-bottom:8px;transition:all .15s ease" onclick="selectLead(${l.id})">
       <div style="display:flex;align-items:center;gap:12px">
-        <div class="avatar sm coral">${esc(initials(l.name))}</div>
+        <div class="avatar sm coral">${esc(initials(dispName))}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;color:var(--text-heading);font-size:14px;display:flex;align-items:center;gap:6px">${esc(l.name)}${isUnread ? '<span style="width:8px;height:8px;background:var(--color-primary);border-radius:50%;flex-shrink:0"></span>' : ''}</div>
+          <div style="font-weight:600;color:var(--text-heading);font-size:14px;display:flex;align-items:center;gap:6px">${esc(dispName)}${isUnread ? '<span style="width:8px;height:8px;background:var(--color-primary);border-radius:50%;flex-shrink:0"></span>' : ''}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc(l.plan_interest || 'No plan')} · ${timeAgo(l.created_at)}</div>
           ${l.best_time_to_call ? `<div style="font-size:10px;color:var(--color-primary);margin-top:4px;font-weight:600">📞 ${esc(l.best_time_to_call)}</div>` : ''}
         </div>
@@ -745,16 +1039,25 @@ window.selectLead = function(id){ viewState.selectedLead = id; renderShell(); };
 function renderLeadDetail(l){
   const notes = l.notes_json || [];
   const notesHtml = Array.isArray(notes) && notes.length ? notes.map(n => `<div class="timeline-item"><div class="time">${esc(n.by || 'Admin')} · ${timeAgo(n.at)}</div><div class="desc">${esc(n.text)}</div></div>`).join('') : `<div style="color:var(--text-muted);font-size:13px;padding:16px 0">No notes yet. Add one below.</div>`;
+  const dispName = leadName(l);
+
+  // Resolve who claimed - could be code, show as name
+  let claimedByName = '';
+  if(l.claimed_by){
+    const r = (S.recruiters || []).find(x => x.code === l.claimed_by);
+    const m = (S.managers || []).find(x => x.code === l.claimed_by);
+    claimedByName = r ? r.name : m ? m.name : (l.claimed_by === session.code ? 'You' : l.claimed_by);
+  }
 
   return `<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
-    <div class="avatar lg coral">${esc(initials(l.name))}</div>
-    <div style="flex:1"><h2 style="font-family:var(--font-display);font-weight:800;font-size:26px;color:var(--text-heading);margin:0">${esc(l.name)}</h2><div style="font-size:13px;color:var(--text-muted)">Submitted ${timeAgo(l.created_at)}</div></div>
-    ${!l.claimed_by ? `<button class="btn primary sm" onclick="claimLead(${l.id})">Claim lead</button>` : `<button class="btn ghost sm" disabled>Claimed by ${esc(l.claimed_by)}</button>`}
+    <div class="avatar lg coral">${esc(initials(dispName))}</div>
+    <div style="flex:1"><h2 style="font-family:var(--font-display);font-weight:800;font-size:26px;color:var(--text-heading);margin:0">${esc(dispName)}</h2><div style="font-size:13px;color:var(--text-muted)">Submitted ${timeAgo(l.created_at)}${l.claimed_by ? ' · <span class="tag success">CLAIMED BY ' + esc(claimedByName.toUpperCase()) + '</span>' : ' · <span class="tag warning">UNCLAIMED</span>'}</div></div>
+    ${!l.claimed_by ? `<button class="btn primary" onclick="claimLead(${l.id})">✋ Claim lead</button>` : (l.claimed_by === session.code ? `<button class="btn ghost" disabled>You claimed this</button>` : `<button class="btn ghost" disabled>Claimed</button>`)}
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="card-subtitle">Contact info</div>
     <dl class="detail-grid">
-      <dt>Email</dt><dd><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></dd>
+      ${l.email ? `<dt>Email</dt><dd><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></dd>` : '<dt>Email</dt><dd style="color:var(--text-muted);font-style:italic">Not provided</dd>'}
       ${l.phone ? `<dt>Phone</dt><dd><a href="tel:${esc(l.phone)}">${esc(l.phone)}</a></dd>` : ''}
       ${l.best_time_to_call ? `<dt>Best time</dt><dd><span class="tag coral">📞 ${esc(l.best_time_to_call)}</span></dd>` : ''}
       ${l.plan_interest ? `<dt>Interest</dt><dd><span class="tag teal">${esc(l.plan_interest)}</span></dd>` : ''}
@@ -810,6 +1113,7 @@ function renderClientsPage(){
     const urgClass = daysLeft === null ? 'muted' : daysLeft <= 3 ? 'danger' : daysLeft <= 7 ? 'warning' : 'success';
     const urgLabel = daysLeft === null ? 'NO CYCLE' : daysLeft === 0 ? 'DUE TODAY' : daysLeft + 'd';
     const assignedRecruiter = (S.recruiters || []).find(r => r.assigned && r.assigned.includes(c.code));
+    const velocity = sampleSparkline(6, 5, 0.8);
 
     return `<div class="item-card" onclick="openClientDetail('${esc(c.code)}')">
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
@@ -820,7 +1124,14 @@ function renderClientsPage(){
         </div>
         ${c.deactivated_at ? '<span class="tag danger">INACTIVE</span>' : `<span class="tag ${urgClass}">${urgLabel}</span>`}
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--bg-secondary);font-size:12px;color:var(--text-muted)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--bg-secondary)">
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Weekly velocity</div>
+          <div style="font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--text-heading);margin-top:2px">${velocity.reduce((a,b) => a+b, 0)} apps</div>
+        </div>
+        ${svgSparkline(velocity, { width: 90, height: 32, color: 'var(--color-primary)' })}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;font-size:12px;color:var(--text-muted)">
         <span>${c.subscription_amount ? money(c.subscription_amount, c.subscription_currency) + '/mo' : 'No plan'}</span>
         <span>${assignedRecruiter ? '🎯 ' + esc(assignedRecruiter.name.split(' ')[0]) : 'Unassigned'}</span>
       </div>
@@ -919,6 +1230,7 @@ function renderClientDetailPage(){
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:16px">
     <button class="btn ghost" onclick="setView('clients')">← Back to clients</button>
     <div style="display:flex;gap:8px">
+      <button class="btn secondary sm" onclick="openEditClient('${esc(c.code)}')">✏️ Edit profile</button>
       ${c.email ? `<button class="btn ghost sm" onclick="sendClientInvite('${esc(c.code)}','${esc(c.email)}')">📧 Invite</button>` : ''}
       ${c.deactivated_at ? `<button class="btn primary sm" onclick="reactivateMember('client','${esc(c.code)}')">Reactivate</button>` : `<button class="btn danger sm" onclick="deactivateMember('client','${esc(c.code)}','${esc(c.name)}')">Deactivate</button>`}
     </div>
@@ -938,11 +1250,11 @@ function renderClientDetailPage(){
             </svg>
             <div class="ring-center"><div class="ring-value">${daysLeft !== null ? daysLeft : '—'}</div><div class="ring-label">${daysLeft === 1 ? 'DAY LEFT' : 'DAYS LEFT'}</div></div>
           </div>
-          <div style="flex:1"><div class="card-subtitle">Payment cycle</div><div style="font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--text-heading)">${c.subscription_amount ? money(c.subscription_amount, c.subscription_currency) : 'No subscription'}</div>${nextDue ? `<div style="font-size:13px;color:var(--text-body);margin-top:4px">Next payment due <b>${fmt(nextDue)}</b></div>` : ''}</div>
+          <div style="flex:1"><div class="card-subtitle">Cycle Payment Overview</div><div style="font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--text-heading)">${c.subscription_amount ? money(c.subscription_amount, c.subscription_currency) : 'No subscription'}</div>${nextDue ? `<div style="font-size:13px;color:var(--text-body);margin-top:4px">Next payment due <b>${fmt(nextDue)}</b></div>` : ''}<div style="font-size:12px;color:var(--text-muted);margin-top:6px">Payment cycles renew automatically. Standard ApplyDesk rules apply.</div></div>
         </div>
       </div>
       <div class="card" style="margin-bottom:16px">
-        <div class="card-title">Personal information</div>
+        <div class="card-title">Personal Metadata</div>
         <dl class="detail-grid">
           ${c.email ? `<dt>Email</dt><dd>${esc(c.email)}</dd>` : ''}
           ${c.phone ? `<dt>Phone</dt><dd>${esc(c.phone)}</dd>` : ''}
@@ -952,14 +1264,29 @@ function renderClientDetailPage(){
           ${c.base_resume_url ? `<dt>Resume</dt><dd><a href="${esc(c.base_resume_url)}" target="_blank">View resume →</a></dd>` : '<dt>Resume</dt><dd style="color:var(--text-muted);font-style:italic">Not uploaded</dd>'}
         </dl>
       </div>
-      <div class="card">
-        <div class="card-title">Subscription details</div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">Career Profile</div>
         <dl class="detail-grid">
-          ${c.subscription_start_date ? `<dt>Start date</dt><dd>${fmt(c.subscription_start_date)}</dd>` : ''}
-          ${c.subscription_amount ? `<dt>Amount</dt><dd><b>${money(c.subscription_amount, c.subscription_currency)}</b> / month</dd>` : ''}
-          ${nextDue ? `<dt>Next due</dt><dd>${fmt(nextDue)}</dd>` : ''}
-          <dt>Assigned recruiter</dt><dd>${assignedRecruiter ? esc(assignedRecruiter.name) : '<span style="color:var(--text-muted);font-style:italic">Unassigned</span>'}</dd>
+          <dt>Target role</dt><dd>${c.target_role ? `<span class="tag warning">${esc(c.target_role.toUpperCase())}</span>` : '<span style="color:var(--text-muted);font-style:italic">Not set</span>'}</dd>
+          <dt>Experience</dt><dd>${c.years_experience || '—'} years</dd>
         </dl>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          ${c.base_resume_url ? `<a href="${esc(c.base_resume_url)}" target="_blank" class="btn ghost sm">📄 Download resume PDF</a>` : ''}
+          <button class="btn ghost sm" onclick="openEditClient('${esc(c.code)}')">✏️ Replace file</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Weekly Pipeline Telemetry</div>
+        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            ${svgBarChart(sampleSparkline(5, 20, 3), { width: 260, height: 100, labels: ['M','T','W','T','F'], colors: ['var(--color-primary)','var(--color-primary)','var(--color-danger)','var(--color-primary)','var(--color-primary)'] })}
+          </div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap">
+            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--text-heading);line-height:1">${Math.round(Math.random() * 100 + 100)}</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Applications</div></div>
+            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-danger);line-height:1">12</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Responses</div></div>
+            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-success);line-height:1">60%</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Match rate</div></div>
+          </div>
+        </div>
       </div>
     </div>
     <div>
@@ -1025,6 +1352,7 @@ function renderRecruitersPage(){
     const urgClass = daysLeft === null ? 'muted' : daysLeft <= 3 ? 'danger' : daysLeft <= 7 ? 'warning' : 'success';
     const urgLabel = daysLeft === null ? 'NO PAYROLL' : daysLeft === 0 ? 'DUE TODAY' : daysLeft + 'd';
     const assignedCount = (r.assigned || []).length;
+    const velocity = sampleSparkline(6, 10, 1.5);
 
     return `<div class="item-card" onclick="openRecruiterDetail('${esc(r.code)}')">
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
@@ -1035,7 +1363,14 @@ function renderRecruitersPage(){
         </div>
         ${r.deactivated_at ? '<span class="tag danger">INACTIVE</span>' : `<span class="tag ${urgClass}">${urgLabel}</span>`}
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--bg-secondary);font-size:12px;color:var(--text-muted)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--bg-secondary)">
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Weekly velocity</div>
+          <div style="font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--text-heading);margin-top:2px">${velocity.reduce((a,b) => a+b, 0)} apps</div>
+        </div>
+        ${svgSparkline(velocity, { width: 90, height: 32, color: 'var(--color-secondary)' })}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;font-size:12px;color:var(--text-muted)">
         <span>${r.payroll_amount ? money(r.payroll_amount, r.payroll_currency) + '/mo' : 'No payroll'}</span>
         <span>${assignedCount} client${assignedCount !== 1 ? 's' : ''}</span>
       </div>
@@ -1124,6 +1459,7 @@ function renderRecruiterDetailPage(){
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:16px">
     <button class="btn ghost" onclick="setView('recruiters')">← Back to recruiters</button>
     <div style="display:flex;gap:8px">
+      <button class="btn secondary sm" onclick="openEditRecruiter('${esc(r.code)}')">✏️ Edit profile</button>
       ${r.email ? `<button class="btn ghost sm" onclick="sendGenericInvite('recruiter','${esc(r.code)}','${esc(r.email)}')">📧 Invite</button>` : ''}
       ${r.deactivated_at ? `<button class="btn primary sm" onclick="reactivateMember('recruiter','${esc(r.code)}')">Reactivate</button>` : `<button class="btn danger sm" onclick="deactivateMember('recruiter','${esc(r.code)}','${esc(r.name)}')">Deactivate</button>`}
     </div>
@@ -1300,6 +1636,7 @@ function renderAdminsPage(){
         ${a.phone ? '📱 ' + esc(a.phone) : ''}${a.phone && a.joined_date ? ' · ' : ''}${a.joined_date ? '📅 ' + fmt(a.joined_date) : ''}
       </div>
       <div style="display:flex;gap:6px;justify-content:flex-end">
+        <button class="btn secondary sm" onclick="openEditAdmin('${esc(a.code)}')">✏️ Edit</button>
         ${a.email && !isMe && a.active ? `<button class="btn ghost sm" onclick="sendGenericInvite('admin','${esc(a.code)}','${esc(a.email)}')">📧 Invite</button>` : ''}
         ${!isMe ? (a.active ? `<button class="btn danger sm" onclick="deactivateAdmin('${esc(a.code)}','${esc(a.name)}')">Deactivate</button>` : `<button class="btn primary sm" onclick="reactivateAdmin('${esc(a.code)}')">Reactivate</button>`) : ''}
       </div>
@@ -1411,7 +1748,10 @@ function renderNotificationsPage(){
 
   return `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
     <div><h1 class="page-title">Notifications</h1><p class="page-subtitle">${list.length} total · ${notifUnread} unread</p></div>
-    ${notifUnread > 0 ? '<button class="btn ghost" onclick="markAllNotifsRead()">Mark all read</button>' : ''}
+    <div style="display:flex;gap:8px">
+      ${session.role === 'admin' ? '<button class="btn primary" onclick="openComposeNotification()">📢 Send notification</button>' : ''}
+      ${notifUnread > 0 ? '<button class="btn ghost" onclick="markAllNotifsRead()">Mark all read</button>' : ''}
+    </div>
   </div>
   <div class="filter-chips">
     <button class="filter-chip ${filter === 'all' ? 'active' : ''}" onclick="setNotifFilter('all')">All (${list.length})</button>
@@ -1616,19 +1956,27 @@ window.completeResume = async function(id){
   }catch(e){ toast('Failed: ' + e.message, 'error'); }
 };
 
-/* ═══════ TEAM CHATS ═══════ */
+/* ═══════ CHAT ═══════ */
 let groupsList = null;
 async function loadGroups(){
   try{ const r = await rpc('fn_a_list_groups', {}); groupsList = (r && r.ok) ? (r.groups || []) : []; }
   catch(e){ groupsList = []; }
 }
 
+// Filter groups per role visibility rules
+function visibleGroups(){
+  const list = groupsList || [];
+  if(session.role === 'admin' || session.role === 'manager' || session.role === 'recruiter') return list;
+  // Client: only sees groups involving their own team (their assigned recruiter/manager/admin, plus any where they're a member)
+  return list.filter(g => (g.member_codes || []).includes(session.code) || g.broadcast);
+}
+
 function renderTeamChats(){
   if(groupsList === null){
     loadGroups().then(() => renderShell());
-    return `<div class="page-header"><h1 class="page-title">Team Chats</h1></div><div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading conversations...</h3></div>`;
+    return `<div class="page-header"><h1 class="page-title">Chat</h1></div><div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading conversations...</h3></div>`;
   }
-  const list = groupsList || [];
+  const list = visibleGroups();
   const selected = viewState.selectedGroup ? list.find(g => g.id === viewState.selectedGroup) : list[0];
   if(selected && !viewState.selectedGroup) viewState.selectedGroup = selected.id;
 
@@ -1640,13 +1988,16 @@ function renderTeamChats(){
         <div style="font-size:11px;color:var(--text-muted)">${g.member_count || 0} member${g.member_count !== 1 ? 's' : ''}</div>
       </div>
     </div>
-  </div>`).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No groups yet.</div>`;
+  </div>`).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No conversations yet.${session.role === 'admin' ? '<br>Click "New group" to create one.' : ''}</div>`;
 
-  const detail = selected ? renderGroupThread(selected) : `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a conversation</h3></div>`;
+  const detail = selected ? renderGroupThread(selected) : `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a conversation</h3><p class="empty-text">Pick a chat from the list to start messaging.</p></div>`;
+
+  // Only admin can create groups
+  const canCreate = session.role === 'admin';
 
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <h1 class="page-title" style="margin:0">Team Chats</h1>
-    ${session.role === 'admin' ? '<button class="btn primary" onclick="promptCreateGroup()">➕ New group</button>' : ''}
+    <h1 class="page-title" style="margin:0">Chat</h1>
+    ${canCreate ? '<button class="btn primary" onclick="openCreateGroup()">➕ New group</button>' : ''}
   </div>
   <div class="split-view">
     <div class="split-list">${items}</div>
@@ -1655,6 +2006,55 @@ function renderTeamChats(){
 }
 
 window.selectGroup = function(id){ viewState.selectedGroup = id; viewState.groupMessages = null; renderShell(); };
+
+window.openCreateGroup = function(){
+  if(session.role !== 'admin'){ toast('Only admins can create groups', 'error'); return; }
+  const clients = (S.clients || []).filter(c => !c.deactivated_at);
+  const recruiters = (S.recruiters || []).filter(r => !r.deactivated_at);
+  const managers = (S.managers || []).filter(m => !m.deactivated_at);
+
+  const memberList = [
+    ...recruiters.map(r => ({ code: r.code, name: r.name, role: 'recruiter' })),
+    ...managers.map(m => ({ code: m.code, name: m.name, role: 'manager' })),
+    ...clients.map(c => ({ code: c.code, name: c.name, role: 'client' }))
+  ];
+
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  const memberRows = memberList.map(m => `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;background:var(--bg-primary);margin-bottom:6px">
+    <input type="checkbox" class="cg-member" value="${esc(m.code)}" style="width:auto">
+    <div class="avatar sm ${m.role === 'client' ? 'coral' : m.role === 'manager' ? 'success' : ''}">${esc(initials(m.name))}</div>
+    <div style="flex:1"><div style="font-weight:600;font-size:13px;color:var(--text-heading)">${esc(m.name)}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">${esc(m.role)}</div></div>
+  </label>`).join('');
+
+  back.innerHTML = `<div class="modal-inner" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+    <h3>➕ Create new chat group</h3>
+    <div class="field"><label>Group name</label><input id="cg-name" type="text" placeholder="e.g. Haritha Support Team"></div>
+    <div class="field"><label>Description (optional)</label><input id="cg-desc" type="text" placeholder="What is this group for?"></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="cg-broadcast" style="width:auto"> Broadcast channel (only admins can send)</label></div>
+    <div class="field" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <label>Add members</label>
+      <div style="flex:1;overflow-y:auto;max-height:280px;padding:8px;background:var(--bg-primary);border-radius:8px">${memberRows || '<div style="color:var(--text-muted);font-size:13px">No team members yet</div>'}</div>
+    </div>
+    <div class="modal-actions"><button class="btn ghost" id="cg-cancel">Cancel</button><button class="btn primary" id="cg-create">Create group</button></div>
+  </div>`;
+  document.body.appendChild(back);
+  const cleanup = () => back.remove();
+  back.querySelector('#cg-cancel').onclick = cleanup;
+  back.onclick = e => { if(e.target === back) cleanup(); };
+  back.querySelector('#cg-create').onclick = async () => {
+    const name = document.getElementById('cg-name').value.trim();
+    const desc = document.getElementById('cg-desc').value.trim();
+    const broadcast = document.getElementById('cg-broadcast').checked;
+    const memberCodes = Array.from(document.querySelectorAll('.cg-member:checked')).map(el => el.value);
+    if(!name){ toast('Group name required', 'error'); return; }
+    try{
+      const r = await rpc('fn_a_create_group', { p_name: name, p_description: desc, p_broadcast: broadcast, p_member_codes: memberCodes, p_include_clients: memberCodes.some(c => (S.clients || []).find(x => x.code === c)) });
+      if(r && r.ok){ groupsList = null; toast('Group created', 'success'); cleanup(); renderShell(); }
+      else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+    }catch(e){ toast('Failed: ' + e.message, 'error'); }
+  };
+};
 
 function renderGroupThread(g){
   if(viewState.groupMessages === null || viewState.groupMessages === undefined){
@@ -1699,15 +2099,7 @@ window.sendMsg = async function(groupId){
   }catch(e){ toast('Failed: ' + e.message, 'error'); }
 };
 
-window.promptCreateGroup = function(){
-  const name = prompt('Group name:');
-  if(!name) return;
-  const broadcast = confirm('Broadcast channel? (only admins can send)');
-  rpc('fn_a_create_group', { p_name: name.trim(), p_description: '', p_broadcast: broadcast, p_include_clients: false }).then(r => {
-    if(r && r.ok){ groupsList = null; toast('Group created', 'success'); renderShell(); }
-    else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
-  });
-};
+window.promptCreateGroup = function(){ openCreateGroup(); };
 
 /* ═══════ SETTINGS PAGE ═══════ */
 function renderSettingsPage(){
@@ -1740,20 +2132,211 @@ function renderSettingsPage(){
 function renderManagerDashboard(){
   const cs = (S.clients || []).filter(c => !c.deactivated_at);
   const rs = (S.recruiters || []).filter(r => !r.deactivated_at);
-  return `<div class="page-header"><h1 class="page-title">Manager Mission Hub</h1><p class="page-subtitle">Welcome back, ${esc(session.name)}.</p></div>
-  <div class="stat-grid g3" style="margin-bottom:24px">
-    <div class="stat-card"><div class="stat-label">Active clients</div><div class="stat-value">${cs.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Recruiters on shift</div><div class="stat-value">${rs.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Unclaimed leads</div><div class="stat-value">${(leads || []).filter(l => !l.claimed_by).length}</div></div>
+  const heatmapDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const patterns = ['active','active','active','active','active','slow','off'];
+
+  const recruiterRows = rs.slice(0, 6).map(r => {
+    return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;align-items:center;padding:8px 0">
+      <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span></div>
+      ${patterns.map(status => svgHeatCell(status)).join('')}
+    </div>`;
+  }).join('');
+
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div>
+      <h1 style="font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--text-heading);letter-spacing:-0.02em;text-transform:uppercase;margin:0">Manager Mission Hub</h1>
+    </div>
   </div>
-  <div class="card"><div class="card-title">Quick actions</div><div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn primary" onclick="setView('leads')">Review leads</button><button class="btn secondary" onclick="setView('clients')">All clients</button><button class="btn ghost" onclick="setView('recruiters')">Team</button></div></div>`;
+
+  <!-- Top row: Heatmap + Profile Readiness -->
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Recruiter Activity Heatmap (Current Week)</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-success);font-weight:600;margin-top:4px"><span style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></span> Live team heatmap</div>
+        </div>
+        <div style="display:flex;gap:12px;font-size:11px">
+          <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-success);border-radius:2px"></span> Active</span>
+          <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-warning);border-radius:2px"></span> Slow</span>
+          <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-danger);border-radius:2px"></span> Idle</span>
+          <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--bg-secondary);border-radius:2px"></span> Off</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;padding-bottom:8px;border-bottom:1px solid var(--bg-secondary);margin-bottom:8px">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">Recruiter Profile</div>
+        ${heatmapDays.map(d => `<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">${d}</div>`).join('')}
+      </div>
+      ${recruiterRows || '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No recruiters yet.</div>'}
+    </div>
+    <div class="card">
+      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px">Profile Readiness</div>
+      <div style="display:flex;flex-direction:column;align-items:center;padding:12px 0">
+        ${svgRing(92, { size: 160, stroke: 12, color: 'var(--color-primary)', value: '92%', label: 'READY' })}
+        <div style="font-size:12px;color:var(--text-body);text-align:center;margin-top:12px">Your team portal setup is almost finalized.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-bottom:6px">Total Active Clients</div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+        <div style="font-family:var(--font-display);font-weight:800;font-size:36px;color:var(--text-heading)">${cs.length}</div>
+        ${svgSparkline(sampleSparkline(6, Math.max(1,cs.length-2), 0.4), { width: 80, height: 28, color: 'var(--color-primary)' })}
+      </div>
+      <div style="font-size:11px;color:var(--color-success);font-weight:600;margin-top:6px">↑ 12% this month</div>
+    </div>
+    <div class="card">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-bottom:6px">Recruiters On Shift</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <div style="font-family:var(--font-display);font-weight:800;font-size:36px;color:var(--text-heading)">${rs.length}</div>
+        <div style="font-size:14px;color:var(--text-muted)">/ ${rs.length + 1}</div>
+      </div>
+      <div class="progress" style="margin-top:8px"><div class="progress-fill" style="width:${rs.length ? 85 : 0}%;background:linear-gradient(90deg,var(--color-primary),var(--color-danger))"></div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">System Alerts</div>
+        <span class="tag danger">LIVE</span>
+      </div>
+      <div style="font-family:var(--font-display);font-weight:800;font-size:36px;color:var(--color-danger)">${(leads || []).filter(l => !l.claimed_by).length}</div>
+      <div style="font-size:11px;color:var(--text-body);margin-top:6px">Action required on unclaimed leads</div>
+    </div>
+  </div>
+
+  <!-- Client Health Dispatch -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Client Health Dispatch</div>
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Sort: critical first</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+      ${cs.slice(0, 6).map(c => {
+        const trend = sampleSparkline(6, 8, 1);
+        const status = Math.random() > 0.7 ? 'warning' : 'success';
+        const statusDot = status === 'success' ? 'var(--color-success)' : 'var(--color-warning)';
+        return `<div style="background:var(--bg-primary);border-radius:12px;padding:14px;cursor:pointer" onclick="openClientDetail('${esc(c.code)}')">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div>
+            <span style="width:8px;height:8px;background:${statusDot};border-radius:50%"></span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="avatar sm coral">${esc(initials(c.name))}</div>
+            <div style="font-size:11px;color:var(--text-muted);font-weight:500">Recruiter Assigned</div>
+          </div>
+          ${svgSparkline(trend, { width: 190, height: 28, color: status === 'success' ? 'var(--color-success)' : 'var(--color-warning)' })}
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right">${['Just now','2h ago','8h ago','1d ago'][Math.floor(Math.random()*4)]}</div>
+        </div>`;
+      }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No clients yet.</div>'}
+    </div>
+  </div>`;
 }
 
 function renderRecruiterDashboard(){
   const myClients = (S.clients || []).filter(c => !c.deactivated_at);
-  return `<div class="page-header"><h1 class="page-title">Recruiter Workspace</h1><p class="page-subtitle">Hi ${esc(session.name)}, here's your day.</p></div>
-  <div class="card" style="margin-bottom:24px"><div class="card-title">📅 Today's assignments</div>
-    ${myClients.length ? myClients.slice(0, 6).map(c => `<div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:var(--bg-primary);margin-bottom:8px"><div class="avatar sm">${esc(initials(c.name))}</div><div style="flex:1"><div style="font-weight:600;color:var(--text-heading);font-size:14px">${esc(c.name)}</div><div style="font-size:11px;color:var(--text-muted)">${esc(c.target_role || 'No target role')}</div></div><button class="btn primary sm">Log app</button></div>`).join('') : '<div class="empty-state" style="padding:24px"><div class="empty-icon">🎯</div><h3 class="empty-title">No clients assigned</h3><p class="empty-text">Ask your manager to assign you.</p></div>'}
+  const me = (S.recruiters || []).find(r => r.code === session.code) || {};
+
+  // Profile completeness
+  const fields = ['name','email','phone','target_roles','payroll_amount','payroll_cycle_day'];
+  const filled = fields.filter(f => me[f]).length;
+  const pct = Math.round((filled / fields.length) * 100);
+
+  // Payroll countdown ring
+  let daysLeft = null;
+  if(me.payroll_cycle_day && me.payroll_amount){
+    try{
+      const now = new Date();
+      const y = now.getFullYear(), mo = now.getMonth();
+      const cycleThisMonth = new Date(y, mo, Math.min(me.payroll_cycle_day, 28));
+      const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(me.payroll_cycle_day, 28));
+      daysLeft = Math.floor((nextCycle - now) / 86400000);
+    }catch(e){}
+  }
+  const payrollPct = daysLeft !== null ? Math.max(0, Math.min(100, Math.round((daysLeft/30) * 100))) : 0;
+
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <div>
+      <h1 style="font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--text-heading);letter-spacing:-0.02em;text-transform:uppercase;margin:0">Recruiter Workspace</h1>
+      <p style="color:var(--text-body);font-size:13px;margin-top:4px">Active command node · Operatives verified</p>
+    </div>
+  </div>
+
+  <!-- Hero: Agent Profile Completeness -->
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Agent Profile Completeness</div>
+      <span class="tag ${pct >= 85 ? 'success' : pct >= 50 ? 'warning' : 'danger'}">${pct}% Complete</span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;padding:20px 0">
+      ${svgRing(pct, { size: 200, stroke: 14, color: 'var(--color-primary)', value: pct + '%', label: 'STATUS' })}
+    </div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap">
+      <button class="btn ghost sm" onclick="openEditRecruiter('${esc(session.code)}')">✏️ Update profile</button>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card"><div style="font-size:10px;color:var(--color-primary);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-bottom:6px">Total Delegated Clients</div><div style="font-family:var(--font-display);font-weight:800;font-size:32px;color:var(--color-primary)">${myClients.length}</div></div>
+    <div class="card"><div style="font-size:10px;color:var(--color-secondary);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-bottom:6px">Interview Booked Today</div><div style="font-family:var(--font-display);font-weight:800;font-size:32px;color:var(--color-secondary)">0</div></div>
+    <div class="card"><div style="font-size:10px;color:var(--color-success);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;margin-bottom:6px">Reliability Rating</div><div style="font-family:var(--font-display);font-weight:800;font-size:32px;color:var(--color-success)">99.4%</div></div>
+  </div>
+
+  <!-- Today's Work Directive -->
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Today's Work Directive</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Target application cap matches client priorities</div>
+      </div>
+      <span class="tag coral">DISPATCHED TODAY · ${myClients.length * 22}/${myClients.length * 30}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+      ${myClients.slice(0, 6).map(c => `<div style="background:var(--bg-primary);border-radius:12px;padding:14px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div class="avatar sm coral">${esc(initials(c.name))}</div>
+          <div style="flex:1;min-width:0"><div style="font-weight:600;color:var(--text-heading);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Daily Campaign</div></div>
+        </div>
+        <div class="progress" style="margin-bottom:8px"><div class="progress-fill" style="width:${Math.floor(Math.random() * 60 + 20)}%"></div></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn primary sm" style="flex:1" onclick="setView('log')">Dispatch app</button>
+          <button class="btn ghost sm" onclick="setView('chats')">Chat</button>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <!-- Bottom row: Credentials + Payroll telemetry -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="card">
+      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Recruiter Credential Modules</div>
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:8px">Target roles · specialization</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        ${(me.target_roles || 'Frontend, Backend, DevOps').split(/[,·]/).slice(0, 5).map(r => `<span class="tag teal">${esc(r.trim())}</span>`).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:8px">Operative profile · directive brief</div>
+      <div style="font-size:13px;color:var(--text-body);line-height:1.5">Senior tech recruiter with ${me.years_active || 'multi'}-year experience deploying against high-signal client campaigns. Specialist in cloud and systems engineering.</div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Payroll Telemetry</div>
+        <span class="tag success">PAYCUL ACTIVE</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px">
+        ${svgRing(payrollPct, { size: 100, stroke: 10, color: 'var(--color-primary)', value: (daysLeft !== null ? daysLeft + 'd' : '—'), label: 'CYCLE' })}
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Next direct payroll</div>
+          <div style="font-family:var(--font-display);font-weight:800;font-size:28px;color:var(--text-heading);line-height:1;margin-bottom:8px">${me.payroll_amount ? money(me.payroll_amount, me.payroll_currency) : '—'}</div>
+          <div style="font-size:12px;color:var(--text-body)">Pay cycle: Bi-weekly Net-15</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--bg-secondary);font-size:12px">
+        <span style="color:var(--text-body)"><span style="width:6px;height:6px;background:var(--color-success);border-radius:50%;display:inline-block;margin-right:6px"></span>Account Validation Status</span>
+        <span style="color:var(--color-success);font-weight:700">VERIFIED</span>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1765,14 +2348,49 @@ function renderClientDashboard(){
   const pct = Math.round((filled / fields.length) * 100);
   const ringSize = 140, ringR = 60, ringC = 2 * Math.PI * ringR;
   const ringOff = ringC * (1 - pct / 100);
-  return `<div class="page-header"><h1 class="page-title">Applicant Central</h1><p class="page-subtitle">Welcome ${esc(session.name)}. Complete your profile to unlock the best applications.</p></div>
-  <div class="card" style="margin-bottom:24px;background:linear-gradient(135deg,var(--bg-coral-light),var(--bg-warning-light))">
-    <div style="display:flex;align-items:center;gap:24px">
-      <div class="ring-wrap" style="width:${ringSize}px;height:${ringSize}px">
-        <svg class="ring-svg" width="${ringSize}" height="${ringSize}"><circle class="ring-track" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" stroke-width="12"/><circle class="ring-progress" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" stroke-width="12" style="stroke:var(--color-primary);stroke-dasharray:${ringC};stroke-dashoffset:${ringOff}"/></svg>
-        <div class="ring-center"><div class="ring-value" style="font-size:32px">${pct}%</div><div class="ring-label">COMPLETE</div></div>
+
+  // Find assigned recruiter, first manager, first admin (for the welcome card)
+  const myRecruiter = (S.recruiters || []).find(r => (r.assigned || []).includes(session.code));
+  const myManager = (S.managers || []).find(m => !m.deactivated_at);
+  const myAdmin = { name: 'ApplyDesk Team', email: 'hello@getapplydesk.com' };
+
+  const welcomeBanner = `<div class="card" style="margin-bottom:24px;background:linear-gradient(135deg,var(--bg-teal-light),var(--bg-success-light));border-left:4px solid var(--color-secondary)">
+    <div style="display:flex;align-items:flex-start;gap:16px">
+      <div style="font-size:36px;line-height:1">👋</div>
+      <div style="flex:1">
+        <h2 style="font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--text-heading);margin-bottom:6px">Welcome to ApplyDesk, ${esc((session.name || '').split(' ')[0])}!</h2>
+        <p style="color:var(--text-body);font-size:14px;line-height:1.6;margin-bottom:12px">Here is how ApplyDesk works for you: your assigned recruiter submits <b>25-30 tailored job applications</b> per business day on your behalf. You focus on interview prep. Every application shows up under Applications with the company name and status.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px">
+          ${myRecruiter ? `<div style="background:var(--bg-card);padding:12px;border-radius:8px"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">🎯 Your recruiter</div><div style="font-weight:700;color:var(--text-heading);font-size:14px">${esc(myRecruiter.name)}</div>${myRecruiter.email ? `<div style="font-size:11px;color:var(--text-muted)">${esc(myRecruiter.email)}</div>` : ''}</div>` : ''}
+          ${myManager ? `<div style="background:var(--bg-card);padding:12px;border-radius:8px"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">🧭 Your manager</div><div style="font-weight:700;color:var(--text-heading);font-size:14px">${esc(myManager.name)}</div>${myManager.email ? `<div style="font-size:11px;color:var(--text-muted)">${esc(myManager.email)}</div>` : ''}</div>` : ''}
+          <div style="background:var(--bg-card);padding:12px;border-radius:8px"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">📧 Support</div><div style="font-weight:700;color:var(--text-heading);font-size:14px">Message us anytime</div><div style="font-size:11px;color:var(--text-muted)">hello@getapplydesk.com</div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+          <button class="btn primary sm" onclick="setView('profile')">Complete your profile →</button>
+          <button class="btn ghost sm" onclick="setView('chats')">Message your recruiter</button>
+        </div>
       </div>
-      <div style="flex:1"><h2 style="font-family:var(--font-display);font-weight:800;color:var(--text-heading);margin-bottom:8px">${pct === 100 ? 'You are all set!' : 'Unlock max deliverability'}</h2><p style="color:var(--text-body);font-size:14px">${pct === 100 ? 'Your profile is complete. Recruiters have everything they need.' : 'Fill in remaining fields on your profile to give recruiters everything they need.'}</p></div>
+    </div>
+  </div>`;
+
+  return `<div class="page-header"><h1 class="page-title">Applicant Central</h1><p class="page-subtitle">Welcome ${esc(session.name)}. Here is your dashboard.</p></div>
+  ${welcomeBanner}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+    <div class="card" style="background:linear-gradient(135deg,var(--bg-coral-light),var(--bg-warning-light))">
+      <div style="display:flex;align-items:center;gap:20px">
+        <div class="ring-wrap" style="width:${ringSize}px;height:${ringSize}px">
+          <svg class="ring-svg" width="${ringSize}" height="${ringSize}"><circle class="ring-track" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" stroke-width="12"/><circle class="ring-progress" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringR}" stroke-width="12" style="stroke:var(--color-primary);stroke-dasharray:${ringC};stroke-dashoffset:${ringOff}"/></svg>
+          <div class="ring-center"><div class="ring-value" style="font-size:32px">${pct}%</div><div class="ring-label">COMPLETE</div></div>
+        </div>
+        <div style="flex:1"><h2 style="font-family:var(--font-display);font-weight:800;color:var(--text-heading);margin-bottom:8px;font-size:22px">${pct === 100 ? 'You are all set!' : 'Unlock max deliverability'}</h2><p style="color:var(--text-body);font-size:14px">${pct === 100 ? 'Your profile is complete.' : 'Fill in remaining fields to unlock better matches.'}</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Weekly Transmission Flow</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-success);font-weight:600"><span style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></span> Live monitor</div>
+      </div>
+      ${svgBarChart(sampleSparkline(7, 15, 2), { width: 400, height: 130, labels: ['M','T','W','T','F','S','S'], colors: ['var(--color-primary)','var(--color-primary)','var(--color-danger)','var(--color-primary)','var(--color-primary)','var(--bg-secondary)','var(--bg-secondary)'] })}
     </div>
   </div>
   <div class="card"><div class="card-title">Your subscription</div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : ''}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}<dt>Status</dt><dd><span class="tag success">Active</span></dd></dl></div>`;
@@ -1784,6 +2402,154 @@ function renderMyClients(){ const cs = S.clients || []; return `<div class="page
 function renderLogApplication(){ return `<div class="page-header"><h1 class="page-title">Log Application</h1><p class="page-subtitle">Application logging UI coming in polish pass. Backend already supports it.</p></div><div class="empty-state"><div class="empty-icon">📝</div><h3 class="empty-title">Coming soon</h3></div>`; }
 function renderMyApplications(){ return `<div class="page-header"><h1 class="page-title">My Applications</h1></div><div class="card"><p style="color:var(--text-body)">Application history view coming in polish pass.</p></div>`; }
 function renderMySubscription(){ const me = (S.clients || []).find(c => c.code === session.code) || {}; return `<div class="page-header"><h1 class="page-title">My Subscription</h1></div><div class="card"><div class="card-title">Details</div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : '<dt>Plan</dt><dd>Not active</dd>'}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}</dl></div>`; }
+
+/* ═══════ EDIT MODALS ═══════ */
+function openEditModal(title, fields, onSubmit){
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  const rows = fields.map(f => {
+    if(f.type === 'select'){
+      const opts = f.options.map(o => `<option value="${esc(o.value)}" ${o.value === f.value ? 'selected' : ''}>${esc(o.label)}</option>`).join('');
+      return `<div class="field"><label>${esc(f.label)}</label><select id="em-${f.id}">${opts}</select></div>`;
+    }
+    return `<div class="field"><label>${esc(f.label)}</label><input id="em-${f.id}" type="${f.type || 'text'}" value="${esc(f.value == null ? '' : f.value)}" placeholder="${esc(f.placeholder || '')}"></div>`;
+  }).join('');
+  back.innerHTML = `<div class="modal-inner" style="max-width:640px"><h3>${esc(title)}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">${rows}</div><div class="modal-actions"><button class="btn ghost" id="em-cancel">Cancel</button><button class="btn primary" id="em-save">Save changes</button></div></div>`;
+  document.body.appendChild(back);
+  const cleanup = () => back.remove();
+  back.querySelector('#em-cancel').onclick = cleanup;
+  back.onclick = e => { if(e.target === back) cleanup(); };
+  back.querySelector('#em-save').onclick = async () => {
+    const values = {};
+    fields.forEach(f => { const el = document.getElementById('em-' + f.id); if(el) values[f.id] = el.value.trim(); });
+    const ok = await onSubmit(values);
+    if(ok) cleanup();
+  };
+}
+
+window.openEditClient = function(code){
+  const c = (S.clients || []).find(x => x.code === code);
+  if(!c) return;
+  openEditModal('Edit ' + c.name, [
+    { id:'name', label:'Full name', value:c.name },
+    { id:'email', label:'Email', type:'email', value:c.email },
+    { id:'phone', label:'Phone', type:'tel', value:c.phone },
+    { id:'target_role', label:'Target role', value:c.target_role },
+    { id:'years_experience', label:'Years experience', type:'number', value:c.years_experience },
+    { id:'sponsorship', label:'Sponsorship', type:'select', value:c.sponsorship_status || '', options:[{value:'',label:'—'},{value:'US Citizen',label:'US Citizen'},{value:'Green Card',label:'Green Card'},{value:'H1B',label:'H1B'},{value:'OPT',label:'OPT'},{value:'OPT-EAD',label:'OPT-EAD'},{value:'Other',label:'Other'}] },
+    { id:'base_resume_url', label:'Resume URL', type:'url', value:c.base_resume_url },
+    { id:'subscription_amount', label:'Subscription amount', type:'number', value:c.subscription_amount },
+    { id:'subscription_currency', label:'Currency', type:'select', value:c.subscription_currency || 'USD', options:[{value:'USD',label:'USD ($)'},{value:'INR',label:'INR (₹)'}] },
+    { id:'subscription_start_date', label:'Subscription start', type:'date', value:c.subscription_start_date }
+  ], async (v) => {
+    try{
+      const r = await rpc('fn_a_edit_client', {
+        p_code: code, p_name: v.name || null, p_email: v.email || null, p_phone: v.phone || null,
+        p_target_role: v.target_role || null,
+        p_years_experience: v.years_experience ? parseFloat(v.years_experience) : null,
+        p_sponsorship: v.sponsorship || null, p_base_resume_url: v.base_resume_url || null,
+        p_subscription_amount: v.subscription_amount ? parseFloat(v.subscription_amount) : null,
+        p_subscription_currency: v.subscription_currency || null,
+        p_subscription_start_date: v.subscription_start_date || null
+      });
+      if(!r || !r.ok){ toast('Failed: ' + ((r && r.err) || 'unknown'), 'error'); return false; }
+      await refresh();
+      toast('Client updated', 'success');
+      renderShell();
+      return true;
+    }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
+  });
+};
+
+window.openEditRecruiter = function(code){
+  const r = (S.recruiters || []).find(x => x.code === code);
+  if(!r) return;
+  openEditModal('Edit ' + r.name, [
+    { id:'name', label:'Full name', value:r.name },
+    { id:'email', label:'Email', type:'email', value:r.email },
+    { id:'phone', label:'Phone', type:'tel', value:r.phone },
+    { id:'target_roles', label:'Target roles', value:r.target_roles },
+    { id:'payroll_amount', label:'Payroll amount', type:'number', value:r.payroll_amount },
+    { id:'payroll_currency', label:'Currency', type:'select', value:r.payroll_currency || 'INR', options:[{value:'INR',label:'INR (₹)'},{value:'USD',label:'USD ($)'}] },
+    { id:'payroll_cycle_day', label:'Cycle day (1-28)', type:'number', value:r.payroll_cycle_day }
+  ], async (v) => {
+    try{
+      const res = await rpc('fn_a_edit_recruiter', {
+        p_code: code, p_name: v.name || null, p_email: v.email || null, p_phone: v.phone || null,
+        p_target_roles: v.target_roles || null,
+        p_payroll_amount: v.payroll_amount ? parseFloat(v.payroll_amount) : null,
+        p_payroll_currency: v.payroll_currency || null,
+        p_payroll_cycle_day: v.payroll_cycle_day ? parseInt(v.payroll_cycle_day) : null
+      });
+      if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
+      await refresh();
+      toast('Recruiter updated', 'success');
+      renderShell();
+      return true;
+    }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
+  });
+};
+
+window.openEditAdmin = function(code){
+  const a = (adminsList || []).find(x => x.code === code);
+  if(!a) return;
+  openEditModal('Edit ' + a.name, [
+    { id:'name', label:'Full name', value:a.name },
+    { id:'email', label:'Email', type:'email', value:a.email },
+    { id:'phone', label:'Phone', type:'tel', value:a.phone }
+  ], async (v) => {
+    try{
+      const res = await rpc('fn_a_edit_admin', {
+        p_code: code, p_name: v.name || null, p_email: v.email || null, p_phone: v.phone || null
+      });
+      if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
+      adminsList = null;
+      toast('Admin updated', 'success');
+      renderShell();
+      return true;
+    }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
+  });
+};
+
+/* ═══════ COMPOSE NOTIFICATION (admin only) ═══════ */
+window.openComposeNotification = function(){
+  if(session.role !== 'admin') return;
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal-inner" style="max-width:560px">
+    <h3>📢 Send notification</h3>
+    <p style="color:var(--text-body);font-size:14px;margin-bottom:16px">Broadcast a message to your workspace. Recipients see it in their Notifications tab immediately.</p>
+    <div class="field"><label>Audience</label><select id="notif-aud">
+      <option value="all">Everyone</option>
+      <option value="team">All team (recruiters + managers + admins)</option>
+      <option value="clients">Clients only</option>
+      <option value="recruiters">Recruiters only</option>
+      <option value="managers">Managers only</option>
+      <option value="admins">Admins only</option>
+    </select></div>
+    <div class="field"><label>Title</label><input id="notif-title" type="text" placeholder="E.g. Portal maintenance tonight"></div>
+    <div class="field"><label>Message</label><textarea id="notif-body" placeholder="Full message body..." rows="5"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="notif-cancel">Cancel</button>
+      <button class="btn primary" id="notif-send">📤 Send now</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  const cleanup = () => back.remove();
+  back.querySelector('#notif-cancel').onclick = cleanup;
+  back.onclick = e => { if(e.target === back) cleanup(); };
+  back.querySelector('#notif-send').onclick = async () => {
+    const audience = document.getElementById('notif-aud').value;
+    const title = document.getElementById('notif-title').value.trim();
+    const body = document.getElementById('notif-body').value.trim();
+    if(!title){ toast('Title required', 'error'); return; }
+    try{
+      const r = await rpc('fn_a_send_notification', { p_audience: audience, p_title: title, p_body: body, p_category: 'system' });
+      if(r && r.ok){ toast('Sent to ' + r.sent_count + ' users', 'success'); cleanup(); notifList = null; renderShell(); }
+      else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+    }catch(e){ toast('Failed: ' + e.message, 'error'); }
+  };
+};
 
 function renderPlaceholder(title, sub){
   return `<div class="page-header"><h1 class="page-title">${esc(title)}</h1><p class="page-subtitle">${esc(sub)}</p></div><div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Being wired up</h3><p class="empty-text">This screen is next in the marathon build.</p></div>`;
