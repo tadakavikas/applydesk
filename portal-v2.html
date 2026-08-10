@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ApplyDesk - Mission Control</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/png" href="/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800;900&family=Inter:wght@600;700&family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+/* ══════════ DESIGN TOKENS (locked, from Figma) ══════════ */
+:root{
+  --bg-primary:#FFF8F0;
+  --bg-card:#FFFFFF;
+  --bg-secondary:#FFF1EC;
+  --color-primary:#FF6B47;
+  --color-primary-hover:#E5502D;
+  --color-secondary:#0F7871;
+  --color-success:#7CB342;
+  --color-warning:#FFC53D;
+  --text-heading:#1A1F2E;
+  --text-body:#5A6478;
+  --text-muted:#8B94A6;
+  --bg-success-light:#EFF5DA;
+  --bg-teal-light:#E6F2F1;
+  --red:#D64550; --red-bg:#FCEBED;
+  --font-display:'Outfit',sans-serif;
+  --font-heading:'Inter',sans-serif;
+  --font-body:'Geist',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --radius-sm:4px; --radius-md:8px; --radius-lg:12px; --radius-xl:16px;
+  --radius-2xl:20px; --radius-3xl:24px; --radius-full:100px;
+  --shadow-card:0 2px 12px rgba(26,31,46,.06);
+  --shadow-lift:0 14px 44px rgba(26,31,46,.10);
+  --line:rgba(26,31,46,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-body);background:var(--bg-primary);color:var(--text-body);line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:var(--font-body);font-size:14.5px;color:var(--text-heading);background:var(--bg-card);border:1px solid rgba(26,31,46,.14);border-radius:var(--radius-md);padding:11px 13px;width:100%;outline:none;transition:border-color .15s ease,box-shadow .15s ease}
+input:focus,select:focus,textarea:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(255,107,71,.13)}
+h1,h2,h3{color:var(--text-heading);font-family:var(--font-heading)}
+
+/* busy bar */
+#busy{display:none;position:fixed;top:0;left:0;right:0;height:3px;z-index:300;background:linear-gradient(90deg,var(--color-primary),var(--color-warning),var(--color-primary));background-size:200% 100%;animation:busyslide 1s linear infinite}
+@keyframes busyslide{0%{background-position:0 0}100%{background-position:200% 0}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-heading);font-weight:700;font-size:14px;padding:11px 20px;border-radius:var(--radius-full);border:2px solid transparent;background:var(--bg-card);color:var(--text-heading);border-color:rgba(26,31,46,.15);transition:transform .14s ease,background .14s ease,border-color .14s ease,color .14s ease}
+.btn:hover{transform:translateY(-1px);border-color:var(--text-heading)}
+.btn.primary{background:var(--color-primary);color:#fff;border-color:transparent;box-shadow:0 8px 20px rgba(255,107,71,.3)}
+.btn.primary:hover{background:var(--color-primary-hover);border-color:transparent}
+.btn.ghost{background:transparent}
+.btn.red{background:var(--red-bg);color:var(--red);border-color:transparent}
+.btn.sm{padding:7px 14px;font-size:12.5px}
+
+/* cards + misc */
+.card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow-card);padding:22px}
+.muted{color:var(--text-muted);font-size:13.5px}
+.center{text-align:center}
+.field{margin-bottom:14px}
+.field label{display:block;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px}
+.mono-tag{font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+
+/* ══════════ LOGIN SCREEN ══════════ */
+.login-wrap{max-width:980px;margin:0 auto;padding:7vh 24px 40px;display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;min-height:88vh}
+.login-hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--color-primary);background:var(--bg-secondary);border:1px solid rgba(255,107,71,.25);padding:6px 14px;border-radius:var(--radius-full);margin-bottom:18px}
+.login-hero h1{font-family:var(--font-display);font-weight:900;font-size:46px;letter-spacing:-0.02em;line-height:1.05;margin-bottom:14px}
+.login-hero h1 em{font-style:normal;color:var(--color-primary)}
+.login-hero p{font-size:15.5px;margin-bottom:24px;max-width:400px}
+.login-points{display:grid;gap:11px;font-size:14px}
+.login-points div{display:flex;gap:10px;align-items:center}
+.login-points .ck{width:22px;height:22px;border-radius:50%;background:var(--bg-success-light);color:#5a8f21;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.login-card{padding:30px 28px;border-radius:var(--radius-2xl);box-shadow:var(--shadow-lift)}
+.login-card h2{font-size:20px;margin-bottom:4px}
+.or-split{border-top:1px solid var(--line);margin:20px 0 14px;position:relative}
+.or-split span{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--bg-card);padding:0 10px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);letter-spacing:.1em}
+.err-band{background:var(--red-bg);color:var(--red);border:1px solid rgba(214,69,80,.25);border-radius:var(--radius-lg);padding:12px 16px;font-weight:600;font-size:14px;margin-bottom:14px}
+
+/* ══════════ APP SHELL ══════════ */
+.shell{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+.sidebar{background:var(--bg-card);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;padding:22px 14px 16px}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--font-heading);font-weight:700;font-size:18px;color:var(--text-heading);padding:0 10px;margin-bottom:26px}
+.logo .mark{width:32px;height:32px;background:var(--color-primary);border-radius:9px;color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:900;font-size:16px;box-shadow:0 6px 14px rgba(255,107,71,.32)}
+.logo em{font-style:normal;color:var(--color-primary)}
+.nav-list{display:flex;flex-direction:column;gap:3px;flex:1;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-lg);font-size:14px;font-weight:500;color:var(--text-body);border:1px solid transparent;transition:background .12s ease,color .12s ease;position:relative}
+.nav-item:hover{background:var(--bg-primary);color:var(--text-heading)}
+.nav-item.active{background:var(--bg-secondary);color:var(--color-primary-hover);font-weight:600;border-color:rgba(255,107,71,.18)}
+.nav-item svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--color-primary);color:#fff;font-family:var(--font-mono);font-size:10px;font-weight:600;min-width:19px;height:19px;border-radius:var(--radius-full);display:flex;align-items:center;justify-content:center;padding:0 6px}
+.nav-sep{margin:12px 12px 8px;font-family:var(--font-mono);font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted)}
+.user-card{border-top:1px solid var(--line);padding:14px 8px 0;display:flex;align-items:center;gap:11px}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--bg-teal-light);color:var(--color-secondary);font-family:var(--font-display);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.user-meta{flex:1;min-width:0}
+.user-meta .un{font-family:var(--font-heading);font-weight:700;font-size:13.5px;color:var(--text-heading);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-meta .ur{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+.logout-btn{background:none;border:none;color:var(--text-muted);padding:6px;border-radius:var(--radius-md);transition:color .12s ease,background .12s ease}
+.logout-btn:hover{color:var(--red);background:var(--red-bg)}
+.logout-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+.workspace{padding:26px 34px 44px;min-width:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px;flex-wrap:wrap}
+.topbar h1{font-family:var(--font-display);font-weight:800;font-size:27px;letter-spacing:-0.015em}
+.topbar .crumb{font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px}
+.conn-pill{display:inline-flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-full);padding:8px 15px;font-size:12.5px;font-weight:600;color:var(--text-heading);box-shadow:var(--shadow-card)}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--color-success);animation:blink 1.8s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* placeholder + stat cards */
+.ph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow-card);padding:20px}
+.stat-card .k{font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:9px}
+.stat-card .v{font-family:var(--font-display);font-weight:900;font-size:34px;color:var(--text-heading);line-height:1}
+.stat-card.hi{background:var(--bg-secondary);border-color:rgba(255,107,71,.18)}
+.stat-card.hi .v{color:var(--color-primary)}
+.ph-block{background:var(--bg-card);border:1px dashed rgba(26,31,46,.2);border-radius:var(--radius-2xl);padding:52px 30px;text-align:center}
+.ph-block .ph-ic{width:58px;height:58px;border-radius:var(--radius-xl);background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.ph-block .ph-ic svg{width:26px;height:26px;fill:none;stroke:var(--color-primary);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ph-block h3{font-size:18px;margin-bottom:8px}
+.ph-block p{max-width:420px;margin:0 auto 16px;font-size:14.5px}
+.sprint-tag{display:inline-block;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--color-secondary);background:var(--bg-teal-light);padding:6px 14px;border-radius:var(--radius-full)}
+
+/* ══════════ RESPONSIVE ══════════ */
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .sidebar{position:sticky;top:0;height:auto;flex-direction:row;align-items:center;gap:8px;padding:10px 12px;z-index:60;border-right:none;border-bottom:1px solid var(--line)}
+  .logo{margin-bottom:0;font-size:0}
+  .logo .mark{font-size:16px}
+  .nav-list{flex-direction:row;overflow-x:auto;scrollbar-width:none}
+  .nav-list::-webkit-scrollbar{display:none}
+  .nav-item{white-space:nowrap;padding:8px 11px;font-size:13px}
+  .nav-sep{display:none}
+  .user-card{border-top:none;padding:0;gap:8px}
+  .user-meta{display:none}
+  .workspace{padding:20px 16px 40px}
+  .login-wrap{grid-template-columns:1fr;gap:26px;padding-top:4vh}
+  .login-hero h1{font-size:34px}
+}
+</style>
+</head>
+<body>
+<div id="busy"></div>
+<div id="app"></div>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   APPLYDESK MISSION CONTROL v2 - SPRINT 1 SHELL
+   Auth + RPC plumbing preserved verbatim from portal.html.
+   UI: warm tokens, sidebar navigation, placeholder routes.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════ SUPABASE CONNECTION (unchanged) ═══════ */
+const SB_URL = 'https://rofyegirmgqjhekuxjat.supabase.co';
+const SB_KEY = 'sb_publishable_4f6WR1sk2N9EUO2bU7dkyA_9TByUhTL';
+const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'ad-auth' } });
+let authMode = null; // 'supabase' after email login, 'legacy' after code login
+
+async function rpc(fn, args){
+  document.getElementById('busy').style.display='block';
+  try{
+    // In supabase auth mode: route writes to fn_a_* which use auth.uid() from JWT.
+    // Strip p_actor (identity comes from JWT). Reads (fn_get_state, fn_login) stay as-is.
+    let useFn = fn;
+    let useArgs = Object.assign({}, args || {});
+    let useAuth = 'Bearer ' + SB_KEY;
+    if (authMode === 'supabase') {
+      const legacyReads = ['fn_get_state','fn_login','fn_get_public_stats','fn_submit_lead'];
+      const isDirectAuth = fn.indexOf('fn_a_') === 0;
+      const shouldRewrite = legacyReads.indexOf(fn) === -1 && !isDirectAuth;
+      if (shouldRewrite || isDirectAuth) {
+        if (shouldRewrite) {
+          useFn = fn.replace(/^fn_/, 'fn_a_');
+          delete useArgs.p_actor;
+        }
+        try {
+          const s = await sb.auth.getSession();
+          if (s && s.data && s.data.session) useAuth = 'Bearer ' + s.data.session.access_token;
+        } catch(e){}
+      }
+    }
+    const r = await fetch(SB_URL + '/rest/v1/rpc/' + useFn, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':useAuth},
+      body: JSON.stringify(useArgs)
+    });
+    if(!r.ok){
+      const txt = await r.text().catch(()=>String(r.status));
+      throw new Error('Network error ' + r.status + ': ' + txt.slice(0,200));
+    }
+    return await r.json();
+  } finally { document.getElementById('busy').style.display='none'; }
+}
+
+// Direct RPC that lets us pass a specific access token (used at login time before authMode is set)
+async function rpcRaw(fn, args, accessToken){
+  try{
+    const r = await fetch(SB_URL + '/rest/v1/rpc/' + fn, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+accessToken},
+      body: JSON.stringify(args||{})
+    });
+    if(!r.ok) return null;
+    return await r.json();
+  }catch(e){ return null; }
+}
+
+/* ═══════ STATE ═══════ */
+let session=null;
+let S={}, leads=[];
+let currentView='dashboard';
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function loadLeads(){
+  try{
+    const r=await rpc('fn_get_leads',{p_actor:session.code});
+    leads=(r&&r.ok&&r.leads)||[];
+  }catch(e){ leads=[]; }
+}
+
+async function refresh(){
+  const res=await rpc('fn_get_state',{p_code:session.code});
+  if(!res.ok){alert('Session expired or removed.');logout();return false;}
+  S=res;
+  if(res.role==='admin'||res.role==='manager')await loadLeads();
+  return true;
+}
+async function refreshAnd(fn){ if(await refresh()) fn(); }
+
+/* ═══════ LOGIN ═══════ */
+function renderLogin(msg){
+  session=null;S={};leads=[];authMode=null;sessionStorage.removeItem('ad-code');
+  try{ sb.auth.signOut(); }catch(e){}
+  $('#app').innerHTML=`
+  <div class="login-wrap">
+    <div class="login-hero">
+      <span class="eyebrow">· Mission Control ·</span>
+      <h1>One workspace.<br>Every <em>campaign</em>.</h1>
+      <p>Clients, recruiters, ops managers, and admin, all in one place. Every application, every reach-out, every conversation, logged.</p>
+      <div class="login-points">
+        <div><span class="ck">✓</span> Daily reports at 6 PM</div>
+        <div><span class="ck">✓</span> Full application history, searchable</div>
+        <div><span class="ck">✓</span> Direct chat with your team</div>
+      </div>
+    </div>
+    <div>
+      ${msg?`<div class="err-band">${esc(msg)}</div>`:''}
+      <div class="card login-card">
+        <h2>Log in</h2>
+        <p class="muted" style="margin-bottom:16px">Use your email and password.</p>
+        <div class="field"><label>Email</label>
+          <input id="li-email" type="email" placeholder="you@example.com" autocomplete="username"></div>
+        <div class="field"><label>Password</label>
+          <input id="li-pass" type="password" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doEmailLogin()"></div>
+        <button class="btn primary" style="width:100%" onclick="doEmailLogin()">Log in</button>
+        <p class="center" style="margin-top:12px;font-size:12.5px"><a href="#" onclick="doReset();return false;" style="color:var(--color-secondary);font-weight:600">Forgot password?</a></p>
+        <div class="or-split"><span>OR</span></div>
+        <p class="center" style="font-size:12.5px"><a href="#" onclick="toggleCodeLogin();return false;" style="color:var(--text-muted);font-weight:600" id="code-toggle-link">Use access code instead</a></p>
+        <div id="code-login-block" style="display:none;margin-top:14px">
+          <div class="field"><label>Access code</label>
+            <input id="code" type="password" placeholder="Enter your access code" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()"></div>
+          <button class="btn" style="width:100%" onclick="doLogin()">Log in with code</button>
+        </div>
+        <p class="muted center" style="margin-top:16px;font-size:12px"><a href="index.html">Back to home</a></p>
+      </div>
+    </div>
+  </div>`;
+}
+
+window.toggleCodeLogin=function(){
+  const b=document.getElementById('code-login-block');
+  const l=document.getElementById('code-toggle-link');
+  if(b.style.display==='none'){b.style.display='block';l.textContent='Hide access code option';setTimeout(()=>{const c=document.getElementById('code');if(c)c.focus();},50);}
+  else{b.style.display='none';l.textContent='Use access code instead';}
+}
+
+window.doEmailLogin=async function(){
+  const email=($('#li-email').value||'').trim().toLowerCase();
+  const pass=$('#li-pass').value||'';
+  if(!email||!pass){renderLogin('Enter email and password.');return;}
+  document.getElementById('busy').style.display='block';
+  try{
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if(error){ renderLogin(error.message||'Login failed.'); return; }
+    const who = await rpcRaw('fn_whoami', {}, data.session.access_token);
+    if(!who || !who.ok){ await sb.auth.signOut(); renderLogin('Your email is not linked to an ApplyDesk profile yet. Ask admin to invite you.'); return; }
+    authMode='supabase';
+    session={code: who.role_code||'', role: who.role, name: who.name, email};
+    await refresh(); rerender();
+  }catch(e){ renderLogin('Connection problem, try again.'); }
+  finally{ document.getElementById('busy').style.display='none'; }
+}
+
+window.doLogin=async function(){
+  const code=$('#code').value.trim(); if(!code)return;
+  try{
+    const res=await rpc('fn_login',{p_code:code});
+    if(!res.ok){renderLogin('Invalid code.');return;}
+    authMode='legacy';
+    session={code,role:res.role,name:res.name};
+    sessionStorage.setItem('ad-code',code);
+    await refresh(); rerender();
+  }catch(e){renderLogin('Connection problem, try again.');}
+}
+
+window.doReset=async function(){
+  const email = prompt('Enter your email to receive a password reset link:');
+  if(!email) return;
+  try{
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: window.location.origin + '/portal-v2.html' });
+    if(error){ alert(error.message||'Could not send reset email.'); return; }
+    alert('If that email is registered, a reset link is on its way. Check your inbox in a few minutes.');
+  }catch(e){ alert('Could not send reset email right now.'); }
+}
+
+window.logout=function(){renderLogin();}
+
+/* ═══════ ICONS ═══════ */
+const IC={
+  grid:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+  flame:'<svg viewBox="0 0 24 24"><path d="M12 3c1 3-3 4.5-3 8a3 3 0 006 0c0-1.5-1-2.5-1-2.5s4 1.5 4 5.5a6 6 0 01-12 0c0-5 6-7 6-11z"/></svg>',
+  briefcase:'<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/><path d="M3 12h18"/></svg>',
+  users:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.6c2.4.2 4.2 1.6 4.9 4.4"/></svg>',
+  ucheck:'<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.2"/><path d="M4.5 20c.6-3.4 2.8-5 5.5-5 1.3 0 2.5.3 3.4 1"/><path d="M15 18l2 2 4-4.5"/></svg>',
+  shield:'<svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/></svg>',
+  crown:'<svg viewBox="0 0 24 24"><path d="M4 17l-1-9 5 4 4-6 4 6 5-4-1 9z"/><path d="M4 20h16"/></svg>',
+  chat:'<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-8 8H4l2.5-3A8 8 0 1121 12z"/></svg>',
+  chats:'<svg viewBox="0 0 24 24"><path d="M8 14H6a2 2 0 01-2-2V6a2 2 0 012-2h9a2 2 0 012 2v1"/><rect x="9" y="9" width="12" height="9" rx="2"/><path d="M12 21l2-3"/></svg>',
+  dollar:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5"/><path d="M12 6.5v11"/></svg>',
+  bell:'<svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 00-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10 19a2 2 0 004 0"/></svg>',
+  gear:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5l1.2 2.6 2.8-.5 1 2.7 2.7 1-.5 2.8 2.3 1.9-1.6 2.4.9 2.7-2.6 1.2-.2 2.9-2.9-.2-1.9 2.2-2.4-1.6-2.7.9-1.2-2.6-2.9-.2.2-2.9-2.2-1.9 1.6-2.4-.9-2.7 2.6-1.2.2-2.9 2.9.2z" opacity=".0"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1.03 1.56V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1.03-1.56 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.56-1.03H3a2 2 0 110-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001.03-1.56V3a2 2 0 114 0v.09c0 .68.4 1.3 1.03 1.56.63.27 1.35.13 1.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.27.63.88 1.03 1.56 1.03H21a2 2 0 110 4h-.09c-.68 0-1.3.4-1.51.97z"/></svg>',
+  table:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/></svg>',
+  out:'<svg viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>',
+  rocket:'<svg viewBox="0 0 24 24"><path d="M12 15c-2 0-4-2-4-2s1-7 8-9c1 0 2 1 2 2-2 7-9 8-9 8z" transform="rotate(45 12 12)"/><path d="M9 15l-4 1 1-4"/><path d="M9 19c-1.5 1.5-4 2-4 2s.5-2.5 2-4"/><circle cx="14" cy="10" r="1.6"/></svg>'
+};
+
+/* ═══════ NAV DEFINITIONS PER ROLE ═══════ */
+// sprint = which coding session delivers the real screen
+function navFor(role){
+  if(role==='admin')return[
+    {id:'dashboard',label:'Dashboard',icon:'grid',sprint:2},
+    {id:'leads',label:'Leads',icon:'flame',sprint:2,badge:()=>leads.filter(l=>!l.claimed_by&&l.status==='new').length},
+    {id:'clients',label:'Clients',icon:'briefcase',sprint:2},
+    {id:'recruiters',label:'Recruiters',icon:'ucheck',sprint:4},
+    {id:'managers',label:'Managers',icon:'shield',sprint:4},
+    {id:'admins',label:'Admins',icon:'crown',sprint:5},
+    {sep:'Comms'},
+    {id:'client-chats',label:'Client chats',icon:'chat',sprint:5},
+    {id:'team-chats',label:'Team chats',icon:'chats',sprint:5},
+    {sep:'Operations'},
+    {id:'finance',label:'Finance',icon:'dollar',sprint:5},
+    {id:'notifications',label:'Notifications',icon:'bell',sprint:5},
+    {id:'settings',label:'Settings',icon:'gear',sprint:5}
+  ];
+  if(role==='manager')return[
+    {id:'dashboard',label:'Dashboard',icon:'grid',sprint:4},
+    {id:'leads',label:'Leads',icon:'flame',sprint:2,badge:()=>leads.filter(l=>!l.claimed_by&&l.status==='new').length},
+    {id:'clients',label:'Clients',icon:'briefcase',sprint:2},
+    {id:'recruiters',label:'Recruiters',icon:'ucheck',sprint:4},
+    {sep:'Comms'},
+    {id:'client-chats',label:'Client chats',icon:'chat',sprint:5},
+    {id:'team-chats',label:'Team chats',icon:'chats',sprint:5},
+    {id:'notifications',label:'Notifications',icon:'bell',sprint:5},
+    {id:'settings',label:'Settings',icon:'gear',sprint:5}
+  ];
+  if(role==='recruiter')return[
+    {id:'dashboard',label:'Dashboard',icon:'grid',sprint:4},
+    {id:'my-clients',label:'My clients',icon:'briefcase',sprint:4},
+    {id:'records',label:'My entries',icon:'table',sprint:4},
+    {sep:'Comms'},
+    {id:'client-chats',label:'Client chats',icon:'chat',sprint:5},
+    {id:'team-chats',label:'Team chats',icon:'chats',sprint:5},
+    {id:'notifications',label:'Notifications',icon:'bell',sprint:5},
+    {id:'settings',label:'Settings',icon:'gear',sprint:5}
+  ];
+  return[
+    {id:'dashboard',label:'Dashboard',icon:'grid',sprint:5},
+    {id:'activity',label:'My activity',icon:'table',sprint:5},
+    {id:'chat',label:'Chat with team',icon:'chat',sprint:5},
+    {id:'notifications',label:'Notifications',icon:'bell',sprint:5},
+    {id:'settings',label:'Settings',icon:'gear',sprint:5}
+  ];
+}
+
+const VIEW_TITLES={dashboard:'Dashboard',leads:'Leads console',clients:'Client management','my-clients':'My clients',records:'My entries',recruiters:'Recruiter roster',managers:'Ops managers',admins:'Admin directory','client-chats':'Client chats','team-chats':'Team chats',finance:'Finance',notifications:'Notifications',settings:'Settings',activity:'My activity',chat:'Chat with your team'};
+
+/* ═══════ SHELL RENDER + ROUTER ═══════ */
+function rerender(){
+  const nav=navFor(session.role);
+  if(!nav.some(n=>n.id===currentView))currentView='dashboard';
+  const initials=(session.name||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  $('#app').innerHTML=`
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="logo"><span class="mark">A</span><span><em>Apply</em>Desk</span></div>
+      <div class="nav-list">
+        ${nav.map(n=>{
+          if(n.sep)return`<div class="nav-sep">${esc(n.sep)}</div>`;
+          const b=n.badge?n.badge():0;
+          return`<a href="#${n.id}" class="nav-item${n.id===currentView?' active':''}" onclick="go('${n.id}');return false;">
+            ${IC[n.icon]||''}<span>${esc(n.label)}</span>${b?`<span class="nav-badge">${b}</span>`:''}
+          </a>`;
+        }).join('')}
+      </div>
+      <div class="user-card">
+        <div class="avatar">${esc(initials)}</div>
+        <div class="user-meta">
+          <div class="un">${esc(session.name||'')}</div>
+          <div class="ur">${esc(session.role)}${authMode==='legacy'?' · code':''}</div>
+        </div>
+        <button class="logout-btn" onclick="logout()" title="Log out">${IC.out}</button>
+      </div>
+    </aside>
+    <main class="workspace">
+      <div class="topbar">
+        <div>
+          <div class="crumb">Mission Control · ${esc(session.role)}</div>
+          <h1>${esc(VIEW_TITLES[currentView]||'Dashboard')}</h1>
+        </div>
+        <span class="conn-pill"><span class="conn-dot"></span> Backend connected</span>
+      </div>
+      <div id="view"></div>
+    </main>
+  </div>`;
+  renderView();
+}
+
+window.go=function(id){currentView=id;rerender();};
+window.addEventListener('hashchange',()=>{
+  const h=(location.hash||'').replace('#','');
+  if(session&&h&&h!==currentView&&navFor(session.role).some(n=>n.id===h)){currentView=h;rerender();}
+});
+
+function renderView(){
+  const v=document.getElementById('view');
+  if(currentView==='dashboard'){v.innerHTML=renderDashboard();return;}
+  const nav=navFor(session.role).find(n=>n.id===currentView)||{};
+  v.innerHTML=`
+  <div class="ph-block">
+    <div class="ph-ic">${IC[nav.icon]||IC.rocket}</div>
+    <h3>${esc(VIEW_TITLES[currentView]||'This section')} is being rebuilt</h3>
+    <p>The backend behind this screen is live and untouched. The new warm interface for it lands in an upcoming session. Until then, use the current portal for this work.</p>
+    <span class="sprint-tag">Ships in Sprint ${nav.sprint||'2'}</span>
+    <p style="margin-top:18px"><a class="btn sm" href="portal.html">Open current portal</a></p>
+  </div>`;
+}
+
+function renderDashboard(){
+  const clients=(S.clients||[]).length;
+  const recruiters=(S.recruiters||[]).length;
+  const records=(S.records||[]).length;
+  const msgs=(S.messages||[]).length;
+  const unclaimed=leads.filter(l=>!l.claimed_by&&l.status==='new').length;
+  const isTeam=session.role==='admin'||session.role==='manager';
+  let cards='';
+  if(session.role==='client'){
+    const mine=records;
+    cards=`
+    <div class="stat-card hi"><div class="k">Applications logged</div><div class="v">${mine}</div></div>
+    <div class="stat-card"><div class="k">Messages with your team</div><div class="v">${msgs}</div></div>`;
+  }else{
+    cards=`
+    <div class="stat-card hi"><div class="k">${session.role==='recruiter'?'Assigned clients':'Active clients'}</div><div class="v">${clients}</div></div>
+    ${isTeam?`<div class="stat-card"><div class="k">Recruiters</div><div class="v">${recruiters}</div></div>`:''}
+    <div class="stat-card"><div class="k">Records on file</div><div class="v">${records}</div></div>
+    ${isTeam?`<div class="stat-card"><div class="k">Unclaimed new leads</div><div class="v">${unclaimed}</div></div>`:''}`;
+  }
+  return`
+  <div class="ph-grid">${cards}</div>
+  <div class="ph-block">
+    <div class="ph-ic">${IC.rocket}</div>
+    <h3>Welcome to the new Mission Control, ${esc((session.name||'').split(' ')[0])}</h3>
+    <p>This is the Sprint 1 shell: your login works, your data is flowing (the numbers above are live from the database), and the sidebar shows everything that's coming. Screens light up sprint by sprint.</p>
+    <span class="sprint-tag">Sprint 1 of 6 · Foundation</span>
+    <p style="margin-top:18px"><a class="btn sm" href="portal.html">Open current portal for daily work</a></p>
+  </div>`;
+}
+
+/* ═══════ SET PASSWORD (invite / recovery links) ═══════ */
+function renderSetPassword(intro){
+  $('#app').innerHTML = `
+  <div style="max-width:460px;margin:9vh auto 0;padding:0 20px">
+    <div class="logo" style="margin-bottom:18px;padding:0"><span class="mark">A</span><span><em>Apply</em>Desk</span></div>
+    <div class="card login-card">
+      <h2>Set your password</h2>
+      <p class="muted" style="margin:6px 0 18px">${esc(intro)}</p>
+      <div class="field"><label>New password</label>
+        <input id="sp-pass" type="password" placeholder="At least 8 characters" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm password</label>
+        <input id="sp-conf" type="password" placeholder="Type it again" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSetPassword()"></div>
+      <button class="btn primary" style="width:100%" onclick="doSetPassword()">Save password and continue</button>
+      <p id="sp-err" style="color:var(--red);font-size:12px;margin-top:10px;min-height:1em"></p>
+    </div>
+  </div>`;
+  setTimeout(()=>{const el=document.getElementById('sp-pass'); if(el) el.focus();}, 100);
+}
+
+window.doSetPassword = async function(){
+  const pass = document.getElementById('sp-pass').value;
+  const conf = document.getElementById('sp-conf').value;
+  const err = document.getElementById('sp-err');
+  if (!pass || pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+  if (pass !== conf) { err.textContent = 'Passwords do not match.'; return; }
+  err.textContent = '';
+  document.getElementById('busy').style.display='block';
+  try {
+    const { error } = await sb.auth.updateUser({ password: pass });
+    if (error) { err.textContent = error.message || 'Could not save password.'; return; }
+    history.replaceState(null, '', window.location.pathname);
+    const who = await sb.auth.getUser();
+    if (who && who.data && who.data.user) {
+      const wr = await rpcRaw('fn_whoami', {}, (await sb.auth.getSession()).data.session.access_token);
+      if (wr && wr.ok) {
+        authMode = 'supabase';
+        session = { code: wr.role_code || '', role: wr.role, name: wr.name, email: who.data.user.email };
+        await refresh();
+        rerender();
+        return;
+      }
+    }
+    alert('Password saved. Please log in.');
+    renderLogin();
+  } catch(e) {
+    err.textContent = 'Could not save password. Try again.';
+  } finally {
+    document.getElementById('busy').style.display='none';
+  }
+}
+
+/* ═══════ BOOT ═══════ */
+(async function boot(){
+  $('#app').innerHTML='<div class="center" style="padding-top:22vh"><h2 style="font-family:var(--font-display);font-weight:800">Loading Mission Control…</h2></div>';
+
+  // 1) Supabase invite / password-reset links (tokens arrive in the URL hash)
+  const hash = window.location.hash || '';
+  const isInvite = hash.includes('type=invite') || hash.includes('type=signup');
+  const isRecovery = hash.includes('type=recovery');
+  if (isInvite || isRecovery) {
+    try {
+      await new Promise(r => setTimeout(r, 400));
+      const { data: { session: s } } = await sb.auth.getSession();
+      if (s) {
+        renderSetPassword(isInvite ? 'Welcome to ApplyDesk! Choose a password to finish setting up your account.' : 'Choose your new password.');
+        return;
+      }
+    } catch(e){}
+  }
+
+  // 2) Legacy access-code session restore
+  const saved=sessionStorage.getItem('ad-code');
+  if(saved){
+    try{
+      const res=await rpc('fn_login',{p_code:saved});
+      if(res.ok){authMode='legacy';session={code:saved,role:res.role,name:res.name};await refresh();rerender();return;}
+    }catch(e){}
+  }
+
+  // 3) NEW in v2: restore an existing Supabase email session (persisted in 'ad-auth')
+  try{
+    const { data: { session: s } } = await sb.auth.getSession();
+    if (s && s.access_token) {
+      const who = await rpcRaw('fn_whoami', {}, s.access_token);
+      if (who && who.ok) {
+        authMode='supabase';
+        session={code: who.role_code||'', role: who.role, name: who.name, email: (s.user&&s.user.email)||''};
+        const h=(location.hash||'').replace('#','');
+        if(h)currentView=h;
+        await refresh(); rerender(); return;
+      }
+    }
+  }catch(e){}
+
+  renderLogin();
+})();
+</script>
+</body>
+</html>
