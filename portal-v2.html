@@ -22,6 +22,7 @@
   --color-success: #7CB342;
   --color-warning: #FFC53D;
   --color-danger: #C9264A;
+  --color-info: #2E7CE0;
   --text-heading: #1A1F2E;
   --text-body: #5A6478;
   --text-muted: #8B94A6;
@@ -552,14 +553,38 @@ window.doLogin = async function(){
   }catch(e){ renderLogin('Connection problem, try again.'); }
 };
 
-window.doReset = async function(){
-  const email = prompt('Enter your email to receive a password reset link:');
-  if(!email) return;
-  try{
-    const { error } = await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: window.location.origin + '/portal-v2.html' });
-    if(error){ alert(error.message || 'Could not send reset email.'); return; }
-    alert('If that email is registered, a reset link is on its way.');
-  }catch(e){ alert('Could not send reset email right now.'); }
+window.doReset = function(){
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal-inner" style="max-width:440px">
+    <h3>🔑 Reset your password</h3>
+    <p style="color:var(--text-body);font-size:14px;margin-bottom:16px">Enter your email and we will send you a link to set a new password.</p>
+    <div class="field"><label>Email</label><input id="rst-email" type="email" placeholder="you@example.com" autocomplete="email"></div>
+    <p id="rst-msg" style="font-size:13px;margin:8px 0;min-height:1em"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="rst-cancel">Cancel</button>
+      <button class="btn primary" id="rst-send">Send reset link</button>
+    </div>
+  </div>`;
+  document.body.appendChild(back);
+  const cleanup = () => back.remove();
+  back.querySelector('#rst-cancel').onclick = cleanup;
+  back.onclick = e => { if(e.target === back) cleanup(); };
+  setTimeout(() => { const el = document.getElementById('rst-email'); if(el) el.focus(); }, 100);
+  back.querySelector('#rst-send').onclick = async () => {
+    const email = (document.getElementById('rst-email').value || '').trim().toLowerCase();
+    const msg = document.getElementById('rst-msg');
+    if(!email || !email.includes('@')){ msg.style.color = 'var(--color-danger)'; msg.textContent = 'Please enter a valid email.'; return; }
+    msg.style.color = 'var(--text-body)';
+    msg.textContent = 'Sending...';
+    try{
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/portal-v2.html' });
+      if(error){ msg.style.color = 'var(--color-danger)'; msg.textContent = error.message || 'Could not send.'; return; }
+      msg.style.color = 'var(--color-success)';
+      msg.textContent = '✓ If that email is registered, a reset link is on its way. Check your inbox in a few minutes.';
+      setTimeout(cleanup, 2500);
+    }catch(e){ msg.style.color = 'var(--color-danger)'; msg.textContent = 'Could not send reset email right now.'; }
+  };
 };
 
 window.logout = function(){ renderLogin(); };
@@ -845,11 +870,14 @@ function renderAdminDashboard(){
 
   const orbitalCards = upcoming.slice(0, 6).map(p => {
     const urgent = p.days <= 3;
-    return `<div onclick="openClientDetail('${esc(p.code)}')" style="background:var(--bg-card);border:2px solid ${urgent ? 'var(--color-primary)' : 'var(--bg-secondary)'};border-radius:12px;padding:14px 16px;cursor:pointer;position:relative;transition:all .15s ease">
-      <div style="position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:50%;background:${urgent ? 'var(--color-primary)' : 'var(--color-success)'}"></div>
+    const dotColor = urgent ? 'var(--color-danger)' : 'var(--color-info)';
+    const borderColor = urgent ? 'var(--color-danger)' : 'var(--color-info)';
+    const amountColor = urgent ? 'var(--color-danger)' : 'var(--color-info)';
+    return `<div onclick="openClientDetail('${esc(p.code)}')" style="background:var(--bg-card);border:2px solid ${urgent ? borderColor : 'var(--bg-secondary)'};border-radius:12px;padding:14px 16px;cursor:pointer;position:relative;transition:all .15s ease">
+      <div style="position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:50%;background:${dotColor}"></div>
       <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name.split(' ').map((w,i,a) => i === a.length-1 ? w[0] + '.' : w).join(' '))}</div>
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
-        <div style="font-family:var(--font-display);font-weight:800;font-size:22px;color:${urgent ? 'var(--color-primary)' : 'var(--text-heading)'};line-height:1">${money(p.amount, p.currency)}</div>
+        <div style="font-family:var(--font-display);font-weight:800;font-size:22px;color:${amountColor};line-height:1">${money(p.amount, p.currency)}</div>
         <div style="font-size:11px;color:var(--text-muted);font-weight:600">${p.days === 0 ? 'today' : p.days + 'd left'}</div>
       </div>
     </div>`;
@@ -947,8 +975,8 @@ function renderAdminDashboard(){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Orbital Billing Pulse</div>
         <div style="display:flex;gap:14px;font-size:11px">
-          <span style="display:flex;align-items:center;gap:4px;color:var(--color-primary)"><span style="width:6px;height:6px;background:var(--color-primary);border-radius:50%"></span> Urgent</span>
-          <span style="display:flex;align-items:center;gap:4px;color:var(--color-success)"><span style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></span> Stable</span>
+          <span style="display:flex;align-items:center;gap:4px;color:var(--color-danger)"><span style="width:6px;height:6px;background:var(--color-danger);border-radius:50%"></span> Urgent</span>
+          <span style="display:flex;align-items:center;gap:4px;color:var(--color-info)"><span style="width:6px;height:6px;background:var(--color-info);border-radius:50%"></span> Stable</span>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${orbitalCards}</div>
@@ -1233,6 +1261,7 @@ function renderClientDetailPage(){
       <button class="btn secondary sm" onclick="openEditClient('${esc(c.code)}')">✏️ Edit profile</button>
       ${c.email ? `<button class="btn ghost sm" onclick="sendClientInvite('${esc(c.code)}','${esc(c.email)}')">📧 Invite</button>` : ''}
       ${c.deactivated_at ? `<button class="btn primary sm" onclick="reactivateMember('client','${esc(c.code)}')">Reactivate</button>` : `<button class="btn danger sm" onclick="deactivateMember('client','${esc(c.code)}','${esc(c.name)}')">Deactivate</button>`}
+      <button class="btn danger sm" onclick="deleteMember('client','${esc(c.code)}','${esc(c.name)}')" style="background:var(--color-danger);color:#fff;border-color:var(--color-danger)">🗑️ Delete</button>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px">
@@ -1272,7 +1301,7 @@ function renderClientDetailPage(){
         </dl>
         <div style="display:flex;gap:8px;margin-top:14px">
           ${c.base_resume_url ? `<a href="${esc(c.base_resume_url)}" target="_blank" class="btn ghost sm">📄 Download resume PDF</a>` : ''}
-          <button class="btn ghost sm" onclick="openEditClient('${esc(c.code)}')">✏️ Replace file</button>
+          <button class="btn ghost sm" onclick="openEditClient('${esc(c.code)}')">✏️ Edit info</button>
         </div>
       </div>
       <div class="card">
@@ -1462,6 +1491,7 @@ function renderRecruiterDetailPage(){
       <button class="btn secondary sm" onclick="openEditRecruiter('${esc(r.code)}')">✏️ Edit profile</button>
       ${r.email ? `<button class="btn ghost sm" onclick="sendGenericInvite('recruiter','${esc(r.code)}','${esc(r.email)}')">📧 Invite</button>` : ''}
       ${r.deactivated_at ? `<button class="btn primary sm" onclick="reactivateMember('recruiter','${esc(r.code)}')">Reactivate</button>` : `<button class="btn danger sm" onclick="deactivateMember('recruiter','${esc(r.code)}','${esc(r.name)}')">Deactivate</button>`}
+      <button class="btn danger sm" onclick="deleteMember('recruiter','${esc(r.code)}','${esc(r.name)}')" style="background:var(--color-danger);color:#fff;border-color:var(--color-danger)">🗑️ Delete</button>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px">
@@ -1550,8 +1580,10 @@ function renderManagersPage(){
       <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--bg-secondary);font-size:12px;color:var(--text-muted)">
         <span>${m.payroll_amount ? money(m.payroll_amount, m.payroll_currency) + '/mo' : 'No payroll'}</span>
         <div style="display:flex;gap:4px">
-          ${m.email ? `<button class="btn ghost sm" onclick="sendGenericInvite('manager','${esc(m.code)}','${esc(m.email)}')">📧</button>` : ''}
-          ${m.deactivated_at ? `<button class="btn primary sm" onclick="reactivateMember('manager','${esc(m.code)}')">↺</button>` : `<button class="btn danger sm" onclick="deactivateMember('manager','${esc(m.code)}','${esc(m.name)}')">✕</button>`}
+          ${m.email ? `<button class="btn ghost sm" onclick="sendGenericInvite('manager','${esc(m.code)}','${esc(m.email)}')" title="Invite">📧</button>` : ''}
+          <button class="btn ghost sm" onclick="event.stopPropagation();openEditManager('${esc(m.code)}')" title="Edit">✏️</button>
+          ${m.deactivated_at ? `<button class="btn primary sm" onclick="reactivateMember('manager','${esc(m.code)}')" title="Reactivate">↺</button>` : `<button class="btn danger sm" onclick="deactivateMember('manager','${esc(m.code)}','${esc(m.name)}')" title="Deactivate">✕</button>`}
+          <button class="btn danger sm" onclick="deleteMember('manager','${esc(m.code)}','${esc(m.name)}')" title="Delete" style="background:var(--color-danger);color:#fff;border-color:var(--color-danger)">🗑</button>
         </div>
       </div>
     </div>`;
@@ -1639,6 +1671,7 @@ function renderAdminsPage(){
         <button class="btn secondary sm" onclick="openEditAdmin('${esc(a.code)}')">✏️ Edit</button>
         ${a.email && !isMe && a.active ? `<button class="btn ghost sm" onclick="sendGenericInvite('admin','${esc(a.code)}','${esc(a.email)}')">📧 Invite</button>` : ''}
         ${!isMe ? (a.active ? `<button class="btn danger sm" onclick="deactivateAdmin('${esc(a.code)}','${esc(a.name)}')">Deactivate</button>` : `<button class="btn primary sm" onclick="reactivateAdmin('${esc(a.code)}')">Reactivate</button>`) : ''}
+        ${!isMe ? `<button class="btn danger sm" onclick="deleteMember('admin','${esc(a.code)}','${esc(a.name)}')" style="background:var(--color-danger);color:#fff;border-color:var(--color-danger)">🗑️ Delete</button>` : ''}
       </div>
     </div>`;
   }).join('') || '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👑</div><h3 class="empty-title">No admins yet</h3></div>';
@@ -1782,15 +1815,16 @@ window.markAllNotifsRead = async function(){
 function renderFinancePage(){
   const tab = viewState.financeTab || 'transactions';
   const tabBtn = (key, label) => `<button class="filter-chip ${tab === key ? 'active' : ''}" onclick="setFinanceTab('${key}')">${label}</button>`;
-  const tabbar = `<div class="filter-chips" style="margin-bottom:24px">${tabBtn('transactions', '📊 Transactions')}${tabBtn('subscriptions', '🔁 Subscriptions')}${tabBtn('payrolls', '💼 Payrolls')}${tabBtn('spends', '📉 Spends')}${tabBtn('resumes', '📄 Resume Requests')}</div>`;
+  const tabbar = `<div class="filter-chips" style="margin-bottom:20px">${tabBtn('transactions', '📊 Transactions')}${tabBtn('subscriptions', '🔁 Subscriptions')}${tabBtn('payrolls', '💼 Payrolls')}${tabBtn('spends', '📉 Spends')}${tabBtn('resumes', '📄 Resume Requests')}</div>`;
 
   const header = `<div class="page-header"><h1 class="page-title">Treasury</h1><p class="page-subtitle">Every dollar in, every rupee out.</p></div>`;
+  const dateFilter = financeDateFilter(tab);
 
-  if(tab === 'subscriptions') return header + tabbar + renderFinSubscriptions();
-  if(tab === 'payrolls') return header + tabbar + renderFinPayrolls();
-  if(tab === 'spends') return header + tabbar + renderFinSpends();
-  if(tab === 'resumes') return header + tabbar + renderFinResumes();
-  return header + tabbar + renderFinTransactions();
+  if(tab === 'subscriptions') return header + tabbar + dateFilter + renderFinSubscriptions();
+  if(tab === 'payrolls') return header + tabbar + dateFilter + renderFinPayrolls();
+  if(tab === 'spends') return header + tabbar + dateFilter + renderFinSpends();
+  if(tab === 'resumes') return header + tabbar + dateFilter + renderFinResumes();
+  return header + tabbar + dateFilter + renderFinTransactions();
 }
 
 window.setFinanceTab = function(t){ viewState.financeTab = t; viewState.financeData = null; renderShell(); };
@@ -1967,8 +2001,8 @@ async function loadGroups(){
 function visibleGroups(){
   const list = groupsList || [];
   if(session.role === 'admin' || session.role === 'manager' || session.role === 'recruiter') return list;
-  // Client: only sees groups involving their own team (their assigned recruiter/manager/admin, plus any where they're a member)
-  return list.filter(g => (g.member_codes || []).includes(session.code) || g.broadcast);
+  // Client: only sees groups they are explicitly a member of. NOT other clients' groups.
+  return list.filter(g => (g.member_codes || []).includes(session.code));
 }
 
 function renderTeamChats(){
@@ -2117,14 +2151,9 @@ function renderSettingsPage(){
     </div>
     <div class="card">
       <div class="card-title">🔑 Security</div>
-      <p style="color:var(--text-body);font-size:14px;margin-bottom:16px">To change your password, log out and use the "Forgot password?" link on the login screen. You will receive a reset link by email.</p>
-      <button class="btn ghost" onclick="doReset()">Send password reset email</button>
+      <p style="color:var(--text-body);font-size:14px;margin-bottom:16px">To change your password, click below. You will receive a reset link by email.</p>
+      <button class="btn primary" onclick="doReset()">Send password reset email</button>
     </div>
-  </div>
-  <div class="card" style="margin-top:24px">
-    <div class="card-title">ℹ️ About</div>
-    <p style="color:var(--text-body);font-size:14px">ApplyDesk Portal v2. Built with warm palette from Figma.</p>
-    <p style="color:var(--text-muted);font-size:12px;margin-top:8px">Backend: Supabase · Deploy: Cloudflare Workers</p>
   </div>`;
 }
 
@@ -2549,6 +2578,75 @@ window.openComposeNotification = function(){
       else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
     }catch(e){ toast('Failed: ' + e.message, 'error'); }
   };
+};
+
+/* ═══════ DELETE MEMBER (permanent) ═══════ */
+window.deleteMember = async function(type, code, name){
+  const ok = await askConfirm('PERMANENTLY DELETE ' + name + '?\n\nThis removes the record. Their historical activity may still show in reports if referenced. This cannot be undone.\n\nType-safe alternative: use Deactivate instead.', 'Delete ' + name + ' forever?');
+  if(!ok) return;
+  try{
+    const r = await rpc('fn_a_delete_member', { p_type: type, p_code: code });
+    if(r && r.ok){
+      if(type === 'admin'){ adminsList = null; }
+      await refresh();
+      toast('Deleted', 'success');
+      // If we deleted the client/recruiter we were viewing, go back to list
+      if(currentView === 'client-detail' || currentView === 'recruiter-detail'){
+        currentView = type + 's';
+        viewState = {};
+      }
+      renderShell();
+    } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
+
+window.openEditManager = function(code){
+  const m = (S.managers || []).find(x => x.code === code);
+  if(!m) return;
+  openEditModal('Edit ' + m.name, [
+    { id:'name', label:'Full name', value:m.name },
+    { id:'email', label:'Email', type:'email', value:m.email },
+    { id:'phone', label:'Phone', type:'tel', value:m.phone },
+    { id:'payroll_amount', label:'Payroll amount', type:'number', value:m.payroll_amount },
+    { id:'payroll_currency', label:'Currency', type:'select', value:m.payroll_currency || 'INR', options:[{value:'INR',label:'INR (₹)'},{value:'USD',label:'USD ($)'}] },
+    { id:'payroll_cycle_day', label:'Cycle day (1-28)', type:'number', value:m.payroll_cycle_day }
+  ], async (v) => {
+    try{
+      const res = await rpc('fn_a_edit_manager', {
+        p_code: code, p_name: v.name || null, p_email: v.email || null, p_phone: v.phone || null,
+        p_payroll_amount: v.payroll_amount ? parseFloat(v.payroll_amount) : null,
+        p_payroll_currency: v.payroll_currency || null,
+        p_payroll_cycle_day: v.payroll_cycle_day ? parseInt(v.payroll_cycle_day) : null
+      });
+      if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
+      await refresh();
+      toast('Manager updated', 'success');
+      renderShell();
+      return true;
+    }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
+  });
+};
+
+/* ═══════ FINANCE FILTER HELPER ═══════ */
+function financeDateFilter(currentTab){
+  const dateFrom = viewState.financeDateFrom || '';
+  const dateTo = viewState.financeDateTo || '';
+  return `<div style="display:flex;gap:12px;align-items:end;margin-bottom:20px;padding:16px;background:var(--bg-card);border-radius:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:140px"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">From date</label><input type="date" id="fin-from" value="${esc(dateFrom)}" style="width:100%"></div>
+    <div style="flex:1;min-width:140px"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">To date</label><input type="date" id="fin-to" value="${esc(dateTo)}" style="width:100%"></div>
+    <button class="btn primary" onclick="applyFinanceFilter()">🔍 Apply filter</button>
+    ${(dateFrom || dateTo) ? '<button class="btn ghost" onclick="clearFinanceFilter()">Clear</button>' : ''}
+  </div>`;
+}
+
+window.applyFinanceFilter = function(){
+  viewState.financeDateFrom = document.getElementById('fin-from').value;
+  viewState.financeDateTo = document.getElementById('fin-to').value;
+  renderShell();
+};
+window.clearFinanceFilter = function(){
+  viewState.financeDateFrom = ''; viewState.financeDateTo = '';
+  renderShell();
 };
 
 function renderPlaceholder(title, sub){
