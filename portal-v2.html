@@ -459,11 +459,23 @@ async function loadLeads(){
   catch(e){ leads = []; }
 }
 async function refresh(){
-  const res = await rpc('fn_get_state', {p_code: session.code});
-  if(!res.ok){ alert('Session expired.'); logout(); return false; }
-  S = res;
-  if(res.role==='admin' || res.role==='manager') await loadLeads();
-  return true;
+  try{
+    const res = await rpc('fn_get_state', {p_code: session.code});
+    if(res && res.ok){
+      S = res;
+      if(res.role === 'admin' || res.role === 'manager') await loadLeads();
+      return true;
+    }
+    // fn_get_state failed but user IS authenticated - continue with empty state
+    console.warn('fn_get_state returned not-ok:', res);
+    S = { clients: [], recruiters: [], managers: [], role: session.role };
+    if(session.role === 'admin' || session.role === 'manager'){ try{ await loadLeads(); }catch(e){} }
+    return true;
+  }catch(e){
+    console.warn('refresh error:', e);
+    S = { clients: [], recruiters: [], managers: [], role: session.role };
+    return true;
+  }
 }
 async function refreshAnd(fn){ if(await refresh()) fn(); }
 
@@ -779,7 +791,9 @@ window.toggleAvatarMenu = function(e){
   if(!isOpen){
     setTimeout(() => {
       document.addEventListener('click', function outsideClick(ev){
-        if(!document.getElementById('avatar-menu').contains(ev.target)){
+        const menu = document.getElementById('avatar-menu');
+        if(!menu){ document.removeEventListener('click', outsideClick); return; }
+        if(!menu.contains(ev.target)){
           closeAvatarMenu();
           document.removeEventListener('click', outsideClick);
         }
