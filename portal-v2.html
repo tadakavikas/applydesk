@@ -490,6 +490,13 @@ async function refresh(){
     if(res && res.ok){
       S = res;
       if(res.role === 'admin' || res.role === 'manager') await loadLeads();
+      // Clients: fetch full own record for profile %, subscription, profile page
+      if(res.role === 'client'){
+        try{
+          const fc = await rpc('fn_a_get_my_full_client', {});
+          if(fc && fc.ok && fc.client){ S.me = fc.client; }
+        }catch(e){ console.warn('full client load failed', e); }
+      }
       return true;
     }
     // fn_get_state failed but user IS authenticated - continue with empty state
