@@ -776,6 +776,12 @@ document.getElementById('leadForm').addEventListener('submit',async function(ev)
       msg.classList.add('ok');
       this.reset();
       btn.textContent='Request received ✓';
+      // Fire the thank-you email (non-blocking, ignore failures)
+      fetch(SB_URL+'/functions/v1/send-welcome',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY},
+        body:JSON.stringify({email:email,first_name:first})
+      }).catch(function(){});
     }else{throw new Error((d&&d.err)||'submit failed');}
   }catch(e){
     msg.textContent='That did not go through. Email us at hello@getapplydesk.com and we will take it from there.';
