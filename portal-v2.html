@@ -3351,6 +3351,21 @@ window.submitApplication = async function(){
   try{
     toast('Uploading files...', 'success');
 
+    // Ensure the storage client carries the user's JWT (RLS checks auth.jwt email)
+    try{
+      const sess = await sb.auth.getSession();
+      const tok = sess && sess.data && sess.data.session;
+      if(!tok || !tok.access_token){
+        toast('Your session expired. Please log out and back in, then retry.', 'error');
+        return;
+      }
+      // Force-apply the session to the storage client so uploads are authenticated
+      await sb.auth.setSession({ access_token: tok.access_token, refresh_token: tok.refresh_token });
+    }catch(e){
+      toast('Auth check failed. Log out and back in, then retry.', 'error');
+      return;
+    }
+
     // Step 1: Upload resume to Supabase Storage
     const timestamp = Date.now();
     const safeResumeName = resumeFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
