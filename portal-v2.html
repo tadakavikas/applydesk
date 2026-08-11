@@ -827,6 +827,7 @@ window.openHelp = function(){
 };
 
 window.setView = function(key){
+  if(key !== 'chats' && typeof stopChatPoll === 'function') stopChatPoll();
   currentView = key;
   viewState = {}; // reset per-view state on nav
   renderShell();
@@ -2437,6 +2438,7 @@ function renderTeamChats(){
 
 window.openDm = async function(targetCode){
   try{
+    if(typeof stopChatPoll === 'function') stopChatPoll();
     const r = await rpc('fn_a_start_direct_chat', { p_target_code: targetCode });
     if(r && r.ok){
       groupsList = null; groupsAttempted = false;
@@ -2536,7 +2538,7 @@ window.sendThreadMsg = async function(clientCode){
 };
 
 window.setChatTab = function(tab){ viewState.chatTab = tab; renderShell(); };
-window.selectChat = function(key){ viewState.selectedChatKey = key; viewState.groupMessages = null; viewState.directMessages = null; renderShell(); };
+window.selectChat = function(key){ if(typeof stopChatPoll === 'function') stopChatPoll(); viewState.selectedChatKey = key; viewState.groupMessages = null; viewState.directMessages = null; renderShell(); };
 // Keep old selectGroup for backward compat
 window.selectGroup = function(id){ viewState.selectedChatKey = 'group:' + id; viewState.groupMessages = null; renderShell(); };
 
@@ -2660,12 +2662,15 @@ function renderGroupThread(g){
     headerName = parts.find(p => p.trim() !== mine) || parts[parts.length - 1];
   }
 
+  // Start auto-poll for this group so new messages arrive without refresh
+  startChatPoll(g.id);
+
   return `<div style="display:flex;flex-direction:column;height:100%">
     <div style="border-bottom:1px solid var(--bg-secondary);padding-bottom:12px;margin-bottom:16px">
       <div style="font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--text-heading)">${isBroadcast ? '📢 ' : ''}${esc(headerName)}</div>
       <div style="font-size:12px;color:var(--text-muted)">${isDirect ? 'Direct message' : (g.member_count || 0) + ' members'}${isBroadcast ? ' · Broadcast (admin-only send)' : ''}</div>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:0 4px;min-height:300px">${bubbles}</div>
+    <div id="group-scroll" style="flex:1;overflow-y:auto;padding:0 4px;min-height:300px">${bubbles}</div>
     ${canSend ? `<div style="display:flex;gap:8px;padding-top:16px;border-top:1px solid var(--bg-secondary)">
       <input type="text" id="msg-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg(${g.id})">
       <button class="btn primary" onclick="sendMsg(${g.id})">Send</button>
@@ -2673,15 +2678,57 @@ function renderGroupThread(g){
   </div>`;
 }
 
+let chatPollTimer = null;
+let chatPollGroup = null;
+function startChatPoll(groupId){
+  // Restart only if switching groups
+  if(chatPollGroup === groupId && chatPollTimer) return;
+  stopChatPoll();
+  chatPollGroup = groupId;
+  chatPollTimer = setInterval(async () => {
+    // Only poll while this exact group is still open on the Chat view
+    if(currentView !== 'chats' || viewState.selectedChatKey !== 'group:' + groupId){ stopChatPoll(); return; }
+    // Don't clobber text being typed
+    const input = document.getElementById('msg-input');
+    const typing = input && document.activeElement === input && input.value.trim().length > 0;
+    try{
+      const rr = await rpc('fn_a_group_messages', { p_group_id: groupId, p_limit: 100 });
+      if(rr && rr.ok){
+        const fresh = rr.messages || [];
+        const cur = Array.isArray(viewState.groupMessages) ? viewState.groupMessages : [];
+        // Only re-render if message count changed (new message arrived)
+        if(fresh.length !== cur.length){
+          viewState.groupMessages = fresh;
+          const draft = typing ? input.value : '';
+          renderShell();
+          if(draft){ const ni = document.getElementById('msg-input'); if(ni){ ni.value = draft; ni.focus(); } }
+          setTimeout(() => { const s = document.getElementById('group-scroll'); if(s) s.scrollTop = s.scrollHeight; }, 60);
+        }
+      }
+    }catch(e){ /* silent */ }
+  }, 3000);
+}
+function stopChatPoll(){
+  if(chatPollTimer){ clearInterval(chatPollTimer); chatPollTimer = null; }
+  chatPollGroup = null;
+}
+
 window.sendMsg = async function(groupId){
   const input = document.getElementById('msg-input');
+  if(!input) return;
   const body = (input.value || '').trim();
   if(!body) return;
+  input.value = '';
   try{
     const r = await rpc('fn_a_send_group_message', { p_group_id: groupId, p_body: body });
-    if(r && r.ok){ viewState.groupMessages = null; renderShell(); }
-    else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
-  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+    if(r && r.ok){
+      // Reload THIS group's messages, keep it selected
+      const rr = await rpc('fn_a_group_messages', { p_group_id: groupId, p_limit: 100 });
+      viewState.groupMessages = (rr && rr.ok) ? (rr.messages || []) : [];
+      renderShell();
+      setTimeout(() => { const s = document.getElementById('group-scroll'); if(s) s.scrollTop = s.scrollHeight; }, 100);
+    } else { toast('Failed: ' + ((r && r.err) || 'unknown'), 'error'); input.value = body; }
+  }catch(e){ toast('Failed: ' + e.message, 'error'); input.value = body; }
 };
 
 window.promptCreateGroup = function(){ openCreateGroup(); };
