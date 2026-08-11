@@ -1130,8 +1130,19 @@ function renderLeadDetail(l){
     <dl class="detail-grid">
       ${l.email ? `<dt>Email</dt><dd><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></dd>` : '<dt>Email</dt><dd style="color:var(--text-muted);font-style:italic">Not provided</dd>'}
       ${l.phone ? `<dt>Phone</dt><dd><a href="tel:${esc(l.phone)}">${esc(l.phone)}</a></dd>` : ''}
-      ${l.best_time_to_call ? `<dt>Best time</dt><dd><span class="tag coral">📞 ${esc(l.best_time_to_call)}</span></dd>` : ''}
-      ${l.plan_interest ? `<dt>Interest</dt><dd><span class="tag teal">${esc(l.plan_interest)}</span></dd>` : ''}
+      ${(() => {
+        const raw = l.plan || l.plan_interest || '';
+        let planPart = raw, timePart = l.best_time_to_call || '';
+        const marker = raw.indexOf('Preferred call time:');
+        if(marker !== -1){
+          timePart = raw.slice(marker + 'Preferred call time:'.length).replace(/^[\s|:-]+/, '').trim();
+          planPart = raw.slice(0, marker).replace(/[\s|]+$/, '').trim();
+        }
+        let out = '';
+        if(timePart) out += `<dt>Best time to call</dt><dd><span class="tag coral">📞 ${esc(timePart)}</span></dd>`;
+        if(planPart) out += `<dt>Interest</dt><dd><span class="tag teal">${esc(planPart)}</span></dd>`;
+        return out;
+      })()}
       ${l.message ? `<dt>Message</dt><dd style="font-style:italic;color:var(--text-body)">"${esc(l.message)}"</dd>` : ''}
     </dl>
   </div>
