@@ -3056,10 +3056,10 @@ function renderManagerDashboard(){
 
 function renderRecruiterDashboard(){
   const myClients = (S.clients || []).filter(c => !c.deactivated_at);
-  const me = (S.recruiters || []).find(r => r.code === session.code) || {};
+  const me = (S.me) || (S.recruiters || []).find(r => r.code === session.code) || {};
 
-  // Profile completeness
-  const fields = ['name','email','phone','target_roles','payroll_amount','payroll_cycle_day'];
+  // Profile completeness (payroll is admin-set, so count the recruiter-facing fields)
+  const fields = ['name','email','phone','target_roles','joined_date'];
   const filled = fields.filter(f => me[f]).length;
   const pct = Math.round((filled / fields.length) * 100);
 
