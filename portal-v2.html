@@ -3553,10 +3553,10 @@ window.openAssignClients = function(recruiterCode){
     const toRemove = Array.from(currentAssignments).filter(c => !newAssignments.includes(c));
     try{
       for(const clientCode of toAdd){
-        await rpc('fn_a_toggle_assign', { p_recruiter_code: recruiterCode, p_client_code: clientCode, p_assign: true });
+        await rpc('fn_a_toggle_assign', { p_recruiter: recruiterCode, p_client: clientCode });
       }
       for(const clientCode of toRemove){
-        await rpc('fn_a_toggle_assign', { p_recruiter_code: recruiterCode, p_client_code: clientCode, p_assign: false });
+        await rpc('fn_a_toggle_assign', { p_recruiter: recruiterCode, p_client: clientCode });
       }
       await refresh();
       toast('Assignments updated', 'success');
