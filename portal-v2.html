@@ -3287,6 +3287,19 @@ window.refreshClientApps = function(){
 };
 
 /* ═══════ APPLICATION DETAIL MODAL WITH STATUS TIMELINE ═══════ */
+window.deleteApplication = async function(recordId){
+  if(!confirm('Delete this application permanently? This cannot be undone.')) return;
+  try{
+    const r = await rpc('fn_a_delete_application', { p_record_id: recordId });
+    if(r && r.ok){
+      clientAppsCache = null; allAppsCache = null; recentAppsCache = null;
+      const modal = document.querySelector('.modal-back'); if(modal) modal.remove();
+      toast('Application deleted', 'success');
+      renderShell();
+    } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
+
 window.openAppDetail = async function(recordId){
   // Check any cache we have that might contain this app
   const allCaches = [clientAppsCache, allAppsCache, recentAppsCache].filter(c => Array.isArray(c));
@@ -3326,6 +3339,7 @@ window.openAppDetail = async function(recordId){
       ${app.job_url ? `<a href="${esc(app.job_url)}" target="_blank" class="btn ghost sm">🔗 View job posting</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No job posting link</span>'}
       <button onclick="downloadResume(${app.id}, '${esc(app.resume_used || '').replace(/'/g,'')}')" class="btn ghost sm">📄 Download resume used</button>
       ${app.screenshot_url ? `<button onclick="openStoredFile('${esc(app.screenshot_url).replace(/'/g,'')}')" class="btn ghost sm">📎 Original screenshot</button>` : ''}
+      ${session.role === 'admin' ? `<button onclick="deleteApplication(${app.id})" class="btn ghost sm" style="color:var(--color-danger);margin-left:auto">🗑 Delete</button>` : ''}
     </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px;margin-bottom:12px">
       <h4 style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Status Timeline</h4>
