@@ -497,6 +497,13 @@ async function refresh(){
           if(fc && fc.ok && fc.client){ S.me = fc.client; }
         }catch(e){ console.warn('full client load failed', e); }
       }
+      // Recruiters: fetch full own record for profile page
+      if(res.role === 'recruiter'){
+        try{
+          const fr = await rpc('fn_a_get_my_full_recruiter', {});
+          if(fr && fr.ok && fr.recruiter){ S.me = fr.recruiter; }
+        }catch(e){ console.warn('full recruiter load failed', e); }
+      }
       return true;
     }
     // fn_get_state failed but user IS authenticated - continue with empty state
@@ -3406,6 +3413,28 @@ window.openPayModal = function(){
 /* Simple stubs for less-critical screens */
 function renderMyProfile(){
   const me = (S.me) || {};
+
+  // Recruiter view - show admin-entered details, edit basics only
+  if(session.role === 'recruiter'){
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h1 class="page-title" style="margin:0">My Profile</h1>
+      <button class="btn primary sm" onclick="openEditOwnRecruiter()">✏️ Update profile</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Recruiter details</div>
+      <dl class="detail-grid">
+        <dt>Name</dt><dd>${esc(me.name || session.name)}</dd>
+        ${me.email || session.email ? `<dt>Email</dt><dd>${esc(me.email || session.email)}</dd>` : ''}
+        ${me.phone ? `<dt>Phone</dt><dd>${esc(me.phone)}</dd>` : '<dt>Phone</dt><dd style="color:var(--text-muted);font-style:italic">Not set</dd>'}
+        ${me.target_roles ? `<dt>Target roles</dt><dd>${esc(me.target_roles)}</dd>` : ''}
+        ${me.joined_date ? `<dt>Joined</dt><dd>${esc(fmt(me.joined_date))}</dd>` : ''}
+        <dt>Code</dt><dd style="font-family:monospace">${esc(session.code)}</dd>
+      </dl>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:12px">To change your email, joining date, or pay details, contact an admin.</p>
+    </div>`;
+  }
+
+  // Client view
   const resumeVal = me.base_resume_url;
   const isRealUrl = resumeVal && /^https?:\/\//i.test(resumeVal) && resumeVal.indexOf('test.com') === -1;
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -3421,7 +3450,7 @@ function renderMyProfile(){
       ${me.target_role ? `<dt>Target role</dt><dd>${esc(me.target_role)}</dd>` : ''}
       ${me.years_experience != null ? `<dt>Experience</dt><dd>${esc(me.years_experience)} years</dd>` : ''}
       ${me.sponsorship_status ? `<dt>Sponsorship</dt><dd>${esc(me.sponsorship_status)}</dd>` : ''}
-      ${me.location ? `<dt>Location</dt><dd>${esc(me.location)}</dd>` : ''}
+      ${me.location ? `<dt>Location</dt><dd>📍 ${esc(me.location)}</dd>` : ''}
       <dt>Resume</dt><dd>${isRealUrl ? `<a href="${esc(resumeVal)}" target="_blank">View resume →</a>` : '<span style="color:var(--text-muted);font-style:italic">Not uploaded yet</span>'}</dd>
       <dt>Code</dt><dd style="font-family:monospace">${esc(session.code)}</dd>
     </dl>
@@ -3702,7 +3731,7 @@ window.openEditClient = function(code){
 };
 
 window.openEditOwnRecruiter = function(){
-  const me = (S.recruiters || []).find(r => r.code === session.code) || {};
+  const me = (S.me) || (S.recruiters || []).find(r => r.code === session.code) || {};
   openEditModal('Update my profile', [
     { id:'name', label:'Full name', value:me.name },
     { id:'phone', label:'Phone', type:'tel', value:me.phone },
