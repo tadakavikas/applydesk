@@ -3268,10 +3268,7 @@ function renderLogApplication(){
 
   <div class="card">
     <div class="card-title">📝 New application submission</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="field"><label>Client *</label><select id="app-client" required><option value="">— Choose client —</option>${myClients.map(c => `<option value="${esc(c.code)}">${esc(c.name)}${c.target_role ? ' · ' + esc(c.target_role) : ''}</option>`).join('')}</select></div>
-      <div class="field"><label>Application source</label><select id="app-source"><option value="">— Choose source —</option><option>LinkedIn</option><option>Indeed</option><option>Company website</option><option>Recruiter referral</option><option>Dice</option><option>Glassdoor</option><option>ZipRecruiter</option><option>Wellfound</option><option>Other</option></select></div>
-    </div>
+    <div class="field"><label>Client *</label><select id="app-client" required><option value="">— Choose client —</option>${myClients.map(c => `<option value="${esc(c.code)}">${esc(c.name)}${c.target_role ? ' · ' + esc(c.target_role) : ''}</option>`).join('')}</select></div>
     <div class="field"><label>Company *</label><input id="app-company" type="text" placeholder="e.g. Stripe, Google, Netflix" required></div>
     <div class="field"><label>Job title *</label><input id="app-job-title" type="text" placeholder="e.g. Senior Data Engineer" required></div>
     <div class="field"><label>Job posting URL</label><input id="app-job-url" type="url" placeholder="https://careers.company.com/..."></div>
@@ -3324,7 +3321,7 @@ window.submitApplication = async function(){
   const company = document.getElementById('app-company').value.trim();
   const jobTitle = document.getElementById('app-job-title').value.trim();
   const jobUrl = document.getElementById('app-job-url').value.trim();
-  const source = document.getElementById('app-source').value;
+  const source = (document.getElementById('app-source') || {}).value || '';
   const resumeFileInput = document.getElementById('app-resume');
   const resumeFile = resumeFileInput ? resumeFileInput.files[0] : null;
   const screenshotFileInput = document.getElementById('app-screenshot');
@@ -3418,7 +3415,7 @@ window.submitApplication = async function(){
 };
 
 window.clearAppForm = function(){
-  ['app-client','app-company','app-job-title','app-job-url','app-source','app-screenshot'].forEach(id => {
+  ['app-client','app-company','app-job-title','app-job-url','app-screenshot'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.value = '';
   });
