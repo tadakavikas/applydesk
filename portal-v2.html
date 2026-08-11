@@ -3679,6 +3679,9 @@ function openEditModal(title, fields, onSubmit){
         <div id="emfilestatus-${f.id}" style="font-size:11px;color:var(--text-muted);margin-top:4px"></div>
       </div>`;
     }
+    if(f.type === 'readonly'){
+      return `<div class="field"><label>${esc(f.label)}</label><input type="text" value="${esc(f.value == null || f.value === '' ? 'Not set' : f.value)}" disabled style="background:var(--bg-secondary);color:var(--text-muted);cursor:not-allowed"><div style="font-size:10px;color:var(--text-muted);margin-top:3px">Contact an admin to change this</div></div>`;
+    }
     return `<div class="field"><label>${esc(f.label)}</label><input id="em-${f.id}" type="${f.type || 'text'}" value="${esc(f.value == null ? '' : f.value)}" placeholder="${esc(f.placeholder || '')}"></div>`;
   }).join('');
   back.innerHTML = `<div class="modal-inner" style="max-width:640px"><h3>${esc(title)}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">${rows}</div><div class="modal-actions"><button class="btn ghost" id="em-cancel">Cancel</button><button class="btn primary" id="em-save">Save changes</button></div></div>`;
@@ -3734,12 +3737,14 @@ window.openEditOwnRecruiter = function(){
   const me = (S.me) || (S.recruiters || []).find(r => r.code === session.code) || {};
   openEditModal('Update my profile', [
     { id:'name', label:'Full name', value:me.name },
+    { id:'email', label:'Email', type:'email', value:me.email },
     { id:'phone', label:'Phone', type:'tel', value:me.phone },
-    { id:'target_roles', label:'Target roles you recruit for', value:me.target_roles, placeholder:'e.g. Data Engineer, Analyst' }
+    { id:'target_roles', label:'Target roles you recruit for', value:me.target_roles, placeholder:'e.g. Data Engineer, Analyst' },
+    { id:'joined_date', label:'Joining date', type:'readonly', value:me.joined_date ? fmt(me.joined_date) : '' }
   ], async (v) => {
     try{
       const res = await rpc('fn_a_edit_own_recruiter', {
-        p_name: v.name || null, p_phone: v.phone || null, p_target_roles: v.target_roles || null
+        p_name: v.name || null, p_phone: v.phone || null, p_target_roles: v.target_roles || null, p_email: v.email || null
       });
       if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
       await refresh();
