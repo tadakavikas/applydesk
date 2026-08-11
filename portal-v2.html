@@ -836,28 +836,36 @@ window.toggleAvatarMenu = function(e){
 };
 window.closeAvatarMenu = function(){ const m = document.getElementById('avatar-menu'); if(m) m.style.display = 'none'; };
 
-// Open a stored file: full URLs open directly; bare storage paths get a
-// fresh signed URL (fixes older records that saved a raw path).
+// Open a stored file. Handles: full signed URLs (re-signs if needed),
+// bare storage paths, and old filename-only records (no file in storage).
 window.openStoredFile = async function(stored){
-  if(!stored){ toast('No file available', 'error'); return; }
+  if(!stored){ toast('No file attached to this record', 'error'); return; }
   try{
-    // Already a usable URL?
+    let path = null;
+
     if(/^https?:\/\//i.test(stored)){
-      // If it's an expired signed URL, re-sign from its object path
-      if(stored.indexOf('/object/sign/') !== -1){
-        const m = stored.match(/\/object\/sign\/client-resumes\/([^?]+)/);
-        if(m && m[1]){
-          const path = decodeURIComponent(m[1]);
-          const { data, error } = await sb.storage.from('client-resumes').createSignedUrl(path, 60 * 60);
-          if(!error && data && data.signedUrl){ window.open(data.signedUrl, '_blank'); return; }
-        }
+      // Full URL - pull the object path out of a signed URL if present
+      const m = stored.match(/\/object\/(?:sign|public)\/client-resumes\/([^?]+)/);
+      if(m && m[1]){
+        path = decodeURIComponent(m[1]);
+      } else {
+        // Some other URL (gdrive/dropbox link) - just open it
+        window.open(stored, '_blank'); return;
       }
-      window.open(stored, '_blank'); return;
+    } else if(stored.indexOf('/') !== -1){
+      // Bare storage path like "mayur01/123-resume-file.pdf"
+      path = stored.replace(/^\/+/, '').replace(/^client-resumes\//, '');
+    } else {
+      // Filename only, no folder - this record predates file upload.
+      toast('This file was logged before uploads were enabled, so no file is stored for it.', 'error');
+      return;
     }
-    // Bare storage path -> sign it now
-    const path = stored.replace(/^\/+/, '').replace(/^client-resumes\//, '');
+
     const { data, error } = await sb.storage.from('client-resumes').createSignedUrl(path, 60 * 60);
-    if(error || !data || !data.signedUrl){ toast('Could not open file: ' + ((error && error.message) || 'not found'), 'error'); return; }
+    if(error || !data || !data.signedUrl){
+      toast('File not found in storage: ' + (path.split('/').pop() || ''), 'error');
+      return;
+    }
     window.open(data.signedUrl, '_blank');
   }catch(e){ toast('Could not open file: ' + e.message, 'error'); }
 };
