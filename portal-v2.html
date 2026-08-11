@@ -3012,7 +3012,7 @@ function renderRecruiterDashboard(){
 }
 
 function renderClientDashboard(){
-  const me = (S.clients || []).find(c => c.code === session.code) || {};
+  const me = (S.me) || (S.clients || []).find(c => c.code === session.code) || {};
   // Simple profile completeness calc
   const fields = ['name', 'email', 'phone', 'target_role', 'years_experience', 'sponsorship_status', 'base_resume_url'];
   const filled = fields.filter(f => me[f]).length;
@@ -3073,7 +3073,7 @@ function renderClientDashboard(){
 
 /* ═══════ CLIENT SELF EDIT ═══════ */
 window.openEditOwnProfile = function(){
-  const me = (S.clients || []).find(c => c.code === session.code) || {};
+  const me = (S.me) || (S.clients || []).find(c => c.code === session.code) || {};
   openEditModal('Edit my profile', [
     { id:'name', label:'Full name', value:me.name },
     { id:'phone', label:'Phone', type:'tel', value:me.phone },
@@ -3230,7 +3230,7 @@ window.openAppDetail = async function(recordId){
 
 /* ═══════ PAY MODAL - WhatsApp/email link for subscription renewal ═══════ */
 window.openPayModal = function(){
-  const me = (S.clients || []).find(c => c.code === session.code) || {};
+  const me = (S.me) || (S.clients || []).find(c => c.code === session.code) || {};
   const amount = me.subscription_amount ? money(me.subscription_amount, me.subscription_currency) : 'your subscription';
   const message = encodeURIComponent(`Hi ApplyDesk team, I want to renew my subscription (${amount}). Please share payment details.`);
   const back = document.createElement('div');
@@ -3253,7 +3253,7 @@ window.openPayModal = function(){
 
 /* Simple stubs for less-critical screens */
 function renderMyProfile(){ return `<div class="page-header"><h1 class="page-title">My Profile</h1></div><div class="card"><div class="card-title">Profile</div><dl class="detail-grid"><dt>Name</dt><dd>${esc(session.name)}</dd><dt>Role</dt><dd>${esc(roleLabel(session.role))}</dd><dt>Code</dt><dd style="font-family:monospace">${esc(session.code)}</dd>${session.email ? `<dt>Email</dt><dd>${esc(session.email)}</dd>` : ''}</dl></div>`; }
-function renderMyClients(){ const cs = S.clients || []; return `<div class="page-header"><h1 class="page-title">My Clients</h1></div>${cs.length ? '<div class="card-grid">' + cs.map(c => `<div class="item-card"><div class="avatar coral">${esc(initials(c.name))}</div><h4 style="margin-top:12px">${esc(c.name)}</h4><p style="font-size:12px;color:var(--text-muted)">${esc(c.target_role || 'No target role')}</p></div>`).join('') + '</div>' : '<div class="empty-state"><div class="empty-icon">👥</div><h3 class="empty-title">No clients yet</h3></div>'}`; }
+function renderMyClients(){ const cs = S.clients || []; return `<div class="page-header"><h1 class="page-title">My Clients</h1></div>${cs.length ? '<div class="card-grid">' + cs.map(c => `<div class="item-card" onclick="openClientDetail('${esc(c.code)}')" style="cursor:pointer"><div class="avatar coral">${esc(initials(c.name))}</div><h4 style="margin-top:12px">${esc(c.name)}</h4><p style="font-size:12px;color:var(--text-muted)">${esc(c.target_role || 'No target role')}</p></div>`).join('') + '</div>' : '<div class="empty-state"><div class="empty-icon">👥</div><h3 class="empty-title">No clients yet</h3></div>'}`; }
 function renderLogApplication(){
   const myClients = (S.clients || []).filter(c => !c.deactivated_at);
   const dispatchedToday = viewState.dispatchedToday || 0;
@@ -3426,7 +3426,7 @@ window.clearAppForm = function(){
   if(rf) rf.value = '';
 };
 function renderMyApplications(){ return renderApplicationsPage(); }
-function renderMySubscription(){ const me = (S.clients || []).find(c => c.code === session.code) || {}; return `<div class="page-header"><h1 class="page-title">My Subscription</h1></div><div class="card"><div class="card-title">Details</div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : '<dt>Plan</dt><dd>Not active</dd>'}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}</dl></div>`; }
+function renderMySubscription(){ const me = (S.me) || (S.clients || []).find(c => c.code === session.code) || {}; return `<div class="page-header"><h1 class="page-title">My Subscription</h1></div><div class="card"><div class="card-title">Details</div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : '<dt>Plan</dt><dd>Not active</dd>'}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}</dl></div>`; }
 
 /* ═══════ EDIT MODALS ═══════ */
 function openEditModal(title, fields, onSubmit){
@@ -3496,7 +3496,8 @@ window.openEditRecruiter = function(code){
     { id:'target_roles', label:'Target roles', value:r.target_roles },
     { id:'payroll_amount', label:'Payroll amount', type:'number', value:r.payroll_amount },
     { id:'payroll_currency', label:'Currency', type:'select', value:r.payroll_currency || 'INR', options:[{value:'INR',label:'INR (₹)'},{value:'USD',label:'USD ($)'}] },
-    { id:'payroll_cycle_day', label:'Cycle day (1-28)', type:'number', value:r.payroll_cycle_day }
+    { id:'payroll_cycle_day', label:'Cycle day (1-28)', type:'number', value:r.payroll_cycle_day },
+    { id:'joined_date', label:'Start date', type:'date', value:r.joined_date ? String(r.joined_date).slice(0,10) : '' }
   ], async (v) => {
     try{
       const res = await rpc('fn_a_edit_recruiter', {
@@ -3504,7 +3505,8 @@ window.openEditRecruiter = function(code){
         p_target_roles: v.target_roles || null,
         p_payroll_amount: v.payroll_amount ? parseFloat(v.payroll_amount) : null,
         p_payroll_currency: v.payroll_currency || null,
-        p_payroll_cycle_day: v.payroll_cycle_day ? parseInt(v.payroll_cycle_day) : null
+        p_payroll_cycle_day: v.payroll_cycle_day ? parseInt(v.payroll_cycle_day) : null,
+        p_joined_date: v.joined_date || null
       });
       if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
       await refresh();
