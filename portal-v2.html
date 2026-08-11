@@ -1575,6 +1575,7 @@ function renderClientDetailPage(){
           ${c.email ? `<dt>Email</dt><dd>${esc(c.email)}</dd>` : ''}
           ${c.phone ? `<dt>Phone</dt><dd>${esc(c.phone)}</dd>` : ''}
           ${c.target_role ? `<dt>Target role</dt><dd>${esc(c.target_role)}</dd>` : ''}
+          ${c.location ? `<dt>Location</dt><dd>📍 ${esc(c.location)}</dd>` : ''}
           ${c.years_experience ? `<dt>Experience</dt><dd>${c.years_experience} years</dd>` : ''}
           ${c.sponsorship_status ? `<dt>Sponsorship</dt><dd><span class="tag teal">${esc(c.sponsorship_status)}</span></dd>` : ''}
           ${c.base_resume_url ? `<dt>Resume</dt><dd><a href="${esc(c.base_resume_url)}" target="_blank">View resume →</a></dd>` : '<dt>Resume</dt><dd style="color:var(--text-muted);font-style:italic">Not uploaded</dd>'}
@@ -3085,7 +3086,7 @@ function renderRecruiterDashboard(){
       ${svgRing(pct, { size: 200, stroke: 14, color: 'var(--color-primary)', value: pct + '%', label: 'STATUS' })}
     </div>
     <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap">
-      <button class="btn ghost sm" onclick="openEditRecruiter('${esc(session.code)}')">✏️ Update profile</button>
+      <button class="btn ghost sm" onclick="openEditOwnRecruiter()">✏️ Update profile</button>
     </div>
   </div>
 
@@ -3219,6 +3220,7 @@ window.openEditOwnProfile = function(){
     { id:'name', label:'Full name', value:me.name },
     { id:'phone', label:'Phone', type:'tel', value:me.phone },
     { id:'target_role', label:'Target role', value:me.target_role },
+    { id:'location', label:'Location (City, State)', value:me.location, placeholder:'e.g. Charlotte, NC' },
     { id:'years_experience', label:'Years of experience', type:'number', value:me.years_experience },
     { id:'sponsorship', label:'Visa sponsorship', type:'select', value:me.sponsorship_status || 'US Citizen', options:[
       {value:'US Citizen',label:'US Citizen'},{value:'Green Card',label:'Green Card'},{value:'H1B',label:'H1B'},{value:'OPT',label:'OPT'},{value:'H4 EAD',label:'H4 EAD'},{value:'Needs Sponsorship',label:'Needs Sponsorship'}
@@ -3229,7 +3231,8 @@ window.openEditOwnProfile = function(){
       const res = await rpc('fn_a_edit_own_client', {
         p_name: v.name || null, p_phone: v.phone || null, p_target_role: v.target_role || null,
         p_years_experience: v.years_experience ? parseFloat(v.years_experience) : null,
-        p_sponsorship: v.sponsorship || null, p_base_resume_url: v.base_resume_url || null
+        p_sponsorship: v.sponsorship || null, p_base_resume_url: v.base_resume_url || null,
+        p_location: v.location || null
       });
       if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
       await refresh();
@@ -3401,7 +3404,29 @@ window.openPayModal = function(){
 };
 
 /* Simple stubs for less-critical screens */
-function renderMyProfile(){ return `<div class="page-header"><h1 class="page-title">My Profile</h1></div><div class="card"><div class="card-title">Profile</div><dl class="detail-grid"><dt>Name</dt><dd>${esc(session.name)}</dd><dt>Role</dt><dd>${esc(roleLabel(session.role))}</dd><dt>Code</dt><dd style="font-family:monospace">${esc(session.code)}</dd>${session.email ? `<dt>Email</dt><dd>${esc(session.email)}</dd>` : ''}</dl></div>`; }
+function renderMyProfile(){
+  const me = (S.me) || {};
+  const resumeVal = me.base_resume_url;
+  const isRealUrl = resumeVal && /^https?:\/\//i.test(resumeVal) && resumeVal.indexOf('test.com') === -1;
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h1 class="page-title" style="margin:0">My Profile</h1>
+    <button class="btn primary sm" onclick="openEditOwnProfile()">✏️ Edit profile</button>
+  </div>
+  <div class="card">
+    <div class="card-title">Profile details</div>
+    <dl class="detail-grid">
+      <dt>Name</dt><dd>${esc(me.name || session.name)}</dd>
+      ${session.email ? `<dt>Email</dt><dd>${esc(session.email)}</dd>` : ''}
+      ${me.phone ? `<dt>Phone</dt><dd>${esc(me.phone)}</dd>` : ''}
+      ${me.target_role ? `<dt>Target role</dt><dd>${esc(me.target_role)}</dd>` : ''}
+      ${me.years_experience != null ? `<dt>Experience</dt><dd>${esc(me.years_experience)} years</dd>` : ''}
+      ${me.sponsorship_status ? `<dt>Sponsorship</dt><dd>${esc(me.sponsorship_status)}</dd>` : ''}
+      ${me.location ? `<dt>Location</dt><dd>${esc(me.location)}</dd>` : ''}
+      <dt>Resume</dt><dd>${isRealUrl ? `<a href="${esc(resumeVal)}" target="_blank">View resume →</a>` : '<span style="color:var(--text-muted);font-style:italic">Not uploaded yet</span>'}</dd>
+      <dt>Code</dt><dd style="font-family:monospace">${esc(session.code)}</dd>
+    </dl>
+  </div>`;
+}
 function renderMyClients(){ const cs = S.clients || []; return `<div class="page-header"><h1 class="page-title">My Clients</h1></div>${cs.length ? '<div class="card-grid">' + cs.map(c => `<div class="item-card" onclick="openClientDetail('${esc(c.code)}')" style="cursor:pointer"><div class="avatar coral">${esc(initials(c.name))}</div><h4 style="margin-top:12px">${esc(c.name)}</h4><p style="font-size:12px;color:var(--text-muted)">${esc(c.target_role || 'No target role')}</p></div>`).join('') + '</div>' : '<div class="empty-state"><div class="empty-icon">👥</div><h3 class="empty-title">No clients yet</h3></div>'}`; }
 function renderLogApplication(){
   const myClients = (S.clients || []).filter(c => !c.deactivated_at);
@@ -3648,6 +3673,7 @@ window.openEditClient = function(code){
     { id:'email', label:'Email', type:'email', value:c.email },
     { id:'phone', label:'Phone', type:'tel', value:c.phone },
     { id:'target_role', label:'Target role', value:c.target_role },
+    { id:'location', label:'Location (City, State)', value:c.location, placeholder:'e.g. Charlotte, NC' },
     { id:'years_experience', label:'Years experience', type:'number', value:c.years_experience },
     { id:'sponsorship', label:'Sponsorship', type:'select', value:c.sponsorship_status || '', options:[{value:'',label:'—'},{value:'US Citizen',label:'US Citizen'},{value:'Green Card',label:'Green Card'},{value:'H1B',label:'H1B'},{value:'OPT',label:'OPT'},{value:'OPT-EAD',label:'OPT-EAD'},{value:'Other',label:'Other'}] },
     { id:'base_resume_url', label:'Resume (paste link or upload)', type:'file', uploadPrefix:code, value:c.base_resume_url },
@@ -3661,6 +3687,7 @@ window.openEditClient = function(code){
         p_target_role: v.target_role || null,
         p_years_experience: v.years_experience ? parseFloat(v.years_experience) : null,
         p_sponsorship: v.sponsorship || null, p_base_resume_url: v.base_resume_url || null,
+        p_location: v.location || null,
         p_subscription_amount: v.subscription_amount ? parseFloat(v.subscription_amount) : null,
         p_subscription_currency: v.subscription_currency || null,
         p_subscription_start_date: v.subscription_start_date || null
@@ -3668,6 +3695,26 @@ window.openEditClient = function(code){
       if(!r || !r.ok){ toast('Failed: ' + ((r && r.err) || 'unknown'), 'error'); return false; }
       await refresh();
       toast('Client updated', 'success');
+      renderShell();
+      return true;
+    }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
+  });
+};
+
+window.openEditOwnRecruiter = function(){
+  const me = (S.recruiters || []).find(r => r.code === session.code) || {};
+  openEditModal('Update my profile', [
+    { id:'name', label:'Full name', value:me.name },
+    { id:'phone', label:'Phone', type:'tel', value:me.phone },
+    { id:'target_roles', label:'Target roles you recruit for', value:me.target_roles, placeholder:'e.g. Data Engineer, Analyst' }
+  ], async (v) => {
+    try{
+      const res = await rpc('fn_a_edit_own_recruiter', {
+        p_name: v.name || null, p_phone: v.phone || null, p_target_roles: v.target_roles || null
+      });
+      if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
+      await refresh();
+      toast('Profile updated', 'success');
       renderShell();
       return true;
     }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
