@@ -2357,82 +2357,102 @@ async function loadThreadMessages(clientCode){
 }
 
 function renderTeamChats(){
-  // Load threads once
-  if(clientThreadsCache === null && !threadsAttempted){
-    threadsAttempted = true;
-    loadClientThreads().then(() => renderShell());
+  // Load the DM contact roster + existing groups once
+  if(dmContactsCache === null && !dmContactsAttempted){
+    loadDmContacts().then(() => renderShell());
     return `<div class="page-header"><h1 class="page-title">Chat</h1></div><div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading conversations...</h3></div>`;
   }
-
-  // Background-load groups + roster for the Team section (non-blocking)
   if(groupsList === null && !groupsAttempted){
     groupsAttempted = true;
     loadGroups().then(() => renderShell()).catch(() => {});
   }
-  if(chatPeopleCache === null && !chatPeopleAttempted){
-    loadChatPeople().then(() => renderShell()).catch(() => {});
-  }
 
-  const threads = clientThreadsCache || [];
-  const teamPeople = getChatablePeople().filter(p => p.role !== 'client');
-  const selectedTeamCode = viewState.selectedTeamPerson || null;
-  const selectedClientCode = selectedTeamCode ? null : (viewState.selectedThreadClient || (threads.length ? threads[0].client_code : null));
+  const c = dmContactsCache || { admins:[], managers:[], recruiters:[], clients:[], can_create_group:false };
+  const groups = groupsList || [];
+  const isTeam = session.role !== 'client';
+  const selKey = viewState.selectedChatKey || null;
 
-  // Left sidebar: list of client threads
-  const threadItems = threads.map(t => {
-    const isActive = t.client_code === selectedClientCode;
-    const lastPreview = t.last_body ? (t.last_body.length > 40 ? t.last_body.slice(0, 40) + '...' : t.last_body) : '(no messages yet)';
-    const lastTime = t.last_ts ? timeAgo(t.last_ts) : '';
-    return `<div onclick="selectThread('${esc(t.client_code)}')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;cursor:pointer;margin-bottom:4px;background:${isActive ? 'var(--bg-coral-light)' : 'transparent'};transition:background .15s ease">
-      <div class="avatar sm coral">${esc(initials(t.client_name || t.client_code))}</div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <div style="font-family:var(--font-heading);font-weight:${t.message_count > 0 ? '700' : '500'};color:var(--text-heading);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.client_name || t.client_code)}</div>
-          <div style="font-size:10px;color:var(--text-muted);white-space:nowrap">${esc(lastTime)}</div>
-        </div>
-        <div style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(lastPreview)}</div>
-      </div>
-    </div>`;
-  }).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No client threads yet.</div>`;
-
-  // Team section items (direct chats with admins, managers, recruiters)
-  const teamItems = teamPeople.map(p => {
-    const isActive = p.code === selectedTeamCode;
-    const roleClass = p.role === 'admin' ? 'warning' : p.role === 'manager' ? 'success' : '';
-    return `<div onclick="selectTeamChat('${esc(p.code)}')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;cursor:pointer;margin-bottom:4px;background:${isActive ? 'var(--bg-coral-light)' : 'transparent'};transition:background .15s ease">
+  function personRow(p){
+    const dmKey = 'dm:' + p.code;
+    const isActive = selKey === dmKey;
+    const roleClass = p.role === 'admin' ? 'warning' : p.role === 'manager' ? 'success' : p.role === 'recruiter' ? '' : 'coral';
+    return `<div onclick="openDm('${esc(p.code)}')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;cursor:pointer;margin-bottom:3px;background:${isActive ? 'var(--bg-coral-light)' : 'transparent'};transition:background .15s ease">
       <div class="avatar sm ${roleClass}">${esc(initials(p.name))}</div>
       <div style="flex:1;min-width:0">
         <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div>
         <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">${esc(p.role)}</div>
       </div>
     </div>`;
-  }).join('') || `<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">No team members yet.</div>`;
-
-  // Right side: selected team chat or client thread
-  let threadHtml;
-  if(selectedTeamCode){
-    const person = teamPeople.find(p => p.code === selectedTeamCode);
-    threadHtml = person ? renderDirectChat(person) : `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a conversation</h3></div>`;
-  } else if(!selectedClientCode){
-    threadHtml = `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a client thread</h3><p class="empty-text">Pick a client from the left to view the conversation.</p></div>`;
-  } else {
-    threadHtml = renderClientThread(selectedClientCode);
   }
+
+  function section(label, arr){
+    if(!arr || !arr.length) return '';
+    return `<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:14px 8px 6px 8px">${label} (${arr.length})</div>${arr.map(personRow).join('')}`;
+  }
+
+  // Named groups (3+ members or broadcast). 2-person direct chats are reached via contact tap, not listed here.
+  const namedGroups = groups.filter(g => g.is_broadcast || (g.member_count || 0) > 2 || (g.description !== 'Direct chat' && (!g.name || g.name.indexOf(' & ') === -1)));
+  const groupItems = namedGroups.map(g => {
+    const gKey = 'group:' + g.id;
+    const isActive = selKey === gKey;
+    return `<div onclick="selectChat('${gKey}')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;cursor:pointer;margin-bottom:3px;background:${isActive ? 'var(--bg-coral-light)' : 'transparent'}">
+      <div class="avatar sm success">${esc(initials(g.name || 'G'))}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g.name || 'Group')}${g.is_broadcast ? ' 📢' : ''}</div>
+        <div style="font-size:10px;color:var(--text-muted)">${g.member_count || 0} members</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const contactList = section('Admins', c.admins) + section('Managers', c.managers) + section('Recruiters', c.recruiters) + (isTeam ? section('Clients', c.clients) : '');
+
+  // Right pane
+  let detailHtml;
+  if(selKey && selKey.indexOf('dm:') === 0){
+    const code = selKey.slice(3);
+    const all = [...(c.admins||[]), ...(c.managers||[]), ...(c.recruiters||[]), ...(c.clients||[])];
+    const person = all.find(p => p.code === code);
+    detailHtml = person ? renderDirectChat(person) : `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a conversation</h3></div>`;
+  } else if(selKey && selKey.indexOf('group:') === 0){
+    const g = groups.find(x => ('group:' + x.id) === selKey);
+    detailHtml = g ? renderGroupThread(g) : `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select a conversation</h3></div>`;
+  } else {
+    detailHtml = `<div class="empty-state"><div class="empty-icon">💬</div><h3 class="empty-title">Select someone to chat</h3><p class="empty-text">Tap a name on the left to open a private conversation.</p></div>`;
+  }
+
+  const createBtn = c.can_create_group ? `<button class="btn primary sm" onclick="openCreateGroup()">➕ Group</button>` : '';
 
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <h1 class="page-title" style="margin:0">Chat</h1>
-    <button class="btn ghost sm" onclick="refreshThreads()">↻ Refresh</button>
+    <div style="display:flex;gap:8px">${createBtn}<button class="btn ghost sm" onclick="refreshChats()">↻ Refresh</button></div>
   </div>
   <div class="split-view">
     <div class="split-list" style="padding:12px">
-      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:4px 8px 8px 8px">Client threads (${threads.length})</div>
-      ${threadItems}
-      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:16px 8px 8px 8px">Team (${teamPeople.length})</div>
-      ${teamItems}
+      ${namedGroups.length ? `<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:4px 8px 6px 8px">Groups (${namedGroups.length})</div>${groupItems}` : ''}
+      ${contactList || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No contacts available.</div>`}
     </div>
-    <div class="split-detail">${threadHtml}</div>
+    <div class="split-detail">${detailHtml}</div>
   </div>`;
 }
+
+window.openDm = async function(targetCode){
+  try{
+    const r = await rpc('fn_a_start_direct_chat', { p_target_code: targetCode });
+    if(r && r.ok){
+      groupsList = null; groupsAttempted = false;
+      viewState.selectedChatKey = 'group:' + r.group_id;
+      viewState.groupMessages = null;
+      renderShell();
+    } else toast('Could not open chat: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
+
+window.refreshChats = function(){
+  dmContactsCache = null; dmContactsAttempted = false;
+  groupsList = null; groupsAttempted = false;
+  viewState.groupMessages = null;
+  renderShell();
+};
 
 function renderClientThread(clientCode){
   const thread = (clientThreadsCache || []).find(t => t.client_code === clientCode);
@@ -2477,16 +2497,8 @@ function renderClientThread(clientCode){
 
 window.selectThread = function(clientCode){
   viewState.selectedThreadClient = clientCode;
-  viewState.selectedTeamPerson = null;
   // Force reload of messages for the newly selected thread
   delete threadMessagesCache[clientCode];
-  renderShell();
-};
-
-window.selectTeamChat = function(code){
-  viewState.selectedTeamPerson = code;
-  viewState.selectedThreadClient = null;
-  viewState.groupMessages = null;
   renderShell();
 };
 
@@ -2631,17 +2643,27 @@ function renderGroupThread(g){
   const bubbles = msgs.map(m => {
     const isMine = m.from_code === session.code;
     return `<div style="display:flex;flex-direction:column;${isMine ? 'align-items:flex-end' : 'align-items:flex-start'};margin-bottom:12px">
-      <div class="chat-meta">${esc(m.from_name || m.from_code)} <span class="tag muted" style="font-size:9px">${esc(m.from_role || '')}</span> · ${timeAgo(m.sent_at)}</div>
+      <div class="chat-meta">${esc(m.from_name || m.from_code)} <span class="tag muted" style="font-size:9px">${esc(m.from_role || '')}</span> · ${timeAgo(m.created_at)}</div>
       <div class="chat-bubble ${isMine ? 'own' : 'other'}">${esc(m.body)}</div>
     </div>`;
   }).join('') || `<div style="text-align:center;padding:32px;color:var(--text-muted);font-size:13px">No messages yet. Send the first one.</div>`;
 
-  const canSend = !g.broadcast || session.role === 'admin';
+  const isBroadcast = g.is_broadcast || g.broadcast;
+  const canSend = !isBroadcast || session.role === 'admin';
+
+  // For a 2-person direct chat, show the OTHER person's name, not "X & Y"
+  const isDirect = !isBroadcast && (g.member_count || 0) === 2 && (g.description === 'Direct chat' || (g.name && g.name.indexOf(' & ') !== -1));
+  let headerName = g.name;
+  if(isDirect && g.name && g.name.indexOf(' & ') !== -1){
+    const parts = g.name.split(' & ');
+    const mine = (session.name || '').trim();
+    headerName = parts.find(p => p.trim() !== mine) || parts[parts.length - 1];
+  }
 
   return `<div style="display:flex;flex-direction:column;height:100%">
     <div style="border-bottom:1px solid var(--bg-secondary);padding-bottom:12px;margin-bottom:16px">
-      <div style="font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--text-heading)">${g.broadcast ? '📢 ' : ''}${esc(g.name)}</div>
-      <div style="font-size:12px;color:var(--text-muted)">${g.member_count || 0} members${g.broadcast ? ' · Broadcast (admin-only send)' : ''}</div>
+      <div style="font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--text-heading)">${isBroadcast ? '📢 ' : ''}${esc(headerName)}</div>
+      <div style="font-size:12px;color:var(--text-muted)">${isDirect ? 'Direct message' : (g.member_count || 0) + ' members'}${isBroadcast ? ' · Broadcast (admin-only send)' : ''}</div>
     </div>
     <div style="flex:1;overflow-y:auto;padding:0 4px;min-height:300px">${bubbles}</div>
     ${canSend ? `<div style="display:flex;gap:8px;padding-top:16px;border-top:1px solid var(--bg-secondary)">
@@ -3490,6 +3512,17 @@ window.openAssignClients = function(recruiterCode){
 // Cache the full team roster fetched via fn_list_chat_people
 let chatPeopleCache = null;
 let chatPeopleAttempted = false;
+let dmContactsCache = null;
+let dmContactsAttempted = false;
+
+async function loadDmContacts(){
+  dmContactsAttempted = true;
+  try{
+    const r = await rpc('fn_a_dm_contacts', {});
+    if(r && r.ok){ dmContactsCache = r; return r; }
+  }catch(e){ console.warn('loadDmContacts failed:', e); }
+  return null;
+}
 
 async function loadChatPeople(){
   if(chatPeopleCache) return chatPeopleCache;
