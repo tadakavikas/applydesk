@@ -836,6 +836,31 @@ window.toggleAvatarMenu = function(e){
 };
 window.closeAvatarMenu = function(){ const m = document.getElementById('avatar-menu'); if(m) m.style.display = 'none'; };
 
+// Download a resume for an application. Tries the new storage file first;
+// if that's just a filename (old record), fetches the base64 from app_resumes.
+window.downloadResume = async function(recordId, storedRef){
+  // New records: storedRef is a real URL or storage path -> use storage
+  if(storedRef && (/^https?:\/\//i.test(storedRef) || storedRef.indexOf('/') !== -1)){
+    return openStoredFile(storedRef);
+  }
+  // Old records: fetch base64 data URL from app_resumes
+  try{
+    toast('Fetching resume...', 'success');
+    const r = await rpc('fn_a_get_resume', { p_record_id: recordId });
+    if(!r || !r.ok || !r.data){
+      toast('No resume file stored for this application', 'error');
+      return;
+    }
+    // r.data is a data URL (data:application/pdf;base64,...). Trigger download.
+    const a = document.createElement('a');
+    a.href = r.data;
+    a.download = r.file_name || 'resume.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }catch(e){ toast('Could not fetch resume: ' + e.message, 'error'); }
+};
+
 // Open a stored file. Handles: full signed URLs (re-signs if needed),
 // bare storage paths, and old filename-only records (no file in storage).
 window.openStoredFile = async function(stored){
@@ -3290,7 +3315,7 @@ window.openAppDetail = async function(recordId){
     <div style="color:var(--text-body);font-size:14px;margin-bottom:16px"><b>${esc(app.company || 'Unknown company')}</b>${app.source ? ' · ' + esc(app.source) : ''}${(app.created_at || app.applied_at) ? ' · Applied ' + esc(fmtDateTime(app.created_at || app.applied_at)) : ''}</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
       ${app.job_url ? `<a href="${esc(app.job_url)}" target="_blank" class="btn ghost sm">🔗 View job posting</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No job posting link</span>'}
-      ${app.resume_used ? `<button onclick="openStoredFile('${esc(app.resume_used).replace(/'/g,'')}')" class="btn ghost sm">📄 Download resume used</button>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No resume attached</span>'}
+      <button onclick="downloadResume(${app.id}, '${esc(app.resume_used || '').replace(/'/g,'')}')" class="btn ghost sm">📄 Download resume used</button>
       ${app.screenshot_url ? `<button onclick="openStoredFile('${esc(app.screenshot_url).replace(/'/g,'')}')" class="btn ghost sm">📎 Original screenshot</button>` : ''}
     </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px;margin-bottom:12px">
