@@ -3231,14 +3231,13 @@ window.openEditOwnProfile = function(){
     { id:'years_experience', label:'Years of experience', type:'number', value:me.years_experience },
     { id:'sponsorship', label:'Visa sponsorship', type:'select', value:me.sponsorship_status || 'US Citizen', options:[
       {value:'US Citizen',label:'US Citizen'},{value:'Green Card',label:'Green Card'},{value:'H1B',label:'H1B'},{value:'OPT',label:'OPT'},{value:'H4 EAD',label:'H4 EAD'},{value:'Needs Sponsorship',label:'Needs Sponsorship'}
-    ] },
-    { id:'base_resume_url', label:'Resume (paste link or upload)', type:'file', uploadPrefix:(me.code || 'client'), value:me.base_resume_url }
+    ] }
   ], async (v) => {
     try{
       const res = await rpc('fn_a_edit_own_client', {
         p_name: v.name || null, p_phone: v.phone || null, p_target_role: v.target_role || null,
         p_years_experience: v.years_experience ? parseFloat(v.years_experience) : null,
-        p_sponsorship: v.sponsorship || null, p_base_resume_url: v.base_resume_url || null,
+        p_sponsorship: v.sponsorship || null,
         p_location: v.location || null
       });
       if(!res || !res.ok){ toast('Failed: ' + ((res && res.err) || 'unknown'), 'error'); return false; }
@@ -3451,7 +3450,8 @@ function renderMyProfile(){
       ${me.years_experience != null ? `<dt>Experience</dt><dd>${esc(me.years_experience)} years</dd>` : ''}
       ${me.sponsorship_status ? `<dt>Sponsorship</dt><dd>${esc(me.sponsorship_status)}</dd>` : ''}
       ${me.location ? `<dt>Location</dt><dd>📍 ${esc(me.location)}</dd>` : ''}
-      <dt>Resume</dt><dd>${isRealUrl ? `<a href="${esc(resumeVal)}" target="_blank">View resume →</a>` : '<span style="color:var(--text-muted);font-style:italic">Not uploaded yet</span>'}</dd>
+      ${me.subscription_start_date ? `<dt>Joined</dt><dd>${esc(fmt(me.subscription_start_date))}</dd>` : ''}
+      <dt>Resume</dt><dd>${isRealUrl ? `<a href="${esc(resumeVal)}" target="_blank">📄 Download resume →</a>` : '<span style="color:var(--text-muted);font-style:italic">Not uploaded yet</span>'}</dd>
       <dt>Code</dt><dd style="font-family:monospace">${esc(session.code)}</dd>
     </dl>
   </div>`;
