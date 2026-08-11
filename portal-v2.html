@@ -879,6 +879,13 @@ function renderAdminDashboard(){
   const rs = S.recruiters || [];
   const ms = S.managers || [];
   const activeClients = cs.filter(c => !c.deactivated_at).length;
+  // Real count: applications logged with today's date
+  const _todayStr = new Date().toISOString().slice(0,10);
+  const appsToday = (S.records || []).filter(r => {
+    if(r.type && r.type !== 'application') return false;
+    const d = (r.date || r.created_at || '').slice(0,10);
+    return d === _todayStr;
+  }).length;
   const activeRecruiters = rs.filter(r => !r.deactivated_at).length;
   const monthlyRecurring = cs.filter(c => !c.deactivated_at && c.subscription_amount).reduce((sum, c) => sum + (c.subscription_currency === 'USD' ? Number(c.subscription_amount) : Number(c.subscription_amount) / 88), 0);
   const unclaimedLeads = (leads || []).filter(l => !l.claimed_by).length;
@@ -1000,7 +1007,7 @@ function renderAdminDashboard(){
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
             <div>
               <div style="font-size:12px;color:var(--text-body);margin-bottom:2px">Apps Sent Today</div>
-              <div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-danger)">${Math.round(activeClients * 25)}</div>
+              <div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-danger)">${appsToday}</div>
             </div>
             ${svgSparkline(appsSentTrend, { width: 90, height: 32, color: 'var(--color-danger)' })}
           </div>
