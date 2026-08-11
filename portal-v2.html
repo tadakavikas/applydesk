@@ -301,11 +301,32 @@ let viewState = {}; // per-view local state (selected lead, filter, etc)
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => new Date().toISOString().slice(0,10);
-const fmt = d => { if(!d) return ''; try{ return new Date(d+'T00:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); }catch(e){ return d; } };
+const fmt = d => { if(!d) return ''; try{ return new Date(d+'T00:00:00').toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}); }catch(e){ return d; } };
+// Viewer-local date+time. Auto-detects the viewer's timezone and locale.
+// US viewer sees US format in their zone; India viewer sees IST, dd/mm.
+const fmtDateTime = v => {
+  if(!v) return '';
+  try{
+    let s = String(v);
+    // Bare date (no time) -> show date only, no misleading time
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+      return new Date(s + 'T00:00:00Z').toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone});
+    }
+    // Timestamp without zone -> assume UTC (that's how Postgres stores it)
+    if(/\d{2}:\d{2}/.test(s) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)){
+      s = s.replace(' ', 'T') + 'Z';
+    }
+    const d = new Date(s);
+    if(isNaN(d.getTime())) return String(v);
+    return d.toLocaleString(undefined, {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  }catch(e){ return String(v); }
+};
 const timeAgo = iso => {
   if(!iso) return '';
   try{
-    const t = new Date(iso).getTime();
+    let s = String(iso);
+    if(/\d{2}:\d{2}/.test(s) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) s = s.replace(' ','T') + 'Z';
+    const t = new Date(s).getTime();
     const diff = Math.floor((Date.now() - t) / 1000);
     if(diff < 60) return diff + 's ago';
     if(diff < 3600) return Math.floor(diff/60) + 'm ago';
@@ -3748,51 +3769,43 @@ function renderApplicationsPage(){
   const responses = apps.filter(a => Array.isArray(a.status_json) && a.status_json.some(s => /call|interview|offer|screen/i.test(s.status || ''))).length;
   const responseRate = totalApps > 0 ? Math.round((responses / totalApps) * 100) : 0;
 
-  // Group by client for section headers, but each app is a CARD in a grid
-  const byClient = {};
-  apps.forEach(a => {
-    const key = a.client_code || 'unknown';
-    if(!byClient[key]) byClient[key] = [];
-    byClient[key].push(a);
+  // Sort newest first, render as a compact table (one row per application)
+  const sorted = apps.slice().sort((a,b) => {
+    const ta = new Date((a.created_at || a.applied_at || '')).getTime() || 0;
+    const tb = new Date((b.created_at || b.applied_at || '')).getTime() || 0;
+    return tb - ta;
   });
 
-  const clientCards = Object.entries(byClient).map(([clientCode, clientApps]) => {
-    const client = (S.clients || []).find(c => c.code === clientCode);
-    const clientName = client ? client.name : clientCode;
+  const showClientCol = session.role !== 'client';
+  const rows = sorted.map(a => {
+    const latestStatus = Array.isArray(a.status_json) && a.status_json.length ? a.status_json[a.status_json.length - 1] : null;
+    const statusLabel = latestStatus ? latestStatus.status : 'Applied';
+    const sl = statusLabel.toLowerCase();
+    const statusClass = sl.includes('reject') ? 'danger' : (sl.includes('interview') || sl.includes('call') || sl.includes('screen')) ? 'warning' : sl.includes('offer') || sl.includes('accept') ? 'success' : 'teal';
+    const client = (S.clients || []).find(c => c.code === a.client_code);
+    const clientNm = client ? client.name : (a.client_code || '');
+    const recruiterDisplay = a.recruiter_name || (S.recruiters || []).find(r => r.code === a.recruiter_code)?.name || '';
+    const when = a.created_at || a.applied_at;
+    return `<tr onclick="openAppDetail(${a.id})" style="cursor:pointer">
+      <td style="white-space:nowrap;font-size:12px;color:var(--text-body)">${esc(fmtDateTime(when))}</td>
+      ${showClientCol ? `<td style="white-space:nowrap">${esc(clientNm)}</td>` : ''}
+      <td><b>${esc(a.company || 'Unknown')}</b><br><span style="color:var(--text-muted);font-size:12px">${esc(a.job_title || 'Untitled role')}</span></td>
+      <td><span class="tag ${statusClass}" style="font-size:10px;padding:3px 8px">${esc(statusLabel)}</span></td>
+      <td style="white-space:nowrap;font-size:12px;color:var(--text-body)">${esc(recruiterDisplay) || '—'}</td>
+    </tr>`;
+  }).join('');
 
-    // Each application becomes a CARD (like recruiter cards)
-    const appCards = clientApps.map(a => {
-      const latestStatus = Array.isArray(a.status_json) && a.status_json.length ? a.status_json[a.status_json.length - 1] : null;
-      const statusLabel = latestStatus ? latestStatus.status : 'Applied';
-      const statusClass = statusLabel.toLowerCase().includes('reject') ? 'danger' : statusLabel.toLowerCase().includes('interview') || statusLabel.toLowerCase().includes('call') ? 'warning' : statusLabel.toLowerCase().includes('offer') ? 'success' : 'teal';
-      const recruiterDisplay = a.recruiter_name || (S.recruiters || []).find(r => r.code === a.recruiter_code)?.name || '';
-      const timeStr = a.applied_at ? new Date(a.applied_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
-      const companyInitial = (a.company || '?').charAt(0).toUpperCase();
+  const table = sorted.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+    <thead><tr style="text-align:left;border-bottom:2px solid var(--bg-secondary)">
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Date & Time</th>
+      ${showClientCol ? '<th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Client</th>' : ''}
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Company / Role</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Status</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Recruiter</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`
+    : `<div class="empty-state" style="padding:48px"><div class="empty-icon">📄</div><h3 class="empty-title">No applications yet</h3><p class="empty-text">${session.role === 'recruiter' ? 'Log your first application from the "Log Application" tab.' : 'Applications will appear here once recruiters start logging them.'}</p></div>`;
 
-      return `<div class="item-card" onclick="openAppDetail(${a.id})">
-        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
-          <div class="avatar coral">${esc(companyInitial)}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.company || 'Unknown')}</div>
-            <div style="font-size:12px;color:var(--text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.job_title || 'Untitled role')}</div>
-          </div>
-          <span class="tag ${statusClass}" style="font-size:9px;padding:3px 7px">${esc(statusLabel)}</span>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--bg-secondary);font-size:11px;color:var(--text-muted)">
-          <span>${esc(timeStr) || '—'}</span>
-          ${recruiterDisplay ? `<span style="text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px" title="via ${esc(recruiterDisplay)}">via ${esc(recruiterDisplay)}</span>` : ''}
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div style="margin-bottom:32px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:0 4px">
-        <div class="avatar sm coral">${esc(initials(clientName))}</div>
-        <div style="flex:1"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:15px">${esc(clientName)}</div><div style="font-size:11px;color:var(--text-muted)">${clientApps.length} application${clientApps.length !== 1 ? 's' : ''}</div></div>
-      </div>
-      <div class="card-grid">${appCards}</div>
-    </div>`;
-  }).join('') || `<div class="empty-state" style="padding:48px"><div class="empty-icon">📄</div><h3 class="empty-title">No applications yet</h3><p class="empty-text">${session.role === 'recruiter' ? 'Log your first application from the "Log Application" tab.' : 'Applications will appear here once recruiters start logging them.'}</p></div>`;
+  const clientCards = table;
 
   return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:16px;flex-wrap:wrap">
     <div>
