@@ -775,12 +775,12 @@ function renderShell(){
 
   // Special route: client-detail is not in the sidebar but reachable via clicking a client
   if(currentView === 'client-detail'){
-    const main = `<div class="main-area"><header class="topbar"><h2 class="topbar-title">Client Dossier</h2><div class="topbar-search"><input type="search" placeholder="Search..."></div><div class="topbar-right" style="position:relative"><button class="topbar-bell" onclick="setView('notifications')">🔔<span class="bell-dot"></span></button><button class="topbar-avatar" onclick="toggleAvatarMenu(event)">${esc(initials(session.name))}</button><div id="avatar-menu" style="display:none;position:absolute;top:52px;right:0;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;min-width:220px;z-index:100;border:1px solid var(--bg-secondary)"><div style="padding:12px 14px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px">${esc(session.name || 'You')}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:2px">${esc(roleLabel(session.role))}</div></div><button class="sidebar-item" onclick="closeAvatarMenu();setView('settings')" style="margin:0;text-align:left"><span class="nav-icon">👤</span><span>Edit profile</span></button><button class="sidebar-item" onclick="closeAvatarMenu();openHelp()" style="margin:0;text-align:left"><span class="nav-icon">❓</span><span>Help & support</span></button><div style="height:1px;background:var(--bg-secondary);margin:6px 0"></div><button class="sidebar-item" onclick="closeAvatarMenu();logout()" style="margin:0;text-align:left;color:var(--color-danger)"><span class="nav-icon">🚪</span><span>Log out</span></button></div></div></header><main class="content" id="page-content">${renderClientDetailPage()}</main></div>`;
+    const main = `<div class="main-area"><header class="topbar"><h2 class="topbar-title">Client Dossier</h2><div class="topbar-search"><input type="search" placeholder="Search..."></div><div class="topbar-right" style="position:relative"><button class="topbar-bell" onclick="toggleNotifPanel(event)">🔔<span class="bell-dot"></span></button><button class="topbar-avatar" onclick="toggleAvatarMenu(event)">${esc(initials(session.name))}</button><div id="avatar-menu" style="display:none;position:absolute;top:52px;right:0;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;min-width:220px;z-index:100;border:1px solid var(--bg-secondary)"><div style="padding:12px 14px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px">${esc(session.name || 'You')}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:2px">${esc(roleLabel(session.role))}</div></div><button class="sidebar-item" onclick="closeAvatarMenu();setView('settings')" style="margin:0;text-align:left"><span class="nav-icon">👤</span><span>Edit profile</span></button><button class="sidebar-item" onclick="closeAvatarMenu();openHelp()" style="margin:0;text-align:left"><span class="nav-icon">❓</span><span>Help & support</span></button><div style="height:1px;background:var(--bg-secondary);margin:6px 0"></div><button class="sidebar-item" onclick="closeAvatarMenu();logout()" style="margin:0;text-align:left;color:var(--color-danger)"><span class="nav-icon">🚪</span><span>Log out</span></button></div></div></header><main class="content" id="page-content">${renderClientDetailPage()}</main></div>`;
     $('#app').innerHTML = `<div class="app-shell">${sidebar}${main}</div>`;
     return;
   }
   if(currentView === 'recruiter-detail'){
-    const main = `<div class="main-area"><header class="topbar"><h2 class="topbar-title">Recruiter Intel</h2><div class="topbar-search"><input type="search" placeholder="Search..."></div><div class="topbar-right" style="position:relative"><button class="topbar-bell" onclick="setView('notifications')">🔔<span class="bell-dot"></span></button><button class="topbar-avatar" onclick="toggleAvatarMenu(event)">${esc(initials(session.name))}</button><div id="avatar-menu" style="display:none;position:absolute;top:52px;right:0;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;min-width:220px;z-index:100;border:1px solid var(--bg-secondary)"><div style="padding:12px 14px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px">${esc(session.name || 'You')}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:2px">${esc(roleLabel(session.role))}</div></div><button class="sidebar-item" onclick="closeAvatarMenu();setView('settings')" style="margin:0;text-align:left"><span class="nav-icon">👤</span><span>Edit profile</span></button><button class="sidebar-item" onclick="closeAvatarMenu();openHelp()" style="margin:0;text-align:left"><span class="nav-icon">❓</span><span>Help & support</span></button><div style="height:1px;background:var(--bg-secondary);margin:6px 0"></div><button class="sidebar-item" onclick="closeAvatarMenu();logout()" style="margin:0;text-align:left;color:var(--color-danger)"><span class="nav-icon">🚪</span><span>Log out</span></button></div></div></header><main class="content" id="page-content">${renderRecruiterDetailPage()}</main></div>`;
+    const main = `<div class="main-area"><header class="topbar"><h2 class="topbar-title">Recruiter Intel</h2><div class="topbar-search"><input type="search" placeholder="Search..."></div><div class="topbar-right" style="position:relative"><button class="topbar-bell" onclick="toggleNotifPanel(event)">🔔<span class="bell-dot"></span></button><button class="topbar-avatar" onclick="toggleAvatarMenu(event)">${esc(initials(session.name))}</button><div id="avatar-menu" style="display:none;position:absolute;top:52px;right:0;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;min-width:220px;z-index:100;border:1px solid var(--bg-secondary)"><div style="padding:12px 14px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px">${esc(session.name || 'You')}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:2px">${esc(roleLabel(session.role))}</div></div><button class="sidebar-item" onclick="closeAvatarMenu();setView('settings')" style="margin:0;text-align:left"><span class="nav-icon">👤</span><span>Edit profile</span></button><button class="sidebar-item" onclick="closeAvatarMenu();openHelp()" style="margin:0;text-align:left"><span class="nav-icon">❓</span><span>Help & support</span></button><div style="height:1px;background:var(--bg-secondary);margin:6px 0"></div><button class="sidebar-item" onclick="closeAvatarMenu();logout()" style="margin:0;text-align:left;color:var(--color-danger)"><span class="nav-icon">🚪</span><span>Log out</span></button></div></div></header><main class="content" id="page-content">${renderRecruiterDetailPage()}</main></div>`;
     $('#app').innerHTML = `<div class="app-shell">${sidebar}${main}</div>`;
     return;
   }
@@ -794,7 +794,7 @@ function renderShell(){
       <h2 class="topbar-title">${esc(activeItem ? activeItem.label : 'ApplyDesk')}</h2>
       <div class="topbar-search"><input type="search" placeholder="Search clients, leads, transactions..."></div>
       <div class="topbar-right" style="position:relative">
-        <button class="topbar-bell" onclick="setView('notifications')" title="Notifications">🔔<span class="bell-dot"></span></button>
+        <button class="topbar-bell" onclick="toggleNotifPanel(event)" title="Notifications">🔔<span class="bell-dot"></span></button>
         <button class="topbar-avatar" onclick="toggleAvatarMenu(event)" title="Menu">${esc(initials(session.name))}</button>
         <div id="avatar-menu" style="display:none;position:absolute;top:52px;right:0;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;min-width:220px;z-index:100;border:1px solid var(--bg-secondary)">
           <div style="padding:12px 14px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px">
@@ -835,6 +835,74 @@ window.toggleAvatarMenu = function(e){
   }
 };
 window.closeAvatarMenu = function(){ const m = document.getElementById('avatar-menu'); if(m) m.style.display = 'none'; };
+
+window.toggleNotifPanel = async function(e){
+  if(e) e.stopPropagation();
+  let panel = document.getElementById('notif-panel');
+  if(panel && panel.style.display !== 'none'){ panel.style.display = 'none'; return; }
+  // Ensure panel exists
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'notif-panel';
+    panel.style.cssText = 'position:absolute;top:52px;right:52px;width:360px;max-height:70vh;overflow-y:auto;background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px;z-index:200;border:1px solid var(--bg-secondary)';
+    const bell = document.querySelector('.topbar-bell');
+    if(bell && bell.parentElement){ bell.parentElement.appendChild(panel); }
+    else { document.body.appendChild(panel); }
+  }
+  panel.style.display = 'block';
+  panel.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Loading...</div>';
+
+  // Load fresh notifications
+  try{
+    const r = await rpc('fn_list_notifications', { p_limit: 50 });
+    const list = (r && r.ok) ? (r.notifications || []) : [];
+    notifList = list; notifUnread = (r && r.unread_count) || 0;
+    renderNotifPanel(list);
+  }catch(err){
+    panel.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Could not load notifications.</div>';
+  }
+
+  setTimeout(() => {
+    document.addEventListener('click', function outside(ev){
+      const p = document.getElementById('notif-panel');
+      const bell = document.querySelector('.topbar-bell');
+      if(!p){ document.removeEventListener('click', outside); return; }
+      if(!p.contains(ev.target) && !(bell && bell.contains(ev.target))){
+        p.style.display = 'none';
+        document.removeEventListener('click', outside);
+      }
+    });
+  }, 50);
+};
+
+function renderNotifPanel(list){
+  const panel = document.getElementById('notif-panel');
+  if(!panel) return;
+  const iconFor = c => c === 'subscription_reminder' ? '💰' : c === 'payroll_reminder' ? '💼' : c === 'new_lead' ? '🔥' : c === 'new_message' ? '💬' : c === 'resume_request' ? '📄' : '🔔';
+  const header = `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--bg-secondary);margin-bottom:6px"><div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px">Notifications</div>${list.some(n => !n.is_read) ? '<button class="btn ghost sm" onclick="markAllNotifRead()">Mark all read</button>' : ''}</div>`;
+  if(!list.length){
+    panel.innerHTML = header + '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">You are all caught up.</div>';
+    return;
+  }
+  const items = list.map(n => `<div onclick="markNotifRead(${n.id})" style="display:flex;gap:10px;padding:11px 12px;border-radius:8px;cursor:pointer;margin-bottom:2px;background:${n.is_read ? 'transparent' : 'var(--bg-coral-light)'}">
+    <div style="font-size:18px;flex-shrink:0">${iconFor(n.category)}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-family:var(--font-heading);font-weight:${n.is_read ? '500' : '700'};color:var(--text-heading);font-size:13px">${esc(n.title || 'Notification')}</div>
+      ${n.body ? `<div style="font-size:12px;color:var(--text-body);line-height:1.4;margin-top:2px">${esc(n.body)}</div>` : ''}
+      <div style="font-size:10px;color:var(--text-muted);margin-top:3px">${timeAgo(n.created_at)}</div>
+    </div>
+  </div>`).join('');
+  panel.innerHTML = header + items;
+}
+
+window.markAllNotifRead = async function(){
+  try{ await rpc('fn_mark_all_notifications_read', {}); }catch(e){}
+  notifList = null;
+  const r = await rpc('fn_list_notifications', { p_limit: 50 });
+  const list = (r && r.ok) ? (r.notifications || []) : [];
+  renderNotifPanel(list);
+  const dot = document.querySelector('.bell-dot'); if(dot) dot.style.display = 'none';
+};
 window.openHelp = function(){
   const back = document.createElement('div');
   back.className = 'modal-back';
@@ -1982,7 +2050,14 @@ window.markNotifRead = async function(id){
     await rpc('fn_mark_notification_read', { p_id: id });
     const item = (notifList || []).find(n => n.id === id);
     if(item && !item.is_read){ item.is_read = true; notifUnread = Math.max(0, notifUnread - 1); }
-    renderShell();
+    // If the dropdown panel is open, refresh just the panel (avoid full re-render)
+    const panel = document.getElementById('notif-panel');
+    if(panel && panel.style.display !== 'none'){
+      renderNotifPanel(notifList || []);
+      if(notifUnread === 0){ const dot = document.querySelector('.bell-dot'); if(dot) dot.style.display = 'none'; }
+    } else {
+      renderShell();
+    }
   }catch(e){ toast('Failed: ' + e.message, 'error'); }
 };
 window.markAllNotifsRead = async function(){
