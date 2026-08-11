@@ -3351,7 +3351,9 @@ window.submitApplication = async function(){
   try{
     toast('Uploading files...', 'success');
 
-    // Ensure the storage client carries the user's JWT (RLS checks auth.jwt email)
+    // Verify we have a live session (do NOT call setSession - it can force a
+    // token refresh that 403s and logs the user out mid-upload)
+    let _accessToken = null;
     try{
       const sess = await sb.auth.getSession();
       const tok = sess && sess.data && sess.data.session;
@@ -3359,23 +3361,28 @@ window.submitApplication = async function(){
         toast('Your session expired. Please log out and back in, then retry.', 'error');
         return;
       }
-      // Force-apply the session to the storage client so uploads are authenticated
-      await sb.auth.setSession({ access_token: tok.access_token, refresh_token: tok.refresh_token });
+      _accessToken = tok.access_token;
     }catch(e){
       toast('Auth check failed. Log out and back in, then retry.', 'error');
       return;
     }
 
+    // Authenticated storage client - passes the user's JWT so RLS sees them
+    const sbAuthed = window.supabase.createClient(SB_URL, SB_KEY, {
+      global: { headers: { Authorization: 'Bearer ' + _accessToken } },
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+
     // Step 1: Upload resume to Supabase Storage
     const timestamp = Date.now();
     const safeResumeName = resumeFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const resumePath = `${clientCode}/${timestamp}-resume-${safeResumeName}`;
-    const { data: resumeUpload, error: resumeError } = await sb.storage.from('client-resumes').upload(resumePath, resumeFile);
+    const { data: resumeUpload, error: resumeError } = await sbAuthed.storage.from('client-resumes').upload(resumePath, resumeFile);
     if(resumeError){
       toast('Resume upload failed: ' + resumeError.message + '. Check the client-resumes bucket exists.', 'error');
       return;
     }
-    const { data: resumeSignedData } = await sb.storage.from('client-resumes').createSignedUrl(resumeUpload.path, 60 * 60 * 24 * 365);
+    const { data: resumeSignedData } = await sbAuthed.storage.from('client-resumes').createSignedUrl(resumeUpload.path, 60 * 60 * 24 * 365);
     const resumeUrl = resumeSignedData ? resumeSignedData.signedUrl : resumeUpload.path;
 
     // Step 2: Upload screenshot if provided (uses same bucket, different subfolder)
@@ -3383,12 +3390,12 @@ window.submitApplication = async function(){
     if(screenshotFile){
       const safeScreenshotName = screenshotFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const screenshotPath = `${clientCode}/${timestamp}-screenshot-${safeScreenshotName}`;
-      const { data: shotUpload, error: shotError } = await sb.storage.from('client-resumes').upload(screenshotPath, screenshotFile);
+      const { data: shotUpload, error: shotError } = await sbAuthed.storage.from('client-resumes').upload(screenshotPath, screenshotFile);
       if(shotError){
         toast('Screenshot upload failed: ' + shotError.message, 'error');
         return;
       }
-      const { data: shotSignedData } = await sb.storage.from('client-resumes').createSignedUrl(shotUpload.path, 60 * 60 * 24 * 365);
+      const { data: shotSignedData } = await sbAuthed.storage.from('client-resumes').createSignedUrl(shotUpload.path, 60 * 60 * 24 * 365);
       screenshotUrl = shotSignedData ? shotSignedData.signedUrl : shotUpload.path;
     }
 
