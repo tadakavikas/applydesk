@@ -3223,7 +3223,7 @@ window.openEditOwnProfile = function(){
     { id:'sponsorship', label:'Visa sponsorship', type:'select', value:me.sponsorship_status || 'US Citizen', options:[
       {value:'US Citizen',label:'US Citizen'},{value:'Green Card',label:'Green Card'},{value:'H1B',label:'H1B'},{value:'OPT',label:'OPT'},{value:'H4 EAD',label:'H4 EAD'},{value:'Needs Sponsorship',label:'Needs Sponsorship'}
     ] },
-    { id:'base_resume_url', label:'Resume URL (Google Drive/Dropbox)', value:me.base_resume_url }
+    { id:'base_resume_url', label:'Resume (paste link or upload)', type:'file', uploadPrefix:(me.code || 'client'), value:me.base_resume_url }
   ], async (v) => {
     try{
       const res = await rpc('fn_a_edit_own_client', {
@@ -3345,13 +3345,21 @@ window.openAppDetail = async function(recordId){
       if(screenshotFile.size > 5 * 1024 * 1024){ toast('Screenshot must be under 5 MB', 'error'); return; }
       if(!screenshotFile.type.startsWith('image/')){ toast('Screenshot must be an image', 'error'); return; }
       toast('Uploading screenshot...', 'success');
+      // Authenticated client so storage RLS sees the user
+      const sess = await sb.auth.getSession();
+      const tok = sess && sess.data && sess.data.session;
+      if(!tok || !tok.access_token){ toast('Session expired, log out and back in.', 'error'); return; }
+      const sbAuthed = window.supabase.createClient(SB_URL, SB_KEY, {
+        global: { headers: { Authorization: 'Bearer ' + tok.access_token } },
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
       const clientCode = app.client_code || 'unknown';
       const timestamp = Date.now();
       const safeName = screenshotFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const path = `${clientCode}/${timestamp}-status-${safeName}`;
-      const { data: shotUpload, error: shotError } = await sb.storage.from('client-resumes').upload(path, screenshotFile);
+      const { data: shotUpload, error: shotError } = await sbAuthed.storage.from('client-resumes').upload(path, screenshotFile);
       if(shotError){ toast('Screenshot upload failed: ' + shotError.message, 'error'); return; }
-      const { data: signedData } = await sb.storage.from('client-resumes').createSignedUrl(shotUpload.path, 60 * 60 * 24 * 365);
+      const { data: signedData } = await sbAuthed.storage.from('client-resumes').createSignedUrl(shotUpload.path, 60 * 60 * 24 * 365);
       screenshotUrl = signedData ? signedData.signedUrl : shotUpload.path;
     }
 
@@ -3570,6 +3578,34 @@ function renderMyApplications(){ return renderApplicationsPage(); }
 function renderMySubscription(){ const me = (S.me) || (S.clients || []).find(c => c.code === session.code) || {}; return `<div class="page-header"><h1 class="page-title">My Subscription</h1></div><div class="card"><div class="card-title">Details</div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : '<dt>Plan</dt><dd>Not active</dd>'}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}</dl></div>`; }
 
 /* ═══════ EDIT MODALS ═══════ */
+window.uploadEditFile = async function(fieldId, prefix){
+  const fileInput = document.getElementById('emfile-' + fieldId);
+  const urlInput = document.getElementById('em-' + fieldId);
+  const status = document.getElementById('emfilestatus-' + fieldId);
+  const file = fileInput && fileInput.files[0];
+  if(!file){ if(status){ status.textContent = 'Choose a file first.'; status.style.color = 'var(--color-danger)'; } return; }
+  if(file.size > 10 * 1024 * 1024){ if(status){ status.textContent = 'File must be under 10 MB.'; status.style.color = 'var(--color-danger)'; } return; }
+  if(status){ status.textContent = 'Uploading...'; status.style.color = 'var(--text-muted)'; }
+  try{
+    const sess = await sb.auth.getSession();
+    const tok = sess && sess.data && sess.data.session;
+    if(!tok || !tok.access_token){ if(status){ status.textContent = 'Session expired, log out and back in.'; status.style.color = 'var(--color-danger)'; } return; }
+    const sbAuthed = window.supabase.createClient(SB_URL, SB_KEY, {
+      global: { headers: { Authorization: 'Bearer ' + tok.access_token } },
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    const ts = Date.now();
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${prefix}/${ts}-${safe}`;
+    const { data: up, error: upErr } = await sbAuthed.storage.from('client-resumes').upload(path, file);
+    if(upErr){ if(status){ status.textContent = 'Upload failed: ' + upErr.message; status.style.color = 'var(--color-danger)'; } return; }
+    const { data: signed } = await sbAuthed.storage.from('client-resumes').createSignedUrl(up.path, 60 * 60 * 24 * 365);
+    const url = signed ? signed.signedUrl : up.path;
+    if(urlInput) urlInput.value = url;
+    if(status){ status.textContent = '✓ Uploaded: ' + file.name; status.style.color = 'var(--color-success)'; }
+  }catch(e){ if(status){ status.textContent = 'Upload error: ' + e.message; status.style.color = 'var(--color-danger)'; } }
+};
+
 function openEditModal(title, fields, onSubmit){
   const back = document.createElement('div');
   back.className = 'modal-back';
@@ -3577,6 +3613,17 @@ function openEditModal(title, fields, onSubmit){
     if(f.type === 'select'){
       const opts = f.options.map(o => `<option value="${esc(o.value)}" ${o.value === f.value ? 'selected' : ''}>${esc(o.label)}</option>`).join('');
       return `<div class="field"><label>${esc(f.label)}</label><select id="em-${f.id}">${opts}</select></div>`;
+    }
+    if(f.type === 'file'){
+      // URL text field + upload button that fills it
+      return `<div class="field" style="grid-column:1/-1"><label>${esc(f.label)}</label>
+        <input id="em-${f.id}" type="text" value="${esc(f.value == null ? '' : f.value)}" placeholder="Paste a link, or upload a file →" style="margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="file" id="emfile-${f.id}" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="font-size:12px;flex:1">
+          <button type="button" class="btn ghost sm" onclick="uploadEditFile('${f.id}','${esc(f.uploadPrefix || 'misc')}')">⬆ Upload</button>
+        </div>
+        <div id="emfilestatus-${f.id}" style="font-size:11px;color:var(--text-muted);margin-top:4px"></div>
+      </div>`;
     }
     return `<div class="field"><label>${esc(f.label)}</label><input id="em-${f.id}" type="${f.type || 'text'}" value="${esc(f.value == null ? '' : f.value)}" placeholder="${esc(f.placeholder || '')}"></div>`;
   }).join('');
@@ -3603,7 +3650,7 @@ window.openEditClient = function(code){
     { id:'target_role', label:'Target role', value:c.target_role },
     { id:'years_experience', label:'Years experience', type:'number', value:c.years_experience },
     { id:'sponsorship', label:'Sponsorship', type:'select', value:c.sponsorship_status || '', options:[{value:'',label:'—'},{value:'US Citizen',label:'US Citizen'},{value:'Green Card',label:'Green Card'},{value:'H1B',label:'H1B'},{value:'OPT',label:'OPT'},{value:'OPT-EAD',label:'OPT-EAD'},{value:'Other',label:'Other'}] },
-    { id:'base_resume_url', label:'Resume URL', type:'url', value:c.base_resume_url },
+    { id:'base_resume_url', label:'Resume (paste link or upload)', type:'file', uploadPrefix:code, value:c.base_resume_url },
     { id:'subscription_amount', label:'Subscription amount', type:'number', value:c.subscription_amount },
     { id:'subscription_currency', label:'Currency', type:'select', value:c.subscription_currency || 'USD', options:[{value:'USD',label:'USD ($)'},{value:'INR',label:'INR (₹)'}] },
     { id:'subscription_start_date', label:'Subscription start', type:'date', value:c.subscription_start_date }
