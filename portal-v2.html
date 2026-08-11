@@ -307,15 +307,20 @@ const fmt = d => { if(!d) return ''; try{ return new Date(d+'T00:00:00').toLocal
 const fmtDateTime = v => {
   if(!v) return '';
   try{
-    let s = String(v);
-    // Bare date (no time) -> show date only, no misleading time
+    let s = String(v).trim();
+    // Bare date (no time) -> date only, no misleading hour
     if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
-      return new Date(s + 'T00:00:00Z').toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone});
+      const d0 = new Date(s + 'T00:00:00Z');
+      return d0.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'});
     }
-    // Timestamp without zone -> assume UTC (that's how Postgres stores it)
-    if(/\d{2}:\d{2}/.test(s) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)){
-      s = s.replace(' ', 'T') + 'Z';
-    }
+    // Normalize Postgres timestamp: "2026-08-11 16:13:44.895+00" -> ISO
+    s = s.replace(' ', 'T');
+    // Trim microseconds to milliseconds (JS only handles 3 digits)
+    s = s.replace(/(\.\d{3})\d+/, '$1');
+    // Normalize zone: +00 -> +00:00, +0530 -> +05:30
+    if(/[+-]\d{2}$/.test(s)) s = s + ':00';
+    else if(/[+-]\d{4}$/.test(s)) s = s.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+    else if(!/[zZ]|[+-]\d{2}:\d{2}$/.test(s)) s = s + 'Z'; // no zone at all -> assume UTC
     const d = new Date(s);
     if(isNaN(d.getTime())) return String(v);
     return d.toLocaleString(undefined, {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
@@ -3159,7 +3164,7 @@ window.openAppDetail = async function(recordId){
   back.className = 'modal-back';
   back.innerHTML = `<div class="modal-inner" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
     <h3>${esc(app.job_title || 'Application')}</h3>
-    <div style="color:var(--text-body);font-size:14px;margin-bottom:16px"><b>${esc(app.company || 'Unknown company')}</b>${app.source ? ' · ' + esc(app.source) : ''}${app.applied_at ? ' · Applied ' + fmt(app.applied_at) : ''}</div>
+    <div style="color:var(--text-body);font-size:14px;margin-bottom:16px"><b>${esc(app.company || 'Unknown company')}</b>${app.source ? ' · ' + esc(app.source) : ''}${(app.created_at || app.applied_at) ? ' · Applied ' + esc(fmtDateTime(app.created_at || app.applied_at)) : ''}</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
       ${app.job_url ? `<a href="${esc(app.job_url)}" target="_blank" class="btn ghost sm">🔗 View job posting</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No job posting link</span>'}
       ${app.resume_used ? `<a href="${esc(app.resume_used)}" target="_blank" download class="btn ghost sm">📄 Download resume used</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No resume attached</span>'}
