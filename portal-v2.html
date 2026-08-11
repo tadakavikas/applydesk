@@ -836,6 +836,32 @@ window.toggleAvatarMenu = function(e){
 };
 window.closeAvatarMenu = function(){ const m = document.getElementById('avatar-menu'); if(m) m.style.display = 'none'; };
 
+// Open a stored file: full URLs open directly; bare storage paths get a
+// fresh signed URL (fixes older records that saved a raw path).
+window.openStoredFile = async function(stored){
+  if(!stored){ toast('No file available', 'error'); return; }
+  try{
+    // Already a usable URL?
+    if(/^https?:\/\//i.test(stored)){
+      // If it's an expired signed URL, re-sign from its object path
+      if(stored.indexOf('/object/sign/') !== -1){
+        const m = stored.match(/\/object\/sign\/client-resumes\/([^?]+)/);
+        if(m && m[1]){
+          const path = decodeURIComponent(m[1]);
+          const { data, error } = await sb.storage.from('client-resumes').createSignedUrl(path, 60 * 60);
+          if(!error && data && data.signedUrl){ window.open(data.signedUrl, '_blank'); return; }
+        }
+      }
+      window.open(stored, '_blank'); return;
+    }
+    // Bare storage path -> sign it now
+    const path = stored.replace(/^\/+/, '').replace(/^client-resumes\//, '');
+    const { data, error } = await sb.storage.from('client-resumes').createSignedUrl(path, 60 * 60);
+    if(error || !data || !data.signedUrl){ toast('Could not open file: ' + ((error && error.message) || 'not found'), 'error'); return; }
+    window.open(data.signedUrl, '_blank');
+  }catch(e){ toast('Could not open file: ' + e.message, 'error'); }
+};
+
 window.toggleNotifPanel = async function(e){
   if(e) e.stopPropagation();
   let panel = document.getElementById('notif-panel');
@@ -3256,8 +3282,8 @@ window.openAppDetail = async function(recordId){
     <div style="color:var(--text-body);font-size:14px;margin-bottom:16px"><b>${esc(app.company || 'Unknown company')}</b>${app.source ? ' · ' + esc(app.source) : ''}${(app.created_at || app.applied_at) ? ' · Applied ' + esc(fmtDateTime(app.created_at || app.applied_at)) : ''}</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
       ${app.job_url ? `<a href="${esc(app.job_url)}" target="_blank" class="btn ghost sm">🔗 View job posting</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No job posting link</span>'}
-      ${app.resume_used ? `<a href="${esc(app.resume_used)}" target="_blank" download class="btn ghost sm">📄 Download resume used</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No resume attached</span>'}
-      ${app.screenshot_url ? `<a href="${esc(app.screenshot_url)}" target="_blank" class="btn ghost sm">📎 Original screenshot</a>` : ''}
+      ${app.resume_used ? `<button onclick="openStoredFile('${esc(app.resume_used).replace(/'/g,'')}')" class="btn ghost sm">📄 Download resume used</button>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No resume attached</span>'}
+      ${app.screenshot_url ? `<button onclick="openStoredFile('${esc(app.screenshot_url).replace(/'/g,'')}')" class="btn ghost sm">📎 Original screenshot</button>` : ''}
     </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px;margin-bottom:12px">
       <h4 style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Status Timeline</h4>
