@@ -1573,11 +1573,22 @@ function renderClientsPage(){
     rpc('fn_a_list_all_applications', {}).then(r => {
       const recCounts = {}, clientCounts = {};
       if(r && r.ok && Array.isArray(r.applications)){
+        const _mon = new Date(); _mon.setDate(_mon.getDate() - ((_mon.getDay()+6)%7)); _mon.setHours(0,0,0,0);
+        const recWeek = {}; const recWeekBars = {};
         r.applications.forEach(a => {
           const rCode = a.recruiter_code || a.added_by;
-          if(rCode){ recCounts[rCode] = (recCounts[rCode] || 0) + 1; }
+          if(rCode){
+            recCounts[rCode] = (recCounts[rCode] || 0) + 1;
+            const d = new Date(a.created_at || a.applied_at);
+            if(!isNaN(d) && d >= _mon){
+              recWeek[rCode] = (recWeek[rCode]||0)+1;
+              if(!recWeekBars[rCode]) recWeekBars[rCode] = [0,0,0,0,0,0,0];
+              recWeekBars[rCode][(d.getDay()+6)%7]++;
+            }
+          }
           if(a.client_code){ clientCounts[a.client_code] = (clientCounts[a.client_code] || 0) + 1; }
         });
+        window.recruiterWeekCounts = recWeek; window.recruiterWeekBars = recWeekBars;
       }
       window.recruiterAppCounts = recCounts;
       window.clientAppCounts = clientCounts;
@@ -1864,11 +1875,22 @@ function renderRecruitersPage(){
     rpc('fn_a_list_all_applications', {}).then(r => {
       const recCounts = {}, clientCounts = {};
       if(r && r.ok && Array.isArray(r.applications)){
+        const _mon = new Date(); _mon.setDate(_mon.getDate() - ((_mon.getDay()+6)%7)); _mon.setHours(0,0,0,0);
+        const recWeek = {}; const recWeekBars = {};
         r.applications.forEach(a => {
           const rCode = a.recruiter_code || a.added_by;
-          if(rCode){ recCounts[rCode] = (recCounts[rCode] || 0) + 1; }
+          if(rCode){
+            recCounts[rCode] = (recCounts[rCode] || 0) + 1;
+            const d = new Date(a.created_at || a.applied_at);
+            if(!isNaN(d) && d >= _mon){
+              recWeek[rCode] = (recWeek[rCode]||0)+1;
+              if(!recWeekBars[rCode]) recWeekBars[rCode] = [0,0,0,0,0,0,0];
+              recWeekBars[rCode][(d.getDay()+6)%7]++;
+            }
+          }
           if(a.client_code){ clientCounts[a.client_code] = (clientCounts[a.client_code] || 0) + 1; }
         });
+        window.recruiterWeekCounts = recWeek; window.recruiterWeekBars = recWeekBars;
       }
       window.recruiterAppCounts = recCounts;
       window.clientAppCounts = clientCounts;
@@ -1891,9 +1913,10 @@ function renderRecruitersPage(){
     const urgClass = daysLeft === null ? 'muted' : daysLeft <= 3 ? 'danger' : daysLeft <= 7 ? 'warning' : 'success';
     const urgLabel = daysLeft === null ? 'NO PAYROLL' : daysLeft === 0 ? 'DUE TODAY' : daysLeft + 'd';
     const assignedCount = (r.assigned || []).length;
-    // Real velocity: count of apps this recruiter has logged (from cache if available)
+    // Real: all-time total + this-week count, with a real 7-day sparkline
     const recruiterAppCount = (window.recruiterAppCounts && window.recruiterAppCounts[r.code]) || 0;
-    const velocity = window.recruiterAppCounts ? [0,0,0,0,0,0, recruiterAppCount] : sampleSparkline(6, 0, 0);
+    const recruiterWeekCount = (window.recruiterWeekCounts && window.recruiterWeekCounts[r.code]) || 0;
+    const velocity = (window.recruiterWeekBars && window.recruiterWeekBars[r.code]) || [0,0,0,0,0,0,0];
 
     return `<div class="item-card" onclick="openRecruiterDetail('${esc(r.code)}')">
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
@@ -1906,8 +1929,9 @@ function renderRecruitersPage(){
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--bg-secondary)">
         <div>
-          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Weekly velocity</div>
-          <div style="font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--text-heading);margin-top:2px">${velocity.reduce((a,b) => a+b, 0)} apps</div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Applications</div>
+          <div style="font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--text-heading);margin-top:2px">${recruiterAppCount.toLocaleString()} <span style="font-size:12px;font-weight:600;color:var(--text-muted)">total</span></div>
+          <div style="font-size:11px;color:var(--color-success);font-weight:600;margin-top:1px">${recruiterWeekCount} this week</div>
         </div>
         ${svgSparkline(velocity, { width: 90, height: 32, color: 'var(--color-secondary)' })}
       </div>
@@ -2629,7 +2653,7 @@ function renderFinResumePayments(){
     <td><span class="tag success">${esc(r.status||'Delivered')}</span></td>
     <td class="amt">${money(r.paid_amount, r.paid_currency)}</td>
     <td><span class="tag success">Received</span></td>
-    <td><button class="icon-btn" onclick='openResumePayEdit(${JSON.stringify({id:r.id,paid_amount:r.paid_amount,paid_currency:r.paid_currency,paid_fx_rate:r.paid_fx_rate}).replace(/'/g,"&#39;")})' title="Edit">✎</button></td>
+    <td class="txn-actions"><button class="icon-btn" onclick='openResumePayEdit(${JSON.stringify({id:r.id,paid_amount:r.paid_amount,paid_currency:r.paid_currency,paid_fx_rate:r.paid_fx_rate}).replace(/'/g,"&#39;")})' title="Edit">✎</button><button class="icon-btn danger" onclick="deleteResumePay(${r.id})" title="Remove payment">🗑</button></td>
   </tr>`).join('');
 
   return cards + `<div class="fin-panel">
@@ -2935,9 +2959,13 @@ window.openResumePayEdit = function(r0){
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
 };
-
-/* client list cache for the payment dropdown */
-let finClientList = null;
+window.deleteResumePay = async function(id){
+  if(!await confirmModal('Remove this resume payment? The order stays, but the recorded payment is cleared.', { title:'Remove payment?', okLabel:'Remove' })) return;
+  try{ const r=await rpc('fn_a_ro_pay_delete',{p_id:id});
+    if(r&&r.ok){ toast('Payment removed','success'); viewState.financeData=null; window._dashFin=null; renderShell(); }
+    else toast('Failed: '+((r&&r.err)||'unknown'),'error');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
 function loadClientList(){
   if(finClientList) return Promise.resolve(finClientList);
   return rpc('fn_a_client_pulse', {}).then(r => { finClientList = (r&&r.ok)?(r.clients||[]).map(c=>({code:c.code,name:c.name})):[]; return finClientList; }).catch(()=>[]);
@@ -3846,7 +3874,21 @@ window.openEditResumeOrder = async function(id){
         p_status: v.status || null, p_resume_file: v.resume_file || null
       });
       if(!r || !r.ok){ toast('Failed: ' + ((r && r.err) || 'unknown'), 'error'); return false; }
-      resumeOrdersCache = null; toast('Order updated', 'success'); renderShell(); return true;
+      // If marked Delivered with an amount, record the resume payment (credited to the assignee)
+      if((v.status||'') === 'Delivered' && v.amount_paid && parseFloat(v.amount_paid) > 0){
+        try{
+          const pr = await rpc('fn_a_ro_deliver_pay', {
+            p_id: id,
+            p_amount: parseFloat(v.amount_paid),
+            p_currency: v.currency || 'USD',
+            p_fx_rate: (v.currency === 'USD') ? 88 : 1,
+            p_credit_to: v.assigned_to || null
+          });
+          if(pr && pr.ok) toast('Delivered and payment recorded', 'success');
+          else toast('Delivered, but payment not recorded: ' + ((pr && pr.err) || 'unknown'), 'error');
+        }catch(e){ toast('Delivered, but payment failed: ' + e.message, 'error'); }
+      }
+      resumeOrdersCache = null; window._dashFin=null; toast('Order updated', 'success'); renderShell(); return true;
     }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
   });
 };
