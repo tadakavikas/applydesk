@@ -1445,7 +1445,7 @@ function renderClientsPage(){
     }).catch(() => { window.recruiterAppCounts = {}; window.clientAppCounts = {}; window._loadingRecCounts = false; });
   }
 
-  const clientCards = filtered.map(c => {
+  const clientRows = filtered.map(c => {
     let daysLeft = null;
     if(c.subscription_start_date){
       try{
@@ -1456,35 +1456,32 @@ function renderClientsPage(){
         daysLeft = Math.floor((nextDue - now) / 86400000);
       }catch(e){}
     }
-    const urgClass = daysLeft === null ? 'muted' : daysLeft <= 3 ? 'danger' : daysLeft <= 7 ? 'warning' : 'success';
-    const urgLabel = daysLeft === null ? 'NO CYCLE' : daysLeft === 0 ? 'DUE TODAY' : daysLeft + 'd';
-    const assignedRecruiter = (S.recruiters || []).find(r => r.assigned && r.assigned.includes(c.code));
-    // Real velocity: count of apps for this client
-    const clientAppCount = (window.clientAppCounts && window.clientAppCounts[c.code]) || 0;
-    const velocity = window.clientAppCounts ? [0,0,0,0,0,0, clientAppCount] : sampleSparkline(6, 0, 0);
+    const resumeVal = c.base_resume_url;
+    const isRealResume = resumeVal && /^https?:\/\//i.test(resumeVal) && resumeVal.indexOf('test.com') === -1;
+    return `<tr onclick="openClientDetail('${esc(c.code)}')" style="cursor:pointer">
+      <td><b>${esc(c.name)}</b>${c.deactivated_at ? ' <span class="tag danger" style="font-size:9px">INACTIVE</span>' : ''}<br><span style="font-size:11px;color:var(--text-muted);font-family:monospace">${esc(c.code)}</span></td>
+      <td style="font-size:12px">${c.phone ? esc(c.phone) : '—'}</td>
+      <td style="font-size:12px">${c.email ? esc(c.email) : '—'}</td>
+      <td style="font-size:12px">${c.target_role ? esc(c.target_role) : '—'}</td>
+      <td style="font-size:12px">${c.years_experience != null ? esc(c.years_experience) + 'y' : '—'}</td>
+      <td style="font-size:12px">${c.sponsorship_status ? `<span class="tag teal" style="font-size:9px">${esc(c.sponsorship_status)}</span>` : '—'}</td>
+      <td>${isRealResume ? `<button class="btn ghost sm" onclick="event.stopPropagation();openStoredFile('${esc(resumeVal).replace(/'/g,'')}')">📄</button>` : '<span style="font-size:11px;color:var(--text-muted)">—</span>'}</td>
+      <td style="white-space:nowrap;font-size:12px">${c.subscription_amount ? money(c.subscription_amount, c.subscription_currency) : 'No plan'}</td>
+    </tr>`;
+  }).join('');
 
-    return `<div class="item-card" onclick="openClientDetail('${esc(c.code)}')">
-      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
-        <div class="avatar coral">${esc(initials(c.name))}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</div>
-          <div style="font-size:11px;color:var(--text-muted);font-family:monospace">${esc(c.code)}</div>
-        </div>
-        ${c.deactivated_at ? '<span class="tag danger">INACTIVE</span>' : `<span class="tag ${urgClass}">${urgLabel}</span>`}
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--bg-secondary)">
-        <div>
-          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Apps received</div>
-          <div style="font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--text-heading);margin-top:2px">${clientAppCount} ${clientAppCount === 1 ? 'app' : 'apps'}</div>
-        </div>
-        ${svgSparkline(velocity, { width: 90, height: 32, color: 'var(--color-primary)' })}
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;font-size:12px;color:var(--text-muted)">
-        <span>${c.subscription_amount ? money(c.subscription_amount, c.subscription_currency) + '/mo' : 'No plan'}</span>
-        <span>${assignedRecruiter ? '🎯 ' + esc(assignedRecruiter.name.split(' ')[0]) : 'Unassigned'}</span>
-      </div>
-    </div>`;
-  }).join('') || `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👥</div><h3 class="empty-title">No clients yet</h3><p class="empty-text">Add your first client to get started.</p><button class="btn primary" onclick="toggleAddClient()">+ Add client</button></div>`;
+  const clientTable = filtered.length ? `<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+    <thead><tr style="text-align:left;border-bottom:2px solid var(--bg-secondary)">
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Name</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Phone</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Email</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Target role</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Exp</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Visa</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Resume</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Plan</th>
+    </tr></thead><tbody>${clientRows}</tbody></table></div>`
+    : `<div class="empty-state"><div class="empty-icon">👥</div><h3 class="empty-title">No clients yet</h3><p class="empty-text">Add your first client to get started.</p><button class="btn primary" onclick="toggleAddClient()">+ Add client</button></div>`;
 
   const addForm = showAdd ? `<div class="card" style="margin-bottom:24px;border:2px solid var(--color-primary)">
     <div class="card-title">➕ Add new client <button class="btn ghost sm" onclick="toggleAddClient()">Cancel</button></div>
@@ -1517,7 +1514,7 @@ function renderClientsPage(){
     <button class="filter-chip ${filter === 'active' ? 'active' : ''}" onclick="setClientFilter('active')">Active (${cs.filter(c => !c.deactivated_at).length})</button>
     <button class="filter-chip ${filter === 'inactive' ? 'active' : ''}" onclick="setClientFilter('inactive')">Deactivated (${cs.filter(c => c.deactivated_at).length})</button>
   </div>
-  <div class="card-grid">${clientCards}</div>`;
+  ${clientTable}`;
 }
 
 window.setClientFilter = function(f){ viewState.clientFilter = f; renderShell(); };
