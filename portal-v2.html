@@ -2306,7 +2306,7 @@ function renderFinancePage(){
 window.setFinanceTab = function(t){
   viewState.financeTab = t;
   viewState.financeData = null;
-  viewState.finAdmin = 'vtproton@22'; // default admin sub-filter (matches the highlighted sub-tab)
+  // (transactions are combined across admins - no sub-filter)
   renderShell();
 };
 
@@ -2375,9 +2375,8 @@ function finCheckpoints(months){
 function renderFinTransactions(){
   if(viewState.financeData === null || viewState.financeData === undefined){
     viewState.financeData = 'loading';
-    const admin = viewState.finAdmin || 'vtproton@22';
     const { from, to } = finMonthRange();
-    rpc('fn_a_tx_list', { p_from: from, p_to: to, p_admin: admin })
+    rpc('fn_a_tx_list', { p_from: from, p_to: to, p_admin: null })
       .then(r => { viewState.financeData = (r && r.ok) ? (r.txns || []) : []; renderShell(); })
       .catch(() => { viewState.financeData = []; renderShell(); });
     return finLoading('transactions');
@@ -2394,12 +2393,6 @@ function renderFinTransactions(){
     finMetric('Total Expenses', 'money out', inr(totalOut), 'var(--color-danger)'),
     finMetric('Net Profit', net>=0?'in the black':'in the red', inr(net), net>=0?'var(--color-success)':'var(--color-danger)')
   ]);
-
-  const adminTab = viewState.finAdmin || 'vtproton@22';
-  const subtabs = `<div class="fin-admintabs">
-    <button class="fin-admintab ${adminTab==='vtproton@22'?'active':''}" onclick="setFinAdmin('vtproton@22')">Admin Vikas</button>
-    <button class="fin-admintab ${adminTab==='abhi00'?'active':''}" onclick="setFinAdmin('abhi00')">Admin Abhinaya</button>
-  </div>`;
 
   // running balance computed oldest-first, shown newest-first
   const asc = [...txns].sort((a,b)=> (a.txn_date||'').localeCompare(b.txn_date||'') || (a.id-b.id));
@@ -2424,15 +2417,13 @@ function renderFinTransactions(){
       ${finMonthChip()}
       <button class="btn primary" onclick="openTxnAdd()">+ Add transaction</button>
     </div>
-    ${subtabs}
     ${txns.length ? `<table class="data-table fin-table">
       <tr><th>DATE</th><th>DESCRIPTION</th><th>CATEGORY</th><th>AMOUNT</th><th>FX RATE</th><th>BALANCE</th><th>ADMIN</th><th>EDIT</th></tr>${rows}
     </table>
-    <div class="fin-foot">TELEMETRY READ: ${txns.length} RECORDS • ACTIVE ADMIN: ${adminTab==='vtproton@22'?'VIKAS':'ABHINAYA'}</div>`
-    : finEmpty('📊','No transactions for this admin in range','Add one, or clear the month filter.')}
+    <div class="fin-foot">TELEMETRY READ: ${txns.length} RECORD${txns.length===1?'':'S'} • ALL ADMINS COMBINED</div>`
+    : finEmpty('📊','No transactions in range','Add one, or clear the month filter.')}
   </div>`;
 }
-window.setFinAdmin = function(code){ viewState.finAdmin = code; viewState.financeData = null; renderShell(); };
 
 /* ─────────── CLIENT PAYMENTS (checkpoint cards) ─────────── */
 function renderFinClientPayments(){
