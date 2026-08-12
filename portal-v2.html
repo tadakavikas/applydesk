@@ -694,6 +694,7 @@ const NAV_ITEMS = {
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
     { key:'admins', label:'Admins', icon:'👑' },
     { key:'applications', label:'Applications', icon:'📄' },
+    { key:'resume-orders', label:'Resume Orders', icon:'📋' },
     { key:'chats', label:'Chat', icon:'💬' },
     { key:'finance', label:'Finance', icon:'💰' },
     { key:'notifications', label:'Notifications', icon:'🔔' },
@@ -705,6 +706,7 @@ const NAV_ITEMS = {
     { key:'clients', label:'All Clients', icon:'👥' },
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
     { key:'applications', label:'Applications', icon:'📄' },
+    { key:'resume-orders', label:'Resume Orders', icon:'📋' },
     { key:'chats', label:'Chat', icon:'💬' },
     { key:'notifications', label:'Notifications', icon:'🔔' },
     { key:'settings', label:'Settings', icon:'⚙️' }
@@ -760,12 +762,14 @@ function renderShell(){
       dashboard: renderAdminDashboard, leads: renderLeadsPage, clients: renderClientsPage,
       recruiters: renderRecruitersPage, managers: renderManagersPage, admins: renderAdminsPage,
       applications: renderApplicationsPage,
+      'resume-orders': renderResumeOrdersPage,
       chats: renderTeamChats, finance: renderFinancePage, notifications: renderNotificationsPage,
       settings: renderSettingsPage
     },
     manager: {
       dashboard: renderManagerDashboard, leads: renderLeadsPage, clients: renderClientsPage,
       recruiters: renderRecruitersPage, applications: renderApplicationsPage,
+      'resume-orders': renderResumeOrdersPage,
       chats: renderTeamChats, notifications: renderNotificationsPage,
       settings: renderSettingsPage
     },
@@ -3297,6 +3301,107 @@ window.deleteApplication = async function(recordId){
       toast('Application deleted', 'success');
       renderShell();
     } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+  }catch(e){ toast('Failed: ' + e.message, 'error'); }
+};
+
+/* ═══════ RESUME ORDERS ═══════ */
+let resumeOrdersCache = null;
+function renderResumeOrdersPage(){
+  if(resumeOrdersCache === null){
+    rpc('fn_a_list_resume_orders', {}).then(r => {
+      resumeOrdersCache = (r && r.ok) ? (r.orders || []) : [];
+      const c = document.getElementById('ro-list'); if(c) c.innerHTML = renderResumeOrdersList();
+    }).catch(() => { resumeOrdersCache = []; });
+  }
+  const canCreate = session.role === 'admin';
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h1 class="page-title" style="margin:0">Resume Orders</h1>
+    ${canCreate ? '<button class="btn primary sm" onclick="openCreateResumeOrder()">➕ New order</button>' : ''}
+  </div>
+  <div id="ro-list">${renderResumeOrdersList()}</div>`;
+}
+
+function renderResumeOrdersList(){
+  if(resumeOrdersCache === null) return `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">⏳ Loading orders...</div>`;
+  if(!resumeOrdersCache.length) return `<div class="empty-state" style="padding:48px"><div class="empty-icon">📋</div><h3 class="empty-title">No resume orders yet</h3>${session.role === 'admin' ? '<p class="empty-text">Click "New order" to add one.</p>' : ''}</div>`;
+  const statusClass = s => s === 'Delivered' ? 'success' : s === 'In progress' ? 'warning' : 'teal';
+  const rows = resumeOrdersCache.map(o => `<tr>
+    <td style="white-space:nowrap;font-size:12px">${esc(fmtDateTime(o.created_at))}</td>
+    <td><b>${esc(o.client_name || '')}</b>${o.phone ? `<br><span style="font-size:11px;color:var(--text-muted)">${esc(o.phone)}</span>` : ''}</td>
+    <td style="white-space:nowrap">${o.amount_paid != null ? money(o.amount_paid, o.currency || 'USD') : '—'}</td>
+    <td style="white-space:nowrap;font-size:12px">${esc(o.assigned_to_name || '—')}</td>
+    <td><span class="tag ${statusClass(o.status)}" style="font-size:10px">${esc(o.status || 'New')}</span></td>
+    <td style="white-space:nowrap">${o.resume_file ? `<button class="btn ghost sm" onclick="openStoredFile('${esc(o.resume_file).replace(/'/g,'')}')">📄 Resume</button>` : '<span style="font-size:11px;color:var(--text-muted)">No file</span>'}</td>
+    ${session.role === 'admin' ? `<td style="white-space:nowrap"><button class="btn ghost sm" onclick="openEditResumeOrder(${o.id})">✏️</button><button class="btn ghost sm" style="color:var(--color-danger)" onclick="deleteResumeOrder(${o.id})">🗑</button></td>` : ''}
+  </tr>`).join('');
+  return `<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+    <thead><tr style="text-align:left;border-bottom:2px solid var(--bg-secondary)">
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Date</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Client</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Paid</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Assigned</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Status</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">File</th>
+      ${session.role === 'admin' ? '<th style="padding:8px"></th>' : ''}
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function resumeOrderFormFields(o){
+  o = o || {};
+  const team = [...(S.admins || []), ...(S.managers || []), ...(S.recruiters || [])];
+  const teamOpts = [{value:'',label:'— Assign to —'}].concat(team.map(t => ({value:t.code, label:t.name})));
+  const clientOpts = [{value:'',label:'— Pick existing client (optional) —'}].concat((S.clients || []).map(c => ({value:c.code, label:c.name})));
+  return [
+    { id:'client_code', label:'Existing client (optional)', type:'select', value:o.client_code || '', options:clientOpts },
+    { id:'client_name', label:'Client name', value:o.client_name },
+    { id:'phone', label:'Phone', type:'tel', value:o.phone },
+    { id:'amount_paid', label:'Amount paid', type:'number', value:o.amount_paid },
+    { id:'currency', label:'Currency', type:'select', value:o.currency || 'USD', options:[{value:'USD',label:'USD ($)'},{value:'INR',label:'INR (₹)'}] },
+    { id:'assigned_to', label:'Assigned to', type:'select', value:o.assigned_to || '', options:teamOpts },
+    { id:'status', label:'Status', type:'select', value:o.status || 'New', options:[{value:'New',label:'New'},{value:'In progress',label:'In progress'},{value:'Delivered',label:'Delivered'}] },
+    { id:'resume_file', label:'Delivered resume (upload)', type:'file', uploadPrefix:'resume-orders', value:o.resume_file }
+  ];
+}
+
+window.openCreateResumeOrder = function(){
+  openEditModal('New resume order', resumeOrderFormFields({}), async (v) => {
+    if(!v.client_name || !v.client_name.trim()){ toast('Client name required', 'error'); return false; }
+    try{
+      const r = await rpc('fn_a_create_resume_order', {
+        p_client_code: v.client_code || null, p_client_name: v.client_name,
+        p_phone: v.phone || null, p_amount_paid: v.amount_paid ? parseFloat(v.amount_paid) : null,
+        p_currency: v.currency || 'USD', p_assigned_to: v.assigned_to || null,
+        p_status: v.status || 'New', p_resume_file: v.resume_file || null
+      });
+      if(!r || !r.ok){ toast('Failed: ' + ((r && r.err) || 'unknown'), 'error'); return false; }
+      resumeOrdersCache = null; toast('Order created', 'success'); renderShell(); return true;
+    }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
+  });
+};
+
+window.openEditResumeOrder = function(id){
+  const o = (resumeOrdersCache || []).find(x => x.id === id);
+  if(!o) return;
+  openEditModal('Edit resume order', resumeOrderFormFields(o), async (v) => {
+    try{
+      const r = await rpc('fn_a_update_resume_order', {
+        p_id: id, p_client_code: v.client_code || null, p_client_name: v.client_name || null,
+        p_phone: v.phone || null, p_amount_paid: v.amount_paid ? parseFloat(v.amount_paid) : null,
+        p_currency: v.currency || null, p_assigned_to: v.assigned_to || null,
+        p_status: v.status || null, p_resume_file: v.resume_file || null
+      });
+      if(!r || !r.ok){ toast('Failed: ' + ((r && r.err) || 'unknown'), 'error'); return false; }
+      resumeOrdersCache = null; toast('Order updated', 'success'); renderShell(); return true;
+    }catch(e){ toast('Failed: ' + e.message, 'error'); return false; }
+  });
+};
+
+window.deleteResumeOrder = async function(id){
+  if(!confirm('Delete this resume order?')) return;
+  try{
+    const r = await rpc('fn_a_delete_resume_order', { p_id: id });
+    if(r && r.ok){ resumeOrdersCache = null; toast('Order deleted', 'success'); renderShell(); }
+    else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
   }catch(e){ toast('Failed: ' + e.message, 'error'); }
 };
 
