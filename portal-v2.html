@@ -4654,6 +4654,16 @@ function renderApplicationsPage(){
       return statusLabel === filterSource;
     });
   }
+  const appQ = (viewState.appSearch || '').trim().toLowerCase();
+  if(appQ){
+    apps = apps.filter(a => {
+      const client = (S.clients || []).find(c => c.code === a.client_code);
+      const clientNm = client ? client.name : (a.client_code || '');
+      return (clientNm||'').toLowerCase().includes(appQ)
+        || (a.company||'').toLowerCase().includes(appQ)
+        || (a.job_title||'').toLowerCase().includes(appQ);
+    });
+  }
   const clientOptions = (S.clients || []).map(c => `<option value="${esc(c.code)}" ${filterClient === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   const statusOptions = ['Applied','Recruiter called me','Vendor emailed','Phone screen scheduled','Technical interview scheduled','Onsite scheduled','Rejected','Offer received','Accepted offer','Withdrew'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
 
@@ -4716,6 +4726,7 @@ function renderApplicationsPage(){
 
   <!-- Filters -->
   <div style="background:var(--bg-card);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+    <div style="flex:1 1 100%;min-width:220px"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Search</label><input type="text" id="app-search" placeholder="Search client, company, or role e.g. vikas google data engineer" value="${esc(viewState.appSearch||'')}" oninput="setAppSearch(this.value)" style="width:100%"></div>
     ${session.role !== 'recruiter' ? `<div style="min-width:180px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Client</label><select id="app-filter-client"><option value="">All clients</option>${clientOptions}</select></div>` : ''}
     <div style="min-width:140px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">Status</label><select id="app-filter-source"><option value="">All statuses</option>${statusOptions}</select></div>
     <div style="min-width:130px;flex:1"><label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:4px">From</label><input type="date" id="app-filter-from" value="${esc(filterFrom)}"></div>
@@ -4727,6 +4738,16 @@ function renderApplicationsPage(){
   ${clientCards}`;
 }
 
+window.setAppSearch = function(v){
+  viewState.appSearch = v;
+  const pos = (document.getElementById('app-search')||{}).selectionStart;
+  clearTimeout(window._appSearchDeb);
+  window._appSearchDeb = setTimeout(() => {
+    renderShell();
+    const n = document.getElementById('app-search');
+    if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} }
+  }, 200);
+};
 window.applyAppFilter = function(){
   const cf = document.getElementById('app-filter-client');
   viewState.appFilterClient = cf ? cf.value : '';
@@ -4737,7 +4758,7 @@ window.applyAppFilter = function(){
   renderShell();
 };
 window.clearAppFilter = function(){
-  viewState.appFilterClient = viewState.appFilterSource = viewState.appFilterFrom = viewState.appFilterTo = '';
+  viewState.appFilterClient = viewState.appFilterSource = viewState.appFilterFrom = viewState.appFilterTo = ''; viewState.appSearch = '';
   allAppsCache = null;
   renderShell();
 };
