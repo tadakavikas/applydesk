@@ -1154,6 +1154,20 @@ function renderAdminDashboard(){
   const rs = S.recruiters || [];
   const ms = S.managers || [];
   const activeClients = cs.filter(c => !c.deactivated_at).length;
+
+  // Real finance data (lazy-loaded once, cached)
+  if(!window._dashFin && !window._loadingDashFin){
+    window._loadingDashFin = true;
+    Promise.all([ rpc('fn_a_dashboard_finance', {}), rpc('fn_a_client_pulse', {}) ]).then(([f,p]) => {
+      window._dashFin = (f && f.ok) ? f : { mrr:0, expenses_month:0, net_month:0, history:[] };
+      window._dashPulse = (p && p.ok) ? (p.clients||[]) : [];
+      window._loadingDashFin = false;
+      renderShell();
+    }).catch(() => { window._dashFin = { mrr:0, expenses_month:0, net_month:0, history:[] }; window._dashPulse = []; window._loadingDashFin = false; });
+  }
+  const fin = window._dashFin || { mrr:0, expenses_month:0, net_month:0, history:[] };
+  const pulse = window._dashPulse || [];
+  const monthlyRecurring = Number(fin.mrr||0); // real: INR collected this month
   // Real count: applications logged with today's date
   const _todayStr = new Date().toISOString().slice(0,10);
   const appsToday = (S.records || []).filter(r => {
@@ -1162,7 +1176,6 @@ function renderAdminDashboard(){
     return d === _todayStr;
   }).length;
   const activeRecruiters = rs.filter(r => !r.deactivated_at).length;
-  const monthlyRecurring = cs.filter(c => !c.deactivated_at && c.subscription_amount).reduce((sum, c) => sum + (c.subscription_currency === 'USD' ? Number(c.subscription_amount) : Number(c.subscription_amount) / 88), 0);
   const unclaimedLeads = (leads || []).filter(l => !l.claimed_by).length;
 
   // Month progress ring
@@ -1171,9 +1184,10 @@ function renderAdminDashboard(){
   const dayOfMonth = now.getDate();
   const monthPct = Math.round((dayOfMonth / daysInMonth) * 100);
 
-  // Revenue history (last 6 months) - sample data since we don't have full history yet
-  const revenueHistory = sampleSparkline(6, Math.max(500, Math.round(monthlyRecurring * 0.7)), Math.round(monthlyRecurring * 0.05));
-  revenueHistory[revenueHistory.length - 1] = Math.round(monthlyRecurring); // Current month is real
+  // Revenue history (last 6 months) - REAL, from finance summary
+  const revenueHistory = (fin.history && fin.history.length)
+    ? fin.history.map(h => Math.round(Number(h.revenue||0)))
+    : [0,0,0,0,0,0];
 
   // Telemetry sparklines
   const activeClientsTrend = sampleSparkline(8, Math.max(1, activeClients - 3), 0.4);
@@ -1182,35 +1196,27 @@ function renderAdminDashboard(){
   const leadsTrend = sampleSparkline(8, Math.max(1, unclaimedLeads + 2), -0.3);
   leadsTrend[leadsTrend.length - 1] = unclaimedLeads;
 
-  // Orbital Billing Pulse - upcoming payments
-  const upcoming = [];
-  cs.forEach(c => {
-    if(c.deactivated_at || !c.subscription_start_date) return;
-    try{
-      const start = new Date(c.subscription_start_date);
-      const nowD = new Date();
-      const monthsElapsed = Math.max(1, Math.ceil((nowD - start) / (30 * 86400000)));
-      const nextDue = new Date(start.getTime() + monthsElapsed * 30 * 86400000);
-      const days = Math.floor((nextDue - nowD) / 86400000);
-      if(days >= 0 && days <= 30) upcoming.push({ name: c.name, code: c.code, days, amount: c.subscription_amount, currency: c.subscription_currency });
-    }catch(e){}
-  });
-  upcoming.sort((a,b) => a.days - b.days);
+  // Orbital Billing Pulse - REAL: clients who have not paid the current month
+  const upcoming = pulse.filter(c => !c.is_active).map(c => ({
+    name: c.name, code: c.code, amount: c.amount, currency: c.currency,
+    unpaid: (c.months||[]).filter(m => !m.paid).length
+  }));
+  upcoming.sort((a,b) => b.unpaid - a.unpaid);
 
   const orbitalCards = upcoming.slice(0, 6).map(p => {
-    const urgent = p.days <= 3;
-    const dotColor = urgent ? 'var(--color-danger)' : 'var(--color-info)';
-    const borderColor = urgent ? 'var(--color-danger)' : 'var(--color-info)';
-    const amountColor = urgent ? 'var(--color-danger)' : 'var(--color-info)';
+    const urgent = p.unpaid >= 2;
+    const dotColor = urgent ? 'var(--color-danger)' : 'var(--color-warning)';
+    const borderColor = urgent ? 'var(--color-danger)' : 'var(--color-warning)';
+    const amountColor = urgent ? 'var(--color-danger)' : 'var(--color-warning)';
     return `<div onclick="openClientDetail('${esc(p.code)}')" style="background:var(--bg-card);border:2px solid ${urgent ? borderColor : 'var(--bg-secondary)'};border-radius:12px;padding:14px 16px;cursor:pointer;position:relative;transition:all .15s ease">
       <div style="position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:50%;background:${dotColor}"></div>
       <div style="font-family:var(--font-heading);font-weight:600;color:var(--text-heading);font-size:14px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name.split(' ').map((w,i,a) => i === a.length-1 ? w[0] + '.' : w).join(' '))}</div>
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
-        <div style="font-family:var(--font-display);font-weight:800;font-size:22px;color:${amountColor};line-height:1">${money(p.amount, p.currency)}</div>
-        <div style="font-size:11px;color:var(--text-muted);font-weight:600">${p.days === 0 ? 'today' : p.days + 'd left'}</div>
+        <div style="font-family:var(--font-display);font-weight:800;font-size:22px;color:${amountColor};line-height:1">${p.amount?money(p.amount, p.currency):'—'}</div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:600">${p.unpaid} mo due</div>
       </div>
     </div>`;
-  }).join('') || `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No payments due in the next 30 days.</div>`;
+  }).join('') || `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--text-muted);font-size:13px">All active clients are paid up. 🎉</div>`;
 
   // Live Activity Pipeline - build from leads + application logs
   const activityFeed = [];
@@ -1279,10 +1285,10 @@ function renderAdminDashboard(){
       <div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <div style="width:8px;height:8px;background:var(--color-success);border-radius:50%"></div>
-          <div style="font-size:11px;color:var(--color-success);font-family:var(--font-heading);font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Monthly Recurring Revenue</div>
+          <div style="font-size:11px;color:var(--color-success);font-family:var(--font-heading);font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Collected This Month</div>
         </div>
-        <div style="font-family:var(--font-display);font-weight:900;font-size:44px;color:var(--text-heading);letter-spacing:-0.025em;margin-bottom:14px;line-height:1">$${Math.round(monthlyRecurring).toLocaleString()}</div>
-        <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-heading);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Revenue Performance Tracker (6 months)</div>
+        <div style="font-family:var(--font-display);font-weight:900;font-size:44px;color:var(--text-heading);letter-spacing:-0.025em;margin-bottom:14px;line-height:1">₹${Math.round(monthlyRecurring).toLocaleString('en-IN')}</div>
+        <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-heading);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Revenue Collected (last 6 months)</div>
         ${svgLineChart(revenueHistory, { width: 380, height: 130, color: 'var(--color-success)' })}
       </div>
       <!-- MIDDLE: Month Progress ring -->
@@ -2696,7 +2702,7 @@ function renderFinSpends(){
 window.deleteSpend = async function(id){
   if(!await confirmModal('Delete this spend? This also removes its ledger entry.', { title:'Delete spend?', okLabel:'Delete' })) return;
   try{ const r = await rpc('fn_a_sp_delete', { p_id: id });
-    if(r && r.ok){ toast('Spend deleted','success'); viewState.financeData=null; renderShell(); }
+    if(r && r.ok){ toast('Spend deleted','success'); viewState.financeData=null; window._dashFin=null; renderShell(); }
     else toast('Failed: '+((r&&r.err)||'unknown'),'error');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
@@ -2753,7 +2759,7 @@ window.openClientPayModal = function(preset){
       if(!code){ toast('Pick a client','error'); return; }
       if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
       try{ const r=await rpc('fn_a_cp_add',{p_client_code:code,p_pay_month:mon,p_amount:amt,p_currency:cur,p_fx_rate:fx,p_paid_date:date,p_to_ledger:ledger});
-        if(r&&r.ok){ toast('Payment recorded','success'); viewState.financeData=null; cleanup(); renderShell(); }
+        if(r&&r.ok){ toast('Payment recorded','success'); viewState.financeData=null; window._dashFin=null; cleanup(); renderShell(); }
         else toast('Failed: '+((r&&r.err)||'unknown'),'error');
       }catch(e){ toast('Failed: '+e.message,'error'); }
     });
@@ -2774,7 +2780,7 @@ window.openClientPayEdit = function(p){
     const date=back.querySelector('#cp-date').value, ledger=back.querySelector('#cp-ledger').checked;
     if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
     try{ const r=await rpc('fn_a_cp_update',{p_id:p.id,p_pay_month:monv,p_amount:amt,p_currency:cur,p_fx_rate:fx,p_paid_date:date,p_to_ledger:ledger});
-      if(r&&r.ok){ toast('Payment updated','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      if(r&&r.ok){ toast('Payment updated','success'); viewState.financeData=null; window._dashFin=null; cleanup(); renderShell(); }
       else toast('Failed: '+((r&&r.err)||'unknown'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
@@ -2782,7 +2788,7 @@ window.openClientPayEdit = function(p){
 window.deleteClientPay = async function(id){
   if(!await confirmModal('Delete this recorded payment? If it was added to the ledger, that entry is removed too.', { title:'Delete payment?', okLabel:'Delete' })) return;
   try{ const r=await rpc('fn_a_cp_delete',{p_id:id});
-    if(r&&r.ok){ toast('Payment deleted','success'); viewState.financeData=null; renderShell(); }
+    if(r&&r.ok){ toast('Payment deleted','success'); viewState.financeData=null; window._dashFin=null; renderShell(); }
     else toast('Failed: '+((r&&r.err)||'unknown'),'error');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
@@ -2799,7 +2805,7 @@ window.openPayrollModal = function(preset){
     const fx=cur==='USD'?(parseFloat(back.querySelector('#pr-fx').value)||88):1, date=back.querySelector('#pr-date').value;
     if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
     try{ const r=await rpc('fn_a_pr_add',{p_member_code:preset.code,p_member_type:preset.member_type,p_pay_month:mon,p_amount:amt,p_currency:cur,p_fx_rate:fx,p_paid_date:date});
-      if(r&&r.ok){ toast('Payroll recorded','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      if(r&&r.ok){ toast('Payroll recorded','success'); viewState.financeData=null; window._dashFin=null; cleanup(); renderShell(); }
       else toast('Failed: '+((r&&r.err)||'unknown'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
@@ -2817,7 +2823,7 @@ window.openPayrollEdit = function(p){
     const fx=cur==='USD'?(parseFloat(back.querySelector('#pr-fx').value)||88):1, date=back.querySelector('#pr-date').value;
     if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
     try{ const r=await rpc('fn_a_pr_update',{p_id:p.id,p_pay_month:monv,p_amount:amt,p_currency:cur,p_fx_rate:fx,p_paid_date:date});
-      if(r&&r.ok){ toast('Payroll updated','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      if(r&&r.ok){ toast('Payroll updated','success'); viewState.financeData=null; window._dashFin=null; cleanup(); renderShell(); }
       else toast('Failed: '+((r&&r.err)||'unknown'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
@@ -2825,7 +2831,7 @@ window.openPayrollEdit = function(p){
 window.deletePayroll = async function(id){
   if(!await confirmModal('Delete this payroll entry? Its ledger entry is removed too.', { title:'Delete payroll?', okLabel:'Delete' })) return;
   try{ const r=await rpc('fn_a_pr_delete',{p_id:id});
-    if(r&&r.ok){ toast('Payroll deleted','success'); viewState.financeData=null; renderShell(); }
+    if(r&&r.ok){ toast('Payroll deleted','success'); viewState.financeData=null; window._dashFin=null; renderShell(); }
     else toast('Failed: '+((r&&r.err)||'unknown'),'error');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
@@ -2850,7 +2856,7 @@ window.openSpendModal = function(spend){
     if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
     const args={p_txn_date:date,p_description:desc,p_category:cat,p_related_party:party||null,p_amount:amt,p_currency:cur,p_fx_rate:fx};
     try{ let r; if(isEdit){ args.p_id=spend.id; r=await rpc('fn_a_sp_update',args); } else r=await rpc('fn_a_sp_add',args);
-      if(r&&r.ok){ toast(isEdit?'Spend updated':'Spend added','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      if(r&&r.ok){ toast(isEdit?'Spend updated':'Spend added','success'); viewState.financeData=null; window._dashFin=null; cleanup(); renderShell(); }
       else toast('Failed: '+((r&&r.err)||'unknown'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
@@ -2871,7 +2877,7 @@ window.openTxnAdd = function(){
     if(!cat||!desc){ toast('Category and description required','error'); return; }
     if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
     try{ const r=await rpc('fn_a_tx_add',{p_direction:dir,p_category:cat,p_description:desc,p_amount:amt,p_currency:cur,p_fx_rate:fx,p_txn_date:date});
-      if(r&&r.ok){ toast('Transaction added','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      if(r&&r.ok){ toast('Transaction added','success'); viewState.financeData=null; window._dashFin=null; cleanup(); renderShell(); }
       else toast('Failed: '+((r&&r.err)||'unknown'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
@@ -2885,7 +2891,7 @@ window.openTxnEdit = function(t){
     const amt=parseFloat(back.querySelector('#tx-amt').value), cur=back.querySelector('#tx-cur').value;
     const fx=cur==='USD'?(parseFloat(back.querySelector('#tx-fx').value)||88):1, date=back.querySelector('#tx-date').value;
     try{ const r=await rpc('fn_a_tx_update',{p_id:t.id,p_category:cat,p_description:desc,p_amount:amt,p_currency:cur,p_fx_rate:fx,p_txn_date:date});
-      if(r&&r.ok){ toast('Updated','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      if(r&&r.ok){ toast('Updated','success'); viewState.financeData=null; window._dashFin=null; cleanup(); renderShell(); }
       else toast('Failed: '+((r&&r.err)||'edit it from its own tab'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
@@ -2893,7 +2899,7 @@ window.openTxnEdit = function(t){
 window.deleteTxn = async function(id){
   if(!await confirmModal('Delete this manual transaction?', { title:'Delete transaction?', okLabel:'Delete' })) return;
   try{ const r=await rpc('fn_a_tx_delete',{p_id:id});
-    if(r&&r.ok){ toast('Deleted','success'); viewState.financeData=null; renderShell(); }
+    if(r&&r.ok){ toast('Deleted','success'); viewState.financeData=null; window._dashFin=null; renderShell(); }
     else toast('Failed: '+((r&&r.err)||'unknown'),'error');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
@@ -2911,7 +2917,7 @@ window.deleteLinkedTxn = async function(t){
   if(!await confirmModal(`This is a ${where} record. Deleting it removes both the ${where} entry and this ledger row. Continue?`, { title:'Delete '+where+' record?', okLabel:'Delete' })) return;
   const fn = t.source_type==='client_payment' ? 'fn_a_cp_delete' : t.source_type==='payroll' ? 'fn_a_pr_delete' : 'fn_a_sp_delete';
   try{ const r=await rpc(fn,{p_id:t.source_id});
-    if(r&&r.ok){ toast('Deleted','success'); viewState.financeData=null; renderShell(); }
+    if(r&&r.ok){ toast('Deleted','success'); viewState.financeData=null; window._dashFin=null; renderShell(); }
     else toast('Failed: '+((r&&r.err)||'unknown'),'error');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
@@ -2924,7 +2930,7 @@ window.openResumePayEdit = function(r0){
     const fx=cur==='USD'?(parseFloat(back.querySelector('#rp-fx').value)||88):1;
     if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
     try{ const r=await rpc('fn_a_ro_pay_update',{p_id:r0.id,p_amount:amt,p_currency:cur,p_fx_rate:fx});
-      if(r&&r.ok){ toast('Updated','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      if(r&&r.ok){ toast('Updated','success'); viewState.financeData=null; window._dashFin=null; cleanup(); renderShell(); }
       else toast('Failed: '+((r&&r.err)||'unknown'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
