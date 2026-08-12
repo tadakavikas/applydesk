@@ -288,6 +288,10 @@ textarea{resize:vertical;min-height:80px}
 .cp-manage{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
 .cp-chip{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--text-body);background:var(--bg-secondary);border-radius:20px;padding:2px 4px 2px 10px}
 .txn-actions{white-space:nowrap}
+.client-search{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.client-search input,.client-search select{padding:8px 12px;border:1px solid var(--bg-secondary);border-radius:var(--radius-md);background:var(--bg-card);font-family:var(--font-body);font-size:13px;color:var(--text-body)}
+.client-search input:focus,.client-search select:focus{outline:none;border-color:var(--color-primary)}
+.cf-count{font-size:12px;color:var(--text-muted);font-weight:600}
 .txn-actions .icon-btn{padding:4px 4px}
 /* checkpoint timeline */
 .ck-row{display:flex;align-items:flex-start;margin:16px 0 4px;padding:0 4px}
@@ -1541,7 +1545,12 @@ window.addLeadNote = async function(id){
 function renderClientsPage(){
   const cs = S.clients || [];
   const filter = viewState.clientFilter || 'active';
-  const filtered = filter === 'all' ? cs : filter === 'active' ? cs.filter(c => !c.deactivated_at) : cs.filter(c => c.deactivated_at);
+  const sf = viewState.clientSearch || {};
+  let filtered = filter === 'all' ? cs : filter === 'active' ? cs.filter(c => !c.deactivated_at) : cs.filter(c => c.deactivated_at);
+  if(sf.role) filtered = filtered.filter(c => (c.target_role||'').toLowerCase().includes(sf.role.toLowerCase()));
+  if(sf.location) filtered = filtered.filter(c => (c.location||'').toLowerCase().includes(sf.location.toLowerCase()));
+  if(sf.visa) filtered = filtered.filter(c => (c.sponsorship_status||'') === sf.visa);
+  if(sf.minExp) filtered = filtered.filter(c => Number(c.years_experience||0) >= Number(sf.minExp));
   const showAdd = viewState.showAddClient;
 
   // Load real app counts (once per session)
@@ -1581,6 +1590,7 @@ function renderClientsPage(){
       <td style="padding:14px 12px;font-size:12px">${c.phone ? esc(c.phone) : '—'}</td>
       <td style="padding:14px 12px;font-size:12px">${c.email ? esc(c.email) : '—'}</td>
       <td style="padding:14px 12px;font-size:12px">${c.target_role ? esc(c.target_role) : '—'}</td>
+      <td style="padding:14px 12px;font-size:12px">${c.location ? esc(c.location) : '—'}</td>
       <td style="padding:14px 12px;font-size:12px">${c.years_experience != null ? esc(c.years_experience) + 'y' : '—'}</td>
       <td style="padding:14px 12px;font-size:12px">${c.sponsorship_status ? `<span class="tag teal" style="font-size:9px">${esc(c.sponsorship_status)}</span>` : '—'}</td>
       <td style="padding:14px 12px">${isRealResume ? `<button class="btn ghost sm" onclick="event.stopPropagation();openStoredFile('${esc(resumeVal).replace(/'/g,'')}')">📄</button>` : '<span style="font-size:11px;color:var(--text-muted)">—</span>'}</td>
@@ -1594,6 +1604,7 @@ function renderClientsPage(){
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Phone</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Email</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Target role</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Location</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Exp</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Visa</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Resume</th>
@@ -1609,6 +1620,7 @@ function renderClientsPage(){
       <div class="field"><label>Phone</label><input id="ac-phone" type="tel" placeholder="(555) 123-4567"></div>
       <div class="field"><label>Access code *</label><input id="ac-code" type="text" placeholder="jane01"></div>
       <div class="field"><label>Target role</label><input id="ac-role" type="text" placeholder="Senior Product Manager"></div>
+      <div class="field"><label>Location</label><input id="ac-location" type="text" placeholder="e.g. Charlotte, NC"></div>
       <div class="field"><label>Years experience</label><input id="ac-years" type="number" placeholder="5"></div>
       <div class="field"><label>Sponsorship</label><select id="ac-sponsor"><option value="">Select...</option><option>US Citizen</option><option>Green Card</option><option>H1B</option><option>OPT</option><option>OPT-EAD</option><option>Other</option></select></div>
       <div class="field"><label>Base resume URL</label><input id="ac-resume" type="url" placeholder="https://..."></div>
@@ -1632,8 +1644,26 @@ function renderClientsPage(){
     <button class="filter-chip ${filter === 'active' ? 'active' : ''}" onclick="setClientFilter('active')">Active (${cs.filter(c => !c.deactivated_at).length})</button>
     <button class="filter-chip ${filter === 'inactive' ? 'active' : ''}" onclick="setClientFilter('inactive')">Deactivated (${cs.filter(c => c.deactivated_at).length})</button>
   </div>
+  <div class="client-search">
+    <input type="text" id="cf-role" placeholder="Target role e.g. Java Developer" value="${esc(sf.role||'')}" oninput="setClientSearch('role',this.value)">
+    <input type="text" id="cf-loc" placeholder="Location e.g. Charlotte" value="${esc(sf.location||'')}" oninput="setClientSearch('location',this.value)">
+    <select id="cf-visa" onchange="setClientSearch('visa',this.value)"><option value="">Any visa</option>${['US Citizen','Green Card','H1B','OPT','OPT-EAD','Other'].map(v=>`<option ${sf.visa===v?'selected':''}>${v}</option>`).join('')}</select>
+    <input type="number" id="cf-exp" placeholder="Min years exp" value="${esc(sf.minExp||'')}" oninput="setClientSearch('minExp',this.value)" style="max-width:130px">
+    ${(sf.role||sf.location||sf.visa||sf.minExp)?`<button class="btn ghost sm" onclick="clearClientSearch()">Clear</button><span class="cf-count">${filtered.length} match${filtered.length===1?'':'es'}</span>`:''}
+  </div>
   ${clientTable}`;
 }
+
+window.setClientSearch = function(k,v){
+  viewState.clientSearch = Object.assign({}, viewState.clientSearch, {[k]: v});
+  const el = document.activeElement; const id = el && el.id; const pos = el && el.selectionStart;
+  clearTimeout(window._cfDeb);
+  window._cfDeb = setTimeout(() => {
+    renderShell();
+    if(id){ const n = document.getElementById(id); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } }
+  }, 200);
+};
+window.clearClientSearch = function(){ viewState.clientSearch = {}; renderShell(); };
 
 window.setClientFilter = function(f){ viewState.clientFilter = f; renderShell(); };
 window.toggleAddClient = function(){ viewState.showAddClient = !viewState.showAddClient; renderShell(); };
@@ -1656,6 +1686,8 @@ window.submitAddClient = async function(){
       p_target: 25
     });
     if(!r || !r.ok){ toast('Failed: ' + ((r && r.err) || 'unknown'), 'error'); return; }
+    const loc = getV('ac-location').trim();
+    if(loc){ try{ await rpc('fn_a_edit_client', { p_code: code, p_location: loc }); }catch(e){} }
     viewState.showAddClient = false;
     await refresh();
     toast('Client added', 'success');
