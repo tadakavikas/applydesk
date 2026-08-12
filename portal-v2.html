@@ -167,6 +167,12 @@ textarea{resize:vertical;min-height:80px}
 .filter-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
 .filter-chip{padding:8px 16px;border-radius:100px;background:transparent;border:1.5px solid var(--bg-secondary);font-family:var(--font-heading);font-size:13px;font-weight:500;color:var(--text-body);cursor:pointer;transition:all .15s ease}
 .heat-cell:hover{transform:scale(1.25);box-shadow:var(--shadow-lg);z-index:5;position:relative}
+.client-row td{background:var(--bg-card);border-top:2px solid var(--bg-primary);border-bottom:2px solid var(--bg-primary);transition:all .15s ease}
+.client-row td:first-child{border-left:2px solid var(--bg-primary);border-top-left-radius:12px;border-bottom-left-radius:12px}
+.client-row td:last-child{border-right:2px solid var(--bg-primary);border-top-right-radius:12px;border-bottom-right-radius:12px}
+.client-row:hover td{border-color:var(--color-primary);background:var(--bg-coral-light)}
+.client-row:hover{transform:scale(1.015)}
+.client-row{transition:transform .15s ease}
 .filter-chip:hover{border-color:var(--color-primary);color:var(--color-primary)}
 .filter-chip.active{background:var(--color-primary);color:#fff;border-color:var(--color-primary)}
 
@@ -1487,29 +1493,29 @@ function renderClientsPage(){
     }
     const resumeVal = c.base_resume_url;
     const isRealResume = resumeVal && /^https?:\/\//i.test(resumeVal) && resumeVal.indexOf('test.com') === -1;
-    return `<tr onclick="openClientDetail('${esc(c.code)}')" style="cursor:pointer">
-      <td><b>${esc(c.name)}</b>${c.deactivated_at ? ' <span class="tag danger" style="font-size:9px">INACTIVE</span>' : ''}<br><span style="font-size:11px;color:var(--text-muted);font-family:monospace">${esc(c.code)}</span></td>
-      <td style="font-size:12px">${c.phone ? esc(c.phone) : '—'}</td>
-      <td style="font-size:12px">${c.email ? esc(c.email) : '—'}</td>
-      <td style="font-size:12px">${c.target_role ? esc(c.target_role) : '—'}</td>
-      <td style="font-size:12px">${c.years_experience != null ? esc(c.years_experience) + 'y' : '—'}</td>
-      <td style="font-size:12px">${c.sponsorship_status ? `<span class="tag teal" style="font-size:9px">${esc(c.sponsorship_status)}</span>` : '—'}</td>
-      <td>${isRealResume ? `<button class="btn ghost sm" onclick="event.stopPropagation();openStoredFile('${esc(resumeVal).replace(/'/g,'')}')">📄</button>` : '<span style="font-size:11px;color:var(--text-muted)">—</span>'}</td>
-      <td style="white-space:nowrap;font-size:12px">${c.subscription_amount ? money(c.subscription_amount, c.subscription_currency) : 'No plan'}</td>
+    return `<tr class="client-row" onclick="openClientDetail('${esc(c.code)}')" style="cursor:pointer">
+      <td style="padding:14px 12px"><b>${esc(c.name)}</b>${c.deactivated_at ? ' <span class="tag danger" style="font-size:9px">INACTIVE</span>' : ''}<br><span style="font-size:11px;color:var(--text-muted);font-family:monospace">${esc(c.code)}</span></td>
+      <td style="padding:14px 12px;font-size:12px">${c.phone ? esc(c.phone) : '—'}</td>
+      <td style="padding:14px 12px;font-size:12px">${c.email ? esc(c.email) : '—'}</td>
+      <td style="padding:14px 12px;font-size:12px">${c.target_role ? esc(c.target_role) : '—'}</td>
+      <td style="padding:14px 12px;font-size:12px">${c.years_experience != null ? esc(c.years_experience) + 'y' : '—'}</td>
+      <td style="padding:14px 12px;font-size:12px">${c.sponsorship_status ? `<span class="tag teal" style="font-size:9px">${esc(c.sponsorship_status)}</span>` : '—'}</td>
+      <td style="padding:14px 12px">${isRealResume ? `<button class="btn ghost sm" onclick="event.stopPropagation();openStoredFile('${esc(resumeVal).replace(/'/g,'')}')">📄</button>` : '<span style="font-size:11px;color:var(--text-muted)">—</span>'}</td>
+      <td style="padding:14px 12px;white-space:nowrap;font-size:12px">${c.subscription_amount ? money(c.subscription_amount, c.subscription_currency) : 'No plan'}</td>
     </tr>`;
   }).join('');
 
-  const clientTable = filtered.length ? `<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
-    <thead><tr style="text-align:left;border-bottom:2px solid var(--bg-secondary)">
-      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Name</th>
-      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Phone</th>
-      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Email</th>
-      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Target role</th>
-      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Exp</th>
-      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Visa</th>
-      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Resume</th>
-      <th style="padding:8px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Plan</th>
-    </tr></thead><tbody>${clientRows}</tbody></table></div>`
+  const clientTable = filtered.length ? `<table style="width:100%;border-collapse:separate;border-spacing:0 10px">
+    <thead><tr style="text-align:left">
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Name</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Phone</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Email</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Target role</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Exp</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Visa</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Resume</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Plan</th>
+    </tr></thead><tbody>${clientRows}</tbody></table>`
     : `<div class="empty-state"><div class="empty-icon">👥</div><h3 class="empty-title">No clients yet</h3><p class="empty-text">Add your first client to get started.</p><button class="btn primary" onclick="toggleAddClient()">+ Add client</button></div>`;
 
   const addForm = showAdd ? `<div class="card" style="margin-bottom:24px;border:2px solid var(--color-primary)">
