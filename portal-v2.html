@@ -3370,7 +3370,7 @@ function renderResumeOrdersList(){
 
 function resumeOrderFormFields(o){
   o = o || {};
-  const team = (S.admins || []).filter(a => !a.deactivated_at);
+  const team = (adminsList || []).filter(a => a.active !== false && !a.deactivated_at);
   const teamOpts = [{value:'',label:'— Assign to —'}].concat(team.map(t => ({value:t.code, label:t.name})));
   const clientOpts = [{value:'',label:'— Pick existing client (optional) —'}].concat((S.clients || []).map(c => ({value:c.code, label:c.name})));
   return [
@@ -3385,7 +3385,8 @@ function resumeOrderFormFields(o){
   ];
 }
 
-window.openCreateResumeOrder = function(){
+window.openCreateResumeOrder = async function(){
+  if(adminsList === null){ try{ await loadAdmins(); }catch(e){} }
   openEditModal('New resume order', resumeOrderFormFields({}), async (v) => {
     if(!v.client_name || !v.client_name.trim()){ toast('Client name required', 'error'); return false; }
     try{
@@ -3401,7 +3402,8 @@ window.openCreateResumeOrder = function(){
   });
 };
 
-window.openEditResumeOrder = function(id){
+window.openEditResumeOrder = async function(id){
+  if(adminsList === null){ try{ await loadAdmins(); }catch(e){} }
   const o = (resumeOrdersCache || []).find(x => x.id === id);
   if(!o) return;
   openEditModal('Edit resume order', resumeOrderFormFields(o), async (v) => {
