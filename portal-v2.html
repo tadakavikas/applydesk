@@ -287,6 +287,8 @@ textarea{resize:vertical;min-height:80px}
 .icon-btn.xs{font-size:12px;padding:2px 4px}
 .cp-manage{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
 .cp-chip{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--text-body);background:var(--bg-secondary);border-radius:20px;padding:2px 4px 2px 10px}
+.txn-actions{white-space:nowrap}
+.txn-actions .icon-btn{padding:4px 4px}
 /* checkpoint timeline */
 .ck-row{display:flex;align-items:flex-start;margin:16px 0 4px;padding:0 4px}
 .ck-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto}
@@ -2304,7 +2306,7 @@ function renderFinancePage(){
 window.setFinanceTab = function(t){
   viewState.financeTab = t;
   viewState.financeData = null;
-  viewState.finAdmin = null; // reset admin sub-filter
+  viewState.finAdmin = 'vtproton@22'; // default admin sub-filter (matches the highlighted sub-tab)
   renderShell();
 };
 
@@ -2373,7 +2375,7 @@ function finCheckpoints(months){
 function renderFinTransactions(){
   if(viewState.financeData === null || viewState.financeData === undefined){
     viewState.financeData = 'loading';
-    const admin = viewState.finAdmin || null;
+    const admin = viewState.finAdmin || 'vtproton@22';
     const { from, to } = finMonthRange();
     rpc('fn_a_tx_list', { p_from: from, p_to: to, p_admin: admin })
       .then(r => { viewState.financeData = (r && r.ok) ? (r.txns || []) : []; renderShell(); })
@@ -2412,7 +2414,9 @@ function renderFinTransactions(){
     <td class="mono sub">${Number(t.fx_rate||1).toFixed(2)} ${esc(t.currency)}</td>
     <td class="mono">${inr(balById[t.id]||0)}</td>
     <td>${esc(t.enrolled_by_name||t.enrolled_by||'')}</td>
-    <td>${t.source_id?'':`<button class="icon-btn" onclick='openTxnEdit(${JSON.stringify(t).replace(/'/g,"&#39;")})' title="Edit">✎</button>`}</td>
+    <td class="txn-actions">${t.source_id
+      ? `<button class="icon-btn" onclick='editLinkedTxn(${JSON.stringify(t).replace(/'/g,"&#39;")})' title="Edit at source">✎</button><button class="icon-btn danger" onclick='deleteLinkedTxn(${JSON.stringify(t).replace(/'/g,"&#39;")})' title="Delete at source">🗑</button>`
+      : `<button class="icon-btn" onclick='openTxnEdit(${JSON.stringify(t).replace(/'/g,"&#39;")})' title="Edit">✎</button><button class="icon-btn danger" onclick="deleteTxn(${t.id})" title="Delete">🗑</button>`}</td>
   </tr>`).join('');
 
   return cards + `<div class="fin-panel">
@@ -2845,6 +2849,31 @@ window.openTxnEdit = function(t){
       else toast('Failed: '+((r&&r.err)||'edit it from its own tab'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
+};
+window.deleteTxn = async function(id){
+  if(!await confirmModal('Delete this manual transaction?', { title:'Delete transaction?', okLabel:'Delete' })) return;
+  try{ const r=await rpc('fn_a_tx_delete',{p_id:id});
+    if(r&&r.ok){ toast('Deleted','success'); viewState.financeData=null; renderShell(); }
+    else toast('Failed: '+((r&&r.err)||'unknown'),'error');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+/* A ledger row that mirrors a source record: send the user to fix it at the source */
+const FIN_SOURCE_TAB = { client_payment:'client-payments', payroll:'payrolls', spend:'spends' };
+window.editLinkedTxn = function(t){
+  const tab = FIN_SOURCE_TAB[t.source_type];
+  const where = t.source_type==='client_payment' ? 'Client Payments' : t.source_type==='payroll' ? 'Payrolls' : 'Spends';
+  confirmModal(`This transaction came from ${where}. Editing it there keeps the ledger and the record in sync. Go to ${where}?`, { title:'Edit at source', okLabel:'Go to '+where }).then(ok=>{
+    if(ok && tab){ setFinanceTab(tab); }
+  });
+};
+window.deleteLinkedTxn = async function(t){
+  const where = t.source_type==='client_payment' ? 'Client Payments' : t.source_type==='payroll' ? 'Payrolls' : 'Spends';
+  if(!await confirmModal(`This is a ${where} record. Deleting it removes both the ${where} entry and this ledger row. Continue?`, { title:'Delete '+where+' record?', okLabel:'Delete' })) return;
+  const fn = t.source_type==='client_payment' ? 'fn_a_cp_delete' : t.source_type==='payroll' ? 'fn_a_pr_delete' : 'fn_a_sp_delete';
+  try{ const r=await rpc(fn,{p_id:t.source_id});
+    if(r&&r.ok){ toast('Deleted','success'); viewState.financeData=null; renderShell(); }
+    else toast('Failed: '+((r&&r.err)||'unknown'),'error');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
 /* RESUME PAYMENT edit */
