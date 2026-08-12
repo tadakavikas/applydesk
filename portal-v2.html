@@ -284,23 +284,30 @@ textarea{resize:vertical;min-height:80px}
 .icon-btn{background:none;border:none;cursor:pointer;font-size:15px;color:var(--text-muted);padding:4px 6px;border-radius:6px}
 .icon-btn:hover{background:var(--bg-secondary);color:var(--color-primary)}
 .icon-btn.danger:hover{color:var(--color-danger)}
+.icon-btn.xs{font-size:12px;padding:2px 4px}
+.cp-manage{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+.cp-chip{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--text-body);background:var(--bg-secondary);border-radius:20px;padding:2px 4px 2px 10px}
 /* checkpoint timeline */
-.ck-row{display:flex;align-items:center;margin:14px 0 8px}
-.ck-step{display:flex;flex-direction:column;align-items:center;gap:4px}
-.ck-line{flex:1;height:2px;background:var(--bg-secondary);margin:0 2px;margin-bottom:16px}
-.ck-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.ck-row{display:flex;align-items:flex-start;margin:16px 0 4px;padding:0 4px}
+.ck-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto}
+.ck-line{flex:1 1 auto;height:2px;background:var(--bg-secondary);margin:11px 0 0;min-width:14px}
+.ck-dot{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex:0 0 auto}
 .ck-paid{background:var(--color-success)}
 .ck-pending{background:transparent;border:2px solid var(--color-warning)}
-.ck-label{font-size:10px;color:var(--text-muted);font-weight:600}
+.ck-label{font-size:10px;color:var(--text-muted);font-weight:600;white-space:nowrap}
+.ck-more{color:var(--text-muted);font-weight:700;font-size:14px;line-height:24px;flex:0 0 auto}
 /* client payment cards */
 .cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-.cp-card{border:1px solid var(--bg-secondary);border-radius:var(--radius-lg);padding:16px 18px;background:var(--bg-card)}
+.cp-card{border:1px solid var(--bg-secondary);border-radius:var(--radius-lg);padding:16px 18px;background:var(--bg-card);display:flex;flex-direction:column}
 .cp-card.cp-due{border-color:var(--color-primary)}
-.cp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.cp-ident{display:flex;gap:10px;align-items:center}
+.cp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;min-height:42px}
+.cp-ident{display:flex;gap:10px;align-items:flex-start}
+.cp-ident>div{display:flex;flex-direction:column;justify-content:center}
+.cp-name{font-weight:700;color:var(--text-heading);line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cp-card .ck-row{margin-top:auto}
+.cp-card .cp-foot{margin-top:12px}
 .cp-avatar{width:34px;height:34px;border-radius:50%;background:var(--bg-coral-light);color:var(--color-primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
 .cp-avatar.sm{width:28px;height:28px;font-size:11px}
-.cp-name{font-weight:700;color:var(--text-heading)}
 .sub{font-size:11px;color:var(--text-muted)}
 .cp-amt{font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--color-primary)}
 .cp-amt .sub{font-weight:500}
@@ -2348,14 +2355,18 @@ function finMonthRange(){
 /* Checkpoint timeline (Start -> Jul✓ Aug✓ Sep✓ Oct○) used by client + payroll cards */
 function finCheckpoints(months){
   if(!months || !months.length) return '';
-  const dots = months.map(m => {
+  const MAX = 6;
+  const truncated = months.length > MAX;
+  const shown = truncated ? months.slice(-MAX) : months;
+  const dots = shown.map(m => {
     const paid = !!m.paid;
     return `<div class="ck-step">
       <span class="ck-dot ${paid?'ck-paid':'ck-pending'}">${paid?'✓':''}</span>
       <span class="ck-label">${esc(m.label ? m.label.split(' ')[0] : '')}</span>
     </div>`;
   }).join('<span class="ck-line"></span>');
-  return `<div class="ck-row">${dots}</div>`;
+  const lead = truncated ? '<span class="ck-more">…</span><span class="ck-line"></span>' : '';
+  return `<div class="ck-row">${lead}${dots}</div>`;
 }
 
 /* ─────────── TRANSACTIONS (ledger, split by admin) ─────────── */
@@ -2445,6 +2456,14 @@ function renderFinClientPayments(){
   const cardHtml = clients.map(c => {
     const active = c.is_active;
     const startLbl = c.start ? new Date(c.start+'T00:00:00').toLocaleDateString(undefined,{month:'short',year:'numeric'}) : '';
+    const paidMonths = (c.months||[]).filter(m => m.paid && m.pay_id);
+    const manage = paidMonths.length ? `<div class="cp-manage">${paidMonths.map(m => {
+      const p = {id:m.pay_id, code:c.code, name:c.name, month:m.month, amount:m.amount, currency:m.currency, fx_rate:m.fx_rate, paid_date:m.paid_date, to_ledger:m.to_ledger};
+      const j = JSON.stringify(p).replace(/'/g,"&#39;");
+      return `<span class="cp-chip">${esc((m.label||'').split(' ')[0])}
+        <button class="icon-btn xs" onclick='openClientPayEdit(${j})' title="Edit">✎</button>
+        <button class="icon-btn xs danger" onclick="deleteClientPay(${m.pay_id})" title="Delete">🗑</button></span>`;
+    }).join('')}</div>` : '';
     return `<div class="cp-card ${active?'':'cp-due'}">
       <div class="cp-head">
         <div class="cp-ident"><span class="cp-avatar">${esc(initials(c.name))}</span>
@@ -2453,6 +2472,7 @@ function renderFinClientPayments(){
         <div class="cp-amt">${c.amount?money(c.amount,c.currency):'—'}<span class="sub">/mo</span></div>
       </div>
       ${finCheckpoints(c.months)}
+      ${manage}
       <div class="cp-foot">
         <div><span class="cp-badge ${active?'cp-active':'cp-paydue'}">${active?'ACTIVE':'PAYMENT DUE'}</span></div>
         <button class="btn primary sm" onclick='openClientPayModal(${JSON.stringify({code:c.code,name:c.name,amount:c.amount,currency:c.currency}).replace(/'/g,"&#39;")})'>+ Record</button>
@@ -2493,15 +2513,23 @@ function renderFinPayrolls(){
     finMetric('Pending This Month', pending?'needs paying':'all paid', String(pending), pending?'var(--color-warning)':'var(--color-success)')
   ]);
 
-  const rows = members.map(m => `<tr>
+  const rows = members.map(m => {
+    const paidMonths = (m.months||[]).filter(x => x.paid && x.pay_id);
+    const manage = paidMonths.length ? `<div class="cp-manage">${paidMonths.map(x => {
+      const j = JSON.stringify({id:x.pay_id, name:m.name, month:x.month, amount:x.amount, currency:x.currency, fx_rate:x.fx_rate, paid_date:x.paid_date}).replace(/'/g,"&#39;");
+      return `<span class="cp-chip">${esc((x.label||'').split(' ')[0])}
+        <button class="icon-btn xs" onclick='openPayrollEdit(${j})' title="Edit">✎</button>
+        <button class="icon-btn xs danger" onclick="deletePayroll(${x.pay_id})" title="Delete">🗑</button></span>`;
+    }).join('')}</div>` : '';
+    return `<tr>
     <td><div class="cp-ident"><span class="cp-avatar sm">${esc(initials(m.name))}</span><div><b>${esc(m.name)}</b><div class="sub mono">${esc(m.code)}</div></div></div></td>
     <td><span class="tag muted">${esc(m.member_type)}</span></td>
     <td>${m.amount?money(m.amount,m.currency):'—'}</td>
-    <td>${finCheckpoints(m.months)}</td>
+    <td>${finCheckpoints(m.months)}${manage}</td>
     <td><span class="cp-badge ${m.is_paid_current?'cp-active':'cp-paydue'}">${m.is_paid_current?'PAID':'DUE'}</span></td>
     <td>${inr(m.total_paid||0)}</td>
-    <td><button class="btn primary sm" onclick='openPayrollModal(${JSON.stringify({code:m.code,name:m.name,member_type:m.member_type,amount:m.amount,currency:m.currency}).replace(/'/g,"&#39;")})'>+ Pay</button></td>
-  </tr>`).join('');
+    <td><button class="btn primary sm" onclick='openPayrollModal(${JSON.stringify({code:m.code,name:m.name,member_type:m.member_type,amount:m.amount,currency:m.currency}).replace(/'/g,"&#39;")})'>+ Pay</button></td></tr>`;
+  }).join('');
 
   return cards + `<div class="fin-panel">
     <div class="fin-panel-controls">
@@ -2688,6 +2716,33 @@ window.openClientPayModal = function(preset){
   });
 };
 
+window.openClientPayEdit = function(p){
+  const mon = (p.month||'').slice(0,7) || today().slice(0,7);
+  const inner = `<div class="field"><label>Client</label><input value="${esc(p.name||'')}" disabled></div>
+    <div class="field"><label>Payment for month *</label><input id="cp-month" type="month" value="${mon}"></div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">${fld('Amount *','cp-amt','number',p.amount,'0.00')}${curSel('cp-cur',p.currency||'INR')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${fld('FX rate (INR per USD)','cp-fx','number',p.fx_rate||88)}${fld('Paid date','cp-date','date',p.paid_date||today())}</div>
+    <label class="chk"><input type="checkbox" id="cp-ledger" ${p.to_ledger!==false?'checked':''}> Keep this in the Transactions ledger</label>`;
+  finModal('Edit client payment', inner, async (back, cleanup)=>{
+    const monv=back.querySelector('#cp-month').value+'-01';
+    const amt=parseFloat(back.querySelector('#cp-amt').value), cur=back.querySelector('#cp-cur').value;
+    const fx=cur==='USD'?(parseFloat(back.querySelector('#cp-fx').value)||88):1;
+    const date=back.querySelector('#cp-date').value, ledger=back.querySelector('#cp-ledger').checked;
+    if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
+    try{ const r=await rpc('fn_a_cp_update',{p_id:p.id,p_pay_month:monv,p_amount:amt,p_currency:cur,p_fx_rate:fx,p_paid_date:date,p_to_ledger:ledger});
+      if(r&&r.ok){ toast('Payment updated','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      else toast('Failed: '+((r&&r.err)||'unknown'),'error');
+    }catch(e){ toast('Failed: '+e.message,'error'); }
+  });
+};
+window.deleteClientPay = async function(id){
+  if(!await confirmModal('Delete this recorded payment? If it was added to the ledger, that entry is removed too.', { title:'Delete payment?', okLabel:'Delete' })) return;
+  try{ const r=await rpc('fn_a_cp_delete',{p_id:id});
+    if(r&&r.ok){ toast('Payment deleted','success'); viewState.financeData=null; renderShell(); }
+    else toast('Failed: '+((r&&r.err)||'unknown'),'error');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
+};
+
 /* PAYROLL */
 window.openPayrollModal = function(preset){
   const inner = `<div class="field"><label>Member</label><input value="${esc(preset?preset.name:'')}" disabled></div>
@@ -2704,6 +2759,31 @@ window.openPayrollModal = function(preset){
       else toast('Failed: '+((r&&r.err)||'unknown'),'error');
     }catch(e){ toast('Failed: '+e.message,'error'); }
   });
+};
+
+window.openPayrollEdit = function(p){
+  const mon = (p.month||'').slice(0,7) || today().slice(0,7);
+  const inner = `<div class="field"><label>Member</label><input value="${esc(p.name||'')}" disabled></div>
+    <div class="field"><label>Pay for month *</label><input id="pr-month" type="month" value="${mon}"></div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">${fld('Amount *','pr-amt','number',p.amount,'0.00')}${curSel('pr-cur',p.currency||'INR')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${fld('FX rate (INR per USD)','pr-fx','number',p.fx_rate||88)}${fld('Paid date','pr-date','date',p.paid_date||today())}</div>`;
+  finModal('Edit payroll', inner, async (back, cleanup)=>{
+    const monv=back.querySelector('#pr-month').value+'-01';
+    const amt=parseFloat(back.querySelector('#pr-amt').value), cur=back.querySelector('#pr-cur').value;
+    const fx=cur==='USD'?(parseFloat(back.querySelector('#pr-fx').value)||88):1, date=back.querySelector('#pr-date').value;
+    if(!amt||amt<=0){ toast('Enter an amount','error'); return; }
+    try{ const r=await rpc('fn_a_pr_update',{p_id:p.id,p_pay_month:monv,p_amount:amt,p_currency:cur,p_fx_rate:fx,p_paid_date:date});
+      if(r&&r.ok){ toast('Payroll updated','success'); viewState.financeData=null; cleanup(); renderShell(); }
+      else toast('Failed: '+((r&&r.err)||'unknown'),'error');
+    }catch(e){ toast('Failed: '+e.message,'error'); }
+  });
+};
+window.deletePayroll = async function(id){
+  if(!await confirmModal('Delete this payroll entry? Its ledger entry is removed too.', { title:'Delete payroll?', okLabel:'Delete' })) return;
+  try{ const r=await rpc('fn_a_pr_delete',{p_id:id});
+    if(r&&r.ok){ toast('Payroll deleted','success'); viewState.financeData=null; renderShell(); }
+    else toast('Failed: '+((r&&r.err)||'unknown'),'error');
+  }catch(e){ toast('Failed: '+e.message,'error'); }
 };
 
 /* SPEND */
