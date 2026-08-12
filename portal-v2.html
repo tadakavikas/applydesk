@@ -541,6 +541,28 @@ function toast(msg, kind){
   setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 3000);
 }
 
+// Styled confirm dialog (replaces native confirm popup). Returns a Promise<boolean>.
+function confirmModal(message, opts){
+  opts = opts || {};
+  return new Promise(resolve => {
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.innerHTML = `<div class="modal-inner" style="max-width:420px">
+      <h3 style="margin-bottom:10px">${esc(opts.title || 'Please confirm')}</h3>
+      <p style="color:var(--text-body);font-size:14px;line-height:1.5;margin-bottom:20px">${esc(message)}</p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cm-cancel">${esc(opts.cancelLabel || 'Cancel')}</button>
+        <button class="btn ${opts.danger ? '' : 'primary'}" id="cm-ok" ${opts.danger ? 'style="background:var(--color-danger);color:#fff"' : ''}>${esc(opts.okLabel || 'Confirm')}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(back);
+    const done = (val) => { back.remove(); resolve(val); };
+    back.querySelector('#cm-cancel').onclick = () => done(false);
+    back.querySelector('#cm-ok').onclick = () => done(true);
+    back.onclick = e => { if(e.target === back) done(false); };
+  });
+}
+
 /* ═══════ LOGIN & SET PASSWORD ═══════ */
 function renderLogin(msg){
   session = null; S = {}; leads = []; authMode = null;
@@ -1630,7 +1652,7 @@ function renderClientDetailPage(){
 }
 
 window.sendClientInvite = async function(code, email){
-  if(!confirm('Send invitation email to ' + email + '?')) return;
+  if(!await confirmModal('Send invitation email to ' + email + '?', { title:'Send invite', okLabel:'Send' })) return;
   try{
     const { data:{ session: s } } = await sb.auth.getSession();
     if(!s){ toast('Log in with email + password to send invites', 'error'); return; }
@@ -1856,7 +1878,7 @@ function renderRecruiterDetailPage(){
 }
 
 window.sendGenericInvite = async function(role, code, email){
-  if(!confirm('Send invitation email to ' + email + '?')) return;
+  if(!await confirmModal('Send invitation email to ' + email + '?', { title:'Send invite', okLabel:'Send' })) return;
   try{
     const { data:{ session: s } } = await sb.auth.getSession();
     if(!s){ toast('Log in with email + password to send invites', 'error'); return; }
@@ -2029,7 +2051,7 @@ window.submitAddAdmin = async function(){
     viewState.showAddAdmin = false;
     adminsList = null;
     toast('Admin added', 'success');
-    if(confirm('Send invitation email to ' + email + ' now?')) await sendGenericInvite('admin', code, email);
+    if(await confirmModal('Send invitation email to ' + email + ' now?', { title:'Send invite', okLabel:'Send' })) await sendGenericInvite('admin', code, email);
     renderShell();
   }catch(e){ toast('Failed: ' + e.message, 'error'); }
 };
@@ -2503,7 +2525,7 @@ window.completeResume = async function(id){
   const rate = prompt('Exchange rate (INR per USD)? Enter 1 if INR:', '88');
   if(!rate) return;
   const fxRate = parseFloat(rate) || 88;
-  if(!confirm('Mark complete and log payment?')) return;
+  if(!await confirmModal('Mark complete and log payment?', { title:'Confirm payment', okLabel:'Confirm' })) return;
   try{
     const r = await rpc('fn_a_complete_resume_request', { p_id: id, p_fx_rate: fxRate });
     if(r && r.ok){ viewState.financeData = null; toast('Completed and logged', 'success'); renderShell(); }
@@ -3292,7 +3314,7 @@ window.refreshClientApps = function(){
 
 /* ═══════ APPLICATION DETAIL MODAL WITH STATUS TIMELINE ═══════ */
 window.deleteApplication = async function(recordId){
-  if(!confirm('Delete this application permanently? This cannot be undone.')) return;
+  if(!await confirmModal('Delete this application permanently? This cannot be undone.', { title:'Delete application', okLabel:'Delete', danger:true })) return;
   try{
     const r = await rpc('fn_a_delete_application', { p_record_id: recordId });
     if(r && r.ok){
@@ -3348,7 +3370,7 @@ function renderResumeOrdersList(){
 
 function resumeOrderFormFields(o){
   o = o || {};
-  const team = [...(S.admins || []), ...(S.managers || []), ...(S.recruiters || [])];
+  const team = (S.admins || []).filter(a => !a.deactivated_at);
   const teamOpts = [{value:'',label:'— Assign to —'}].concat(team.map(t => ({value:t.code, label:t.name})));
   const clientOpts = [{value:'',label:'— Pick existing client (optional) —'}].concat((S.clients || []).map(c => ({value:c.code, label:c.name})));
   return [
@@ -3397,7 +3419,7 @@ window.openEditResumeOrder = function(id){
 };
 
 window.deleteResumeOrder = async function(id){
-  if(!confirm('Delete this resume order?')) return;
+  if(!await confirmModal('Delete this resume order?', { title:'Delete order', okLabel:'Delete', danger:true })) return;
   try{
     const r = await rpc('fn_a_delete_resume_order', { p_id: id });
     if(r && r.ok){ resumeOrdersCache = null; toast('Order deleted', 'success'); renderShell(); }
