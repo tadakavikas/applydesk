@@ -166,6 +166,7 @@ textarea{resize:vertical;min-height:80px}
 /* Filter chips */
 .filter-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
 .filter-chip{padding:8px 16px;border-radius:100px;background:transparent;border:1.5px solid var(--bg-secondary);font-family:var(--font-heading);font-size:13px;font-weight:500;color:var(--text-body);cursor:pointer;transition:all .15s ease}
+.heat-cell:hover{transform:scale(1.25);box-shadow:var(--shadow-lg);z-index:5;position:relative}
 .filter-chip:hover{border-color:var(--color-primary);color:var(--color-primary)}
 .filter-chip.active{background:var(--color-primary);color:#fff;border-color:var(--color-primary)}
 
@@ -463,11 +464,17 @@ function svgRing(pct, opts){
   </div>`;
 }
 
-// Heatmap cell - single day status square
-function svgHeatCell(status){
-  const colors = { active: 'var(--color-success)', slow: 'var(--color-warning)', idle: 'var(--color-danger)', off: 'var(--bg-secondary)' };
-  const color = colors[status] || colors.off;
-  return `<div style="width:32px;height:32px;background:${color};border-radius:6px;flex-shrink:0"></div>`;
+// Heatmap cell - real count for a day, colored by intensity, zooms on hover
+function svgHeatCell(count, label){
+  count = count || 0;
+  let color;
+  if(count === 0) color = 'var(--bg-secondary)';
+  else if(count <= 5) color = 'rgba(45,183,130,0.35)';
+  else if(count <= 15) color = 'rgba(45,183,130,0.6)';
+  else if(count <= 30) color = 'var(--color-success)';
+  else color = 'var(--color-primary)';
+  const tip = label ? `${label}: ${count} app${count === 1 ? '' : 's'}` : `${count}`;
+  return `<div class="heat-cell" title="${esc(tip)}" style="width:40px;height:40px;background:${color};border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${count > 15 ? '#fff' : 'var(--text-muted)'};cursor:default;transition:transform .15s ease, box-shadow .15s ease">${count > 0 ? count : ''}</div>`;
 }
 
 // Generate sample sparkline data (upward trend with noise)
@@ -1125,14 +1132,36 @@ function renderAdminDashboard(){
     <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;font-weight:500">${timeAgo(a.at)}</div>
   </div>`).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No recent activity.</div>`;
 
-  // Recruiter Activity Heatmap - sample for now, real data would come from apps table
+  // Recruiter Activity Heatmap - REAL per-day application counts this week
   const heatmapDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
-  const recruiterRows = rs.filter(r => !r.deactivated_at).slice(0, 6).map(r => {
-    // Sample activity pattern - weekend low, weekdays high
-    const pattern = ['active','active','active','active','active','slow','off'];
-    return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;align-items:center;padding:8px 0">
+  // Build per-recruiter per-weekday counts from loaded applications (current week)
+  const weekCounts = {}; // { recruiterCode: [mon..sun] }
+  if(window._allAppsForHeatmap){
+    const now = new Date();
+    const dow = (now.getDay() + 6) % 7; // 0=Mon
+    const monday = new Date(now); monday.setDate(now.getDate() - dow); monday.setHours(0,0,0,0);
+    window._allAppsForHeatmap.forEach(a => {
+      const rc = a.recruiter_code || a.added_by;
+      if(!rc) return;
+      const d = new Date(a.created_at || a.applied_at);
+      if(isNaN(d.getTime()) || d < monday) return;
+      const idx = (d.getDay() + 6) % 7;
+      if(!weekCounts[rc]) weekCounts[rc] = [0,0,0,0,0,0,0];
+      weekCounts[rc][idx]++;
+    });
+  } else if(!window._loadingHeatmap){
+    window._loadingHeatmap = true;
+    rpc('fn_a_list_all_applications', {}).then(r => {
+      window._allAppsForHeatmap = (r && r.ok && Array.isArray(r.applications)) ? r.applications : [];
+      window._loadingHeatmap = false;
+      renderShell();
+    }).catch(() => { window._allAppsForHeatmap = []; window._loadingHeatmap = false; });
+  }
+  const recruiterRows = rs.filter(r => !r.deactivated_at).slice(0, 8).map(r => {
+    const counts = weekCounts[r.code] || [0,0,0,0,0,0,0];
+    return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:10px;align-items:center;padding:8px 0">
       <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span></div>
-      ${pattern.map(status => svgHeatCell(status)).join('')}
+      ${counts.map((c, i) => svgHeatCell(c, r.name + ' · ' + heatmapDays[i])).join('')}
     </div>`;
   }).join('');
 
@@ -2976,12 +3005,33 @@ function renderManagerDashboard(){
   const cs = (S.clients || []).filter(c => !c.deactivated_at);
   const rs = (S.recruiters || []).filter(r => !r.deactivated_at);
   const heatmapDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
-  const patterns = ['active','active','active','active','active','slow','off'];
+  const weekCounts = {};
+  if(window._allAppsForHeatmap){
+    const now = new Date();
+    const dow = (now.getDay() + 6) % 7;
+    const monday = new Date(now); monday.setDate(now.getDate() - dow); monday.setHours(0,0,0,0);
+    window._allAppsForHeatmap.forEach(a => {
+      const rc = a.recruiter_code || a.added_by;
+      if(!rc) return;
+      const d = new Date(a.created_at || a.applied_at);
+      if(isNaN(d.getTime()) || d < monday) return;
+      const idx = (d.getDay() + 6) % 7;
+      if(!weekCounts[rc]) weekCounts[rc] = [0,0,0,0,0,0,0];
+      weekCounts[rc][idx]++;
+    });
+  } else if(!window._loadingHeatmap){
+    window._loadingHeatmap = true;
+    rpc('fn_a_list_all_applications', {}).then(r => {
+      window._allAppsForHeatmap = (r && r.ok && Array.isArray(r.applications)) ? r.applications : [];
+      window._loadingHeatmap = false; renderShell();
+    }).catch(() => { window._allAppsForHeatmap = []; window._loadingHeatmap = false; });
+  }
 
-  const recruiterRows = rs.slice(0, 6).map(r => {
-    return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;align-items:center;padding:8px 0">
+  const recruiterRows = rs.slice(0, 8).map(r => {
+    const counts = weekCounts[r.code] || [0,0,0,0,0,0,0];
+    return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:10px;align-items:center;padding:8px 0">
       <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span></div>
-      ${patterns.map(status => svgHeatCell(status)).join('')}
+      ${counts.map((c, i) => svgHeatCell(c, r.name + ' · ' + heatmapDays[i])).join('')}
     </div>`;
   }).join('');
 
