@@ -208,10 +208,10 @@ nav{position:sticky;top:0;z-index:50;background:rgba(255,248,240,.9);backdrop-fi
 
 .responses{padding:20px 0 40px}
 .resp-marquee{overflow:hidden;position:relative;margin-top:18px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
-.resp-track{display:flex;gap:8px;width:max-content;animation:marquee-slide 40s linear infinite;will-change:transform;padding:6px 0}
+.resp-track{display:flex;gap:8px;width:max-content;animation:marquee-slide 18s linear infinite;will-change:transform;padding:6px 0}
 .resp-marquee:hover .resp-track{animation-play-state:paused}
 .resp-card{flex:0 0 auto;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#FFF1E6,#FFE7D0);border:1px solid rgba(255,107,71,.18);box-shadow:0 8px 24px rgba(255,107,71,.10);padding:6px}
-.resp-card img{display:block;height:260px;width:auto;max-width:none;object-fit:contain;border-radius:10px}
+.resp-card img{display:block;height:200px;width:auto;max-width:none;object-fit:contain;border-radius:10px}
 .resp-loading{color:var(--text-muted);font-family:var(--font-mono);font-size:13px;padding:40px 20px}
 </style>
 <style>
@@ -739,8 +739,10 @@ async function loadResponses(){
     if(!imgs.length){ const s=document.querySelector('.responses'); if(s) s.style.display='none'; return; }
     const base = SB_URL + '/storage/v1/object/public/response-screenshots/';
     const cards = imgs.map(f => `<div class="resp-card"><img src="${base}${encodeURIComponent(f.name)}" alt="Client response" loading="lazy"></div>`).join('');
-    // duplicate for a seamless marquee loop
-    track.innerHTML = cards + cards;
+    // repeat enough times to fill the strip and slide smoothly even with few images
+    let reps = cards; let count = imgs.length;
+    while(count < 8){ reps += cards; count += imgs.length; }
+    track.innerHTML = reps + reps;
   }catch(e){ const s=document.querySelector('.responses'); if(s) s.style.display='none'; }
 }
 loadResponses();
