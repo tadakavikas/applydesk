@@ -1738,6 +1738,31 @@ function renderClientDetailPage(){
   const c = (S.clients || []).find(x => x.code === code);
   if(!c) return `<div class="empty-state"><div class="empty-icon">❓</div><h3 class="empty-title">Client not found</h3><p class="empty-text">Code "${esc(code)}" doesn't match any client.</p><button class="btn primary" onclick="setView('clients')">← Back</button></div>`;
 
+  // Real pipeline metrics for THIS client (lazy-load their applications)
+  if(!window._detailApps || window._detailApps.code !== code){
+    if(!window._loadingDetailApps){
+      window._loadingDetailApps = true;
+      rpc('fn_a_list_all_applications', { p_client_code: code }).then(r => {
+        window._detailApps = { code: code, apps: (r && r.ok && Array.isArray(r.applications)) ? r.applications : [] };
+        window._loadingDetailApps = false;
+        renderShell();
+      }).catch(() => { window._detailApps = { code: code, apps: [] }; window._loadingDetailApps = false; });
+    }
+  }
+  const detailApps = (window._detailApps && window._detailApps.code === code) ? window._detailApps.apps : [];
+  const totalApps = detailApps.length;
+  const responseApps = detailApps.filter(a => {
+    const sj = Array.isArray(a.status_json) ? a.status_json : [];
+    return sj.some(s => { const st = (s.status||'').toLowerCase(); return st && st !== 'applied'; });
+  }).length;
+  const matchRate = totalApps ? Math.round(responseApps / totalApps * 100) : 0;
+  const wkBars = [0,0,0,0,0];
+  (function(){
+    const now = new Date(); const dow = (now.getDay()+6)%7;
+    const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
+    detailApps.forEach(a => { const d = new Date(a.applied_at || a.created_at); if(isNaN(d)||d<monday) return; const i=(d.getDay()+6)%7; if(i<5) wkBars[i]++; });
+  })();
+
   let daysLeft = null, nextDue = null;
   if(c.subscription_start_date){
     try{
