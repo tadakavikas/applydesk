@@ -1250,7 +1250,7 @@ function renderAdminDashboard(){
     window._allAppsForHeatmap.forEach(a => {
       const rc = a.recruiter_code || a.added_by;
       if(!rc) return;
-      const d = new Date(a.created_at || a.applied_at);
+      const d = new Date(a.applied_at || a.created_at);
       if(isNaN(d.getTime()) || d < monday) return;
       const idx = (d.getDay() + 6) % 7;
       if(!weekCounts[rc]) weekCounts[rc] = [0,0,0,0,0,0,0];
@@ -1579,7 +1579,7 @@ function renderClientsPage(){
           const rCode = a.recruiter_code || a.added_by;
           if(rCode){
             recCounts[rCode] = (recCounts[rCode] || 0) + 1;
-            const d = new Date(a.created_at || a.applied_at);
+            const d = new Date(a.applied_at || a.created_at);
             if(!isNaN(d) && d >= _mon){
               recWeek[rCode] = (recWeek[rCode]||0)+1;
               if(!recWeekBars[rCode]) recWeekBars[rCode] = [0,0,0,0,0,0,0];
@@ -1881,7 +1881,7 @@ function renderRecruitersPage(){
           const rCode = a.recruiter_code || a.added_by;
           if(rCode){
             recCounts[rCode] = (recCounts[rCode] || 0) + 1;
-            const d = new Date(a.created_at || a.applied_at);
+            const d = new Date(a.applied_at || a.created_at);
             if(!isNaN(d) && d >= _mon){
               recWeek[rCode] = (recWeek[rCode]||0)+1;
               if(!recWeekBars[rCode]) recWeekBars[rCode] = [0,0,0,0,0,0,0];
@@ -3425,7 +3425,7 @@ function renderManagerDashboard(){
     window._allAppsForHeatmap.forEach(a => {
       const rc = a.recruiter_code || a.added_by;
       if(!rc) return;
-      const d = new Date(a.created_at || a.applied_at);
+      const d = new Date(a.applied_at || a.created_at);
       if(isNaN(d.getTime()) || d < monday) return;
       const idx = (d.getDay() + 6) % 7;
       if(!weekCounts[rc]) weekCounts[rc] = [0,0,0,0,0,0,0];
