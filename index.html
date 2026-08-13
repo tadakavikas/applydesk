@@ -205,6 +205,14 @@ nav{position:sticky;top:0;z-index:50;background:rgba(255,248,240,.9);backdrop-fi
 .map-glow.gold{background:var(--color-warning);box-shadow:0 0 18px 6px rgba(255,197,61,.5)}
 .map-label{position:relative;font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.65)}
 .map-foot{position:absolute;left:30px;right:30px;bottom:24px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+
+.responses{padding:20px 0 40px}
+.resp-marquee{overflow:hidden;position:relative;margin-top:18px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.resp-track{display:flex;gap:8px;width:max-content;animation:marquee-slide 40s linear infinite;will-change:transform;padding:6px 0}
+.resp-marquee:hover .resp-track{animation-play-state:paused}
+.resp-card{flex:0 0 auto;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#FFF1E6,#FFE7D0);border:1px solid rgba(255,107,71,.18);box-shadow:0 8px 24px rgba(255,107,71,.10);padding:6px}
+.resp-card img{display:block;height:260px;width:auto;max-width:none;object-fit:contain;border-radius:10px}
+.resp-loading{color:var(--text-muted);font-family:var(--font-mono);font-size:13px;padding:40px 20px}
 </style>
 <style>
 /* ══════════ COMPARE ══════════ */
@@ -416,6 +424,18 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
       <span class="logo-pill" style="color:#1A1F2E">Uber</span>
       <span class="logo-pill" style="color:#0A66C2">LinkedIn</span>
       <span class="logo-pill" style="color:#FF4A00">Zapier</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CLIENT RESPONSES ══════════ -->
+<section class="responses">
+  <div class="logos-head wrap">
+    <span class="eyebrow">· Real responses our clients received ·</span>
+  </div>
+  <div class="resp-marquee">
+    <div class="resp-track" id="respTrack">
+      <div class="resp-loading">Loading responses...</div>
     </div>
   </div>
 </section>
@@ -703,6 +723,27 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
 // ══════════ SUPABASE WIRING (unchanged endpoints) ══════════
 const SB_URL='https://rofyegirmgqjhekuxjat.supabase.co';
 const SB_KEY='sb_publishable_4f6WR1sk2N9EUO2bU7dkyA_9TByUhTL';
+
+// ── Client response screenshots (public bucket: response-screenshots) ──
+async function loadResponses(){
+  const track = document.getElementById('respTrack');
+  if(!track) return;
+  try{
+    const res = await fetch(SB_URL + '/storage/v1/object/list/response-screenshots', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+SB_KEY },
+      body: JSON.stringify({ prefix:'', limit:100, sortBy:{ column:'created_at', order:'desc' } })
+    });
+    const files = await res.json();
+    const imgs = (Array.isArray(files)?files:[]).filter(f => f.name && /\.(png|jpe?g|webp|gif)$/i.test(f.name));
+    if(!imgs.length){ const s=document.querySelector('.responses'); if(s) s.style.display='none'; return; }
+    const base = SB_URL + '/storage/v1/object/public/response-screenshots/';
+    const cards = imgs.map(f => `<div class="resp-card"><img src="${base}${encodeURIComponent(f.name)}" alt="Client response" loading="lazy"></div>`).join('');
+    // duplicate for a seamless marquee loop
+    track.innerHTML = cards + cards;
+  }catch(e){ const s=document.querySelector('.responses'); if(s) s.style.display='none'; }
+}
+loadResponses();
 
 // ── Live public stats (fn_get_public_stats) ──
 let liveStats=null;

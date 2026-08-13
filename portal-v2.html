@@ -349,6 +349,12 @@ textarea{resize:vertical;min-height:80px}
 .sp-admin{font-size:12px;color:var(--text-body)}
 @media(max-width:900px){.fin-metric-grid{grid-template-columns:1fr}.sp-layout{grid-template-columns:1fr}.sp-card{grid-template-columns:1fr auto}}
 
+
+.resp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.resp-tile{position:relative;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#FFF1E6,#FFE7D0);border:1px solid rgba(255,107,71,.18);padding:8px}
+.resp-tile img{display:block;width:100%;height:280px;object-fit:contain;border-radius:8px;background:#fff}
+.resp-del{position:absolute;top:12px;right:12px;background:var(--bg-card);border:none;border-radius:8px;padding:6px 8px;cursor:pointer;font-size:14px;box-shadow:var(--shadow-sm)}
+.resp-del:hover{color:var(--color-danger)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -827,6 +833,7 @@ const NAV_ITEMS = {
     { key:'resume-orders', label:'Resume Orders', icon:'📋' },
     { key:'chats', label:'Chat', icon:'💬' },
     { key:'finance', label:'Finance', icon:'💰' },
+    { key:'responses', label:'Responses', icon:'🖼️' },
     { key:'notifications', label:'Notifications', icon:'🔔' },
     { key:'settings', label:'Settings', icon:'⚙️' }
   ],
@@ -893,7 +900,7 @@ function renderShell(){
       recruiters: renderRecruitersPage, managers: renderManagersPage, admins: renderAdminsPage,
       applications: renderApplicationsPage,
       'resume-orders': renderResumeOrdersPage,
-      chats: renderTeamChats, finance: renderFinancePage, notifications: renderNotificationsPage,
+      chats: renderTeamChats, finance: renderFinancePage, notifications: renderNotificationsPage, responses: renderResponsesPage,
       settings: renderSettingsPage
     },
     manager: {
@@ -2304,6 +2311,59 @@ async function loadNotifications(){
     else { notifList = []; notifUnread = 0; }
   }catch(e){ notifList = []; notifUnread = 0; }
 }
+
+/* ═══════ RESPONSES (admin: client response screenshots) ═══════ */
+const RESP_BUCKET = 'response-screenshots';
+let respCache = null;
+
+function renderResponsesPage(){
+  if(respCache === null && !window._loadingResp){
+    window._loadingResp = true;
+    sb.storage.from(RESP_BUCKET).list('', { limit:100, sortBy:{ column:'created_at', order:'desc' } })
+      .then(({ data, error }) => {
+        respCache = (!error && Array.isArray(data)) ? data.filter(x => x.name && /\.(png|jpe?g|webp|gif)$/i.test(x.name)) : [];
+        window._loadingResp = false; renderShell();
+      }).catch(() => { respCache = []; window._loadingResp = false; renderShell(); });
+    return `<div class="page-header"><h1 class="page-title">Client Responses</h1></div><div class="empty-state"><div class="empty-icon">\u23f3</div><h3 class="empty-title">Loading...</h3></div>`;
+  }
+  const imgs = respCache || [];
+  const base = SB_URL + '/storage/v1/object/public/' + RESP_BUCKET + '/';
+  const grid = imgs.length ? `<div class="resp-grid">${imgs.map(x => `
+    <div class="resp-tile">
+      <img src="${base}${encodeURIComponent(x.name)}" alt="response">
+      <button class="resp-del" onclick="deleteResponse('${esc(x.name).replace(/'/g,'')}')" title="Delete">\ud83d\uddd1</button>
+    </div>`).join('')}</div>` : `<div class="empty-state"><div class="empty-icon">\ud83d\uddbc\ufe0f</div><h3 class="empty-title">No screenshots yet</h3><p class="empty-text">Upload response screenshots to show on the landing page.</p></div>`;
+  return `<div class="page-header"><h1 class="page-title">Client Responses</h1><p class="page-subtitle">Upload response screenshots. They appear on the public landing page, sliding under the companies section.</p></div>
+    <div class="card" style="margin-bottom:20px">
+      <label class="btn primary" style="cursor:pointer">\u2795 Upload screenshot<input type="file" accept="image/*" multiple style="display:none" onchange="uploadResponses(this.files)"></label>
+      <span id="resp-status" style="margin-left:12px;font-size:13px;color:var(--text-muted)"></span>
+    </div>
+    ${grid}`;
+}
+window.uploadResponses = async function(files){
+  if(!files || !files.length) return;
+  const st = document.getElementById('resp-status');
+  let done = 0, fail = 0;
+  for(const file of files){
+    const ext = (file.name.split('.').pop()||'png').toLowerCase();
+    const key = 'resp_' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.' + ext;
+    try{
+      const { error } = await sb.storage.from(RESP_BUCKET).upload(key, file, { contentType: file.type, upsert:false });
+      if(error) fail++; else done++;
+      if(st) st.textContent = `Uploaded ${done}${fail?', '+fail+' failed':''}...`;
+    }catch(e){ fail++; }
+  }
+  toast(`Uploaded ${done} screenshot${done===1?'':'s'}${fail?', '+fail+' failed':''}`, fail?'error':'success');
+  respCache = null; renderShell();
+};
+window.deleteResponse = async function(name){
+  if(!await confirmModal('Delete this screenshot? It will be removed from the landing page too.', { title:'Delete screenshot?', okLabel:'Delete' })) return;
+  try{
+    const { error } = await sb.storage.from(RESP_BUCKET).remove([name]);
+    if(error){ toast('Delete failed: '+error.message, 'error'); return; }
+    toast('Deleted', 'success'); respCache = null; renderShell();
+  }catch(e){ toast('Delete failed: '+e.message, 'error'); }
+};
 
 function renderNotificationsPage(){
   if(notifList === null){
