@@ -1247,12 +1247,15 @@ function renderAdminDashboard(){
     const now = new Date();
     const dow = (now.getDay() + 6) % 7; // 0=Mon
     const monday = new Date(now); monday.setDate(now.getDate() - dow); monday.setHours(0,0,0,0);
+    const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
+    const todayIdx = dow;
     window._allAppsForHeatmap.forEach(a => {
       const rc = a.recruiter_code || a.added_by;
       if(!rc) return;
       const d = new Date(a.applied_at || a.created_at);
-      if(isNaN(d.getTime()) || d < monday) return;
+      if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
       const idx = (d.getDay() + 6) % 7;
+      if(idx > todayIdx) return;
       if(!weekCounts[rc]) weekCounts[rc] = [0,0,0,0,0,0,0];
       weekCounts[rc][idx]++;
     });
@@ -3422,12 +3425,15 @@ function renderManagerDashboard(){
     const now = new Date();
     const dow = (now.getDay() + 6) % 7;
     const monday = new Date(now); monday.setDate(now.getDate() - dow); monday.setHours(0,0,0,0);
+    const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
+    const todayIdx = dow;
     window._allAppsForHeatmap.forEach(a => {
       const rc = a.recruiter_code || a.added_by;
       if(!rc) return;
       const d = new Date(a.applied_at || a.created_at);
-      if(isNaN(d.getTime()) || d < monday) return;
+      if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
       const idx = (d.getDay() + 6) % 7;
+      if(idx > todayIdx) return;
       if(!weekCounts[rc]) weekCounts[rc] = [0,0,0,0,0,0,0];
       weekCounts[rc][idx]++;
     });
