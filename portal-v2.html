@@ -1259,7 +1259,7 @@ function renderAdminDashboard(){
     window._allAppsForHeatmap.forEach(a => {
       const rc = a.recruiter_code || a.added_by;
       if(!rc) return;
-      const d = new Date(a.applied_at || a.created_at);
+      const d = new Date(a.date || a.application_date || a.applied_at || a.created_at);
       if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
       const idx = (d.getDay() + 6) % 7;
       if(idx > todayIdx) return;
@@ -1589,7 +1589,7 @@ function renderClientsPage(){
           const rCode = a.recruiter_code || a.added_by;
           if(rCode){
             recCounts[rCode] = (recCounts[rCode] || 0) + 1;
-            const d = new Date(a.applied_at || a.created_at);
+            const d = new Date(a.date || a.application_date || a.applied_at || a.created_at);
             if(!isNaN(d) && d >= _mon){
               recWeek[rCode] = (recWeek[rCode]||0)+1;
               if(!recWeekBars[rCode]) recWeekBars[rCode] = [0,0,0,0,0,0,0];
@@ -1768,7 +1768,7 @@ function renderClientDetailPage(){
     const now = new Date(); const dow = (now.getDay()+6)%7;
     const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
     const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
-    detailApps.forEach(a => { const d = new Date(a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
+    detailApps.forEach(a => { const d = new Date(a.date || a.application_date || a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
   })();
 
   let daysLeft = null, nextDue = null;
@@ -1917,7 +1917,7 @@ function renderRecruitersPage(){
           const rCode = a.recruiter_code || a.added_by;
           if(rCode){
             recCounts[rCode] = (recCounts[rCode] || 0) + 1;
-            const d = new Date(a.applied_at || a.created_at);
+            const d = new Date(a.date || a.application_date || a.applied_at || a.created_at);
             if(!isNaN(d) && d >= _mon){
               recWeek[rCode] = (recWeek[rCode]||0)+1;
               if(!recWeekBars[rCode]) recWeekBars[rCode] = [0,0,0,0,0,0,0];
@@ -3528,7 +3528,7 @@ function renderManagerDashboard(){
     window._allAppsForHeatmap.forEach(a => {
       const rc = a.recruiter_code || a.added_by;
       if(!rc) return;
-      const d = new Date(a.applied_at || a.created_at);
+      const d = new Date(a.date || a.application_date || a.applied_at || a.created_at);
       if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
       const idx = (d.getDay() + 6) % 7;
       if(idx > todayIdx) return;
@@ -3774,7 +3774,7 @@ function renderClientDashboard(){
     const now = new Date(); const dow = (now.getDay()+6)%7;
     const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
     const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
-    myApps.forEach(a => { const d = new Date(a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
+    myApps.forEach(a => { const d = new Date(a.date || a.application_date || a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
   })();
   // Simple profile completeness calc
   const fields = ['name', 'email', 'phone', 'target_role', 'years_experience', 'sponsorship_status', 'base_resume_url'];
