@@ -3948,7 +3948,7 @@ window.openAppDetail = async function(recordId){
       <div style="max-height:280px;overflow-y:auto">${statusRows}</div>
     </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px">
-      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Recruiter called me</option><option>Vendor emailed</option><option>Phone screen scheduled</option><option>Technical interview scheduled</option><option>Onsite scheduled</option><option>Rejected</option><option>Offer received</option><option>Accepted offer</option><option>Withdrew</option><option>Follow-up sent</option></select></div>
+      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Call</option><option>Screening call</option><option>Screening</option><option>Assessment</option><option>Interview</option><option>Rejected</option><option>Offer received</option><option>Accepted offer</option><option>Withdrew</option><option>Follow-up sent</option></select></div>
       <div class="field"><textarea id="apd-note" placeholder="Notes (e.g. 'Recruiter said next round is Tuesday at 3pm')" rows="2"></textarea></div>
       <div class="field"><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Screenshot of email/message (optional)</label><input id="apd-screenshot-file" type="file" accept="image/*" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
     </div>
@@ -4644,14 +4644,14 @@ function renderApplicationsPage(){
   }
   if(allAppsCache === 'loading') return `<div class="empty-state"><div class="empty-icon">⏳</div><h3 class="empty-title">Loading...</h3></div>`;
 
-  // Filter apps by latest status client-side (filterSource is actually status now)
+  // Filter apps by status - matches ANY status in the history (not just latest)
   let apps = allAppsCache || [];
   if(filterSource){
+    const fs = filterSource.toLowerCase();
     apps = apps.filter(a => {
       const statuses = Array.isArray(a.status_json) ? a.status_json : [];
-      const latest = statuses.length ? statuses[statuses.length - 1] : null;
-      const statusLabel = latest ? latest.status : 'Applied';
-      return statusLabel === filterSource;
+      if(!statuses.length) return fs === 'applied';
+      return statuses.some(s => (s.status||'').toLowerCase() === fs);
     });
   }
   const appQ = (viewState.appSearch || '').trim().toLowerCase();
@@ -4665,7 +4665,7 @@ function renderApplicationsPage(){
     });
   }
   const clientOptions = (S.clients || []).map(c => `<option value="${esc(c.code)}" ${filterClient === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-  const statusOptions = ['Applied','Recruiter called me','Vendor emailed','Phone screen scheduled','Technical interview scheduled','Onsite scheduled','Rejected','Offer received','Accepted offer','Withdrew'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
+  const statusOptions = ['Applied','Call','Screening','Screening call','Assessment','Interview','Rejected','Offer received','Accepted offer','Withdrew'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
 
   // Stats
   const totalApps = apps.length;
