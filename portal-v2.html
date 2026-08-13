@@ -1767,7 +1767,8 @@ function renderClientDetailPage(){
   (function(){
     const now = new Date(); const dow = (now.getDay()+6)%7;
     const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
-    detailApps.forEach(a => { const d = new Date(a.applied_at || a.created_at); if(isNaN(d)||d<monday) return; const i=(d.getDay()+6)%7; if(i<5) wkBars[i]++; });
+    const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
+    detailApps.forEach(a => { const d = new Date(a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
   })();
 
   let daysLeft = null, nextDue = null;
@@ -3772,7 +3773,8 @@ function renderClientDashboard(){
   (function(){
     const now = new Date(); const dow = (now.getDay()+6)%7;
     const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
-    myApps.forEach(a => { const d = new Date(a.applied_at || a.created_at); if(isNaN(d)||d<monday) return; const i=(d.getDay()+6)%7; if(i<5) wkBars[i]++; });
+    const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
+    myApps.forEach(a => { const d = new Date(a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
   })();
   // Simple profile completeness calc
   const fields = ['name', 'email', 'phone', 'target_role', 'years_experience', 'sponsorship_status', 'base_resume_url'];
