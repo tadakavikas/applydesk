@@ -535,12 +535,14 @@ function svgBarChart(values, opts){
   const max = Math.max.apply(null, values.concat([1]));
   return `<svg width="${w}" height="${h}" style="display:block;overflow:visible">
     ${values.map((v, i) => {
-      const barH = Math.max(2, (v / max) * (h - 2*pad - 14));
       const x = pad + i*(barW + gap);
+      const labelTxt = `<text x="${(x + barW/2).toFixed(1)}" y="${h - 2}" text-anchor="middle" font-size="10" font-family="var(--font-heading)" font-weight="600" fill="var(--text-muted)">${esc(labels[i] || '')}</text>`;
+      if(!v || v <= 0) return labelTxt; // empty day: label only, no bar
+      const barH = Math.max(2, (v / max) * (h - 2*pad - 14));
       const y = h - pad - barH - 14;
       const color = colors[i % colors.length];
       return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="${color}"/>
-      <text x="${(x + barW/2).toFixed(1)}" y="${h - 2}" text-anchor="middle" font-size="10" font-family="var(--font-heading)" font-weight="600" fill="var(--text-muted)">${esc(labels[i] || '')}</text>`;
+      ${labelTxt}`;
     }).join('')}
   </svg>`;
 }
