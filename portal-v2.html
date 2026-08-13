@@ -1813,12 +1813,12 @@ function renderClientDetailPage(){
         <div class="card-title">Weekly Pipeline Telemetry</div>
         <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
           <div style="flex:1;min-width:200px">
-            ${svgBarChart(sampleSparkline(5, 20, 3), { width: 260, height: 100, labels: ['M','T','W','T','F'], colors: ['var(--color-primary)','var(--color-primary)','var(--color-danger)','var(--color-primary)','var(--color-primary)'] })}
+            ${svgBarChart(wkBars, { width: 260, height: 100, labels: ['M','T','W','T','F'], colors: ['var(--color-primary)','var(--color-primary)','var(--color-primary)','var(--color-primary)','var(--color-primary)'] })}
           </div>
           <div style="display:flex;gap:24px;flex-wrap:wrap">
-            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--text-heading);line-height:1">${Math.round(Math.random() * 100 + 100)}</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Applications</div></div>
-            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-danger);line-height:1">12</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Responses</div></div>
-            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-success);line-height:1">60%</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Match rate</div></div>
+            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--text-heading);line-height:1">${totalApps}</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Applications</div></div>
+            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-danger);line-height:1">${responseApps}</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Responses</div></div>
+            <div><div style="font-family:var(--font-display);font-weight:800;font-size:24px;color:var(--color-success);line-height:1">${matchRate}%</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-top:4px">Response rate</div></div>
           </div>
         </div>
       </div>
@@ -3653,6 +3653,30 @@ function renderRecruiterDashboard(){
 
 function renderClientDashboard(){
   const me = (S.me) || (S.clients || []).find(c => c.code === session.code) || {};
+
+  // Real pipeline metrics from the client's own applications (scoped server-side)
+  if(!window._clientApps && !window._loadingClientApps){
+    window._loadingClientApps = true;
+    rpc('fn_a_list_all_applications', {}).then(r => {
+      window._clientApps = (r && r.ok && Array.isArray(r.applications)) ? r.applications : [];
+      window._loadingClientApps = false;
+      renderShell();
+    }).catch(() => { window._clientApps = []; window._loadingClientApps = false; });
+  }
+  const myApps = window._clientApps || [];
+  const totalApps = myApps.length;
+  const responseApps = myApps.filter(a => {
+    const sj = Array.isArray(a.status_json) ? a.status_json : [];
+    return sj.some(s => { const st = (s.status||'').toLowerCase(); return st && st !== 'applied'; });
+  }).length;
+  const matchRate = totalApps ? Math.round(responseApps / totalApps * 100) : 0;
+  // last 5 weekdays app counts (Mon-Fri of this week) from real dates
+  const wkBars = [0,0,0,0,0];
+  (function(){
+    const now = new Date(); const dow = (now.getDay()+6)%7;
+    const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
+    myApps.forEach(a => { const d = new Date(a.applied_at || a.created_at); if(isNaN(d)||d<monday) return; const i=(d.getDay()+6)%7; if(i<5) wkBars[i]++; });
+  })();
   // Simple profile completeness calc
   const fields = ['name', 'email', 'phone', 'target_role', 'years_experience', 'sponsorship_status', 'base_resume_url'];
   const filled = fields.filter(f => me[f]).length;
