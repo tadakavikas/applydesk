@@ -3078,6 +3078,7 @@ window.deleteResumePay = async function(id){
     else toast('Failed: '+((r&&r.err)||'unknown'),'error');
   }catch(e){ toast('Failed: '+e.message,'error'); }
 };
+let finClientList = null;
 function loadClientList(){
   if(finClientList) return Promise.resolve(finClientList);
   return rpc('fn_a_client_pulse', {}).then(r => { finClientList = (r&&r.ok)?(r.clients||[]).map(c=>({code:c.code,name:c.name})):[]; return finClientList; }).catch(()=>[]);
