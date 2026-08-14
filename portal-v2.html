@@ -408,6 +408,15 @@ let viewState = {}; // per-view local state (selected lead, filter, etc)
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Parse a date value as LOCAL time (avoids 'YYYY-MM-DD' being read as UTC and shifting a day back)
+function localDate(v){
+  if(!v) return new Date(NaN);
+  if(v instanceof Date) return v;
+  var s = String(v);
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  return new Date(s);
+}
 const today = () => new Date().toISOString().slice(0,10);
 const fmt = d => { if(!d) return ''; try{ return new Date(d+'T00:00:00').toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}); }catch(e){ return d; } };
 // Viewer-local date+time. Auto-detects the viewer's timezone and locale.
@@ -1261,7 +1270,7 @@ function renderAdminDashboard(){
     window._allAppsForHeatmap.forEach(a => {
       const rc = a.recruiter_code || a.added_by;
       if(!rc) return;
-      const d = new Date(a.date || a.application_date || a.applied_at || a.created_at);
+      const d = localDate(a.date || a.application_date || a.applied_at || a.created_at);
       if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
       const idx = (d.getDay() + 6) % 7;
       if(idx > todayIdx) return;
@@ -1591,7 +1600,7 @@ function renderClientsPage(){
           const rCode = a.recruiter_code || a.added_by;
           if(rCode){
             recCounts[rCode] = (recCounts[rCode] || 0) + 1;
-            const d = new Date(a.date || a.application_date || a.applied_at || a.created_at);
+            const d = localDate(a.date || a.application_date || a.applied_at || a.created_at);
             if(!isNaN(d) && d >= _mon){
               recWeek[rCode] = (recWeek[rCode]||0)+1;
               if(!recWeekBars[rCode]) recWeekBars[rCode] = [0,0,0,0,0,0,0];
@@ -1770,7 +1779,7 @@ function renderClientDetailPage(){
     const now = new Date(); const dow = (now.getDay()+6)%7;
     const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
     const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
-    detailApps.forEach(a => { const d = new Date(a.date || a.application_date || a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
+    detailApps.forEach(a => { const d = localDate(a.date || a.application_date || a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
   })();
 
   let daysLeft = null, nextDue = null;
@@ -1919,7 +1928,7 @@ function renderRecruitersPage(){
           const rCode = a.recruiter_code || a.added_by;
           if(rCode){
             recCounts[rCode] = (recCounts[rCode] || 0) + 1;
-            const d = new Date(a.date || a.application_date || a.applied_at || a.created_at);
+            const d = localDate(a.date || a.application_date || a.applied_at || a.created_at);
             if(!isNaN(d) && d >= _mon){
               recWeek[rCode] = (recWeek[rCode]||0)+1;
               if(!recWeekBars[rCode]) recWeekBars[rCode] = [0,0,0,0,0,0,0];
@@ -3530,7 +3539,7 @@ function renderManagerDashboard(){
     window._allAppsForHeatmap.forEach(a => {
       const rc = a.recruiter_code || a.added_by;
       if(!rc) return;
-      const d = new Date(a.date || a.application_date || a.applied_at || a.created_at);
+      const d = localDate(a.date || a.application_date || a.applied_at || a.created_at);
       if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
       const idx = (d.getDay() + 6) % 7;
       if(idx > todayIdx) return;
@@ -3770,13 +3779,14 @@ function renderClientDashboard(){
     return sj.some(s => { const st = (s.status||'').toLowerCase(); return st && st !== 'applied'; });
   }).length;
   const matchRate = totalApps ? Math.round(responseApps / totalApps * 100) : 0;
-  // last 5 weekdays app counts (Mon-Fri of this week) from real dates
+  // real weekday app counts. wkBars = Mon-Fri (5), wkBars7 = Mon-Sun (7), both capped at today
   const wkBars = [0,0,0,0,0];
+  const wkBars7 = [0,0,0,0,0,0,0];
   (function(){
     const now = new Date(); const dow = (now.getDay()+6)%7;
     const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
     const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
-    myApps.forEach(a => { const d = new Date(a.date || a.application_date || a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<5 && i<=dow) wkBars[i]++; });
+    myApps.forEach(a => { const d = localDate(a.date || a.application_date || a.applied_at || a.created_at); if(isNaN(d)||d<monday||d>todayEnd) return; const i=(d.getDay()+6)%7; if(i<=dow){ wkBars7[i]++; if(i<5) wkBars[i]++; } });
   })();
   // Simple profile completeness calc
   const fields = ['name', 'email', 'phone', 'target_role', 'years_experience', 'sponsorship_status', 'base_resume_url'];
@@ -3826,7 +3836,7 @@ function renderClientDashboard(){
         <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Weekly Transmission Flow</div>
         <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-success);font-weight:600"><span style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></span> Live monitor</div>
       </div>
-      ${svgBarChart(sampleSparkline(7, 15, 2), { width: 400, height: 130, labels: ['M','T','W','T','F','S','S'], colors: ['var(--color-primary)','var(--color-primary)','var(--color-danger)','var(--color-primary)','var(--color-primary)','var(--bg-secondary)','var(--bg-secondary)'] })}
+      ${svgBarChart(wkBars7, { width: 400, height: 130, labels: ['M','T','W','T','F','S','S'], colors: ['var(--color-primary)','var(--color-primary)','var(--color-primary)','var(--color-primary)','var(--color-primary)','var(--color-primary)','var(--color-primary)'] })}
     </div>
   </div>
   <div class="card" style="margin-bottom:20px"><div class="card-title">Your subscription <button class="btn ghost sm" onclick="openPayModal()">💳 Renew / pay</button></div><dl class="detail-grid">${me.subscription_amount ? `<dt>Amount</dt><dd><b>${money(me.subscription_amount, me.subscription_currency)}</b>/month</dd>` : ''}${me.subscription_start_date ? `<dt>Started</dt><dd>${fmt(me.subscription_start_date)}</dd>` : ''}<dt>Status</dt><dd><span class="tag success">Active</span></dd></dl></div>
