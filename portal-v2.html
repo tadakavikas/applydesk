@@ -1637,6 +1637,7 @@ function renderClientsPage(){
       <td style="padding:14px 12px;font-size:12px">${c.email ? esc(c.email) : '—'}</td>
       <td style="padding:14px 12px;font-size:12px">${c.target_role ? esc(c.target_role) : '—'}</td>
       <td style="padding:14px 12px;font-size:12px">${c.location ? esc(c.location) : '—'}</td>
+      <td style="padding:14px 12px;font-size:12px">${(function(){ const rec=(S.recruiters||[]).find(r=>r.assigned&&r.assigned.includes(c.code)); return rec?esc(rec.name):'<span style="color:var(--text-muted)">Unassigned</span>'; })()}</td>
       <td style="padding:14px 12px;font-size:12px">${c.years_experience != null ? esc(c.years_experience) + 'y' : '—'}</td>
       <td style="padding:14px 12px;font-size:12px">${c.sponsorship_status ? `<span class="tag teal" style="font-size:9px">${esc(c.sponsorship_status)}</span>` : '—'}</td>
       <td style="padding:14px 12px">${isRealResume ? `<button class="btn ghost sm" onclick="event.stopPropagation();openStoredFile('${esc(resumeVal).replace(/'/g,'')}')">📄</button>` : '<span style="font-size:11px;color:var(--text-muted)">—</span>'}</td>
@@ -1651,6 +1652,7 @@ function renderClientsPage(){
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Email</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Target role</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Location</th>
+      <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Recruiter</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Exp</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Visa</th>
       <th style="padding:4px 12px;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Resume</th>
