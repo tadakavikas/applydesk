@@ -27,3 +27,4 @@ build/
 *.key
 secrets.json
 supabase-service-key.txt
+portal-backup-before-finance.html
