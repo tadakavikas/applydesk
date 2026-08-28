@@ -839,6 +839,7 @@ const NAV_ITEMS = {
     { key:'leads', label:'Leads', icon:'🔥' },
     { key:'clients', label:'Clients', icon:'👥' },
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
+    { key:'managers', label:'Managers', icon:'🧭' },
     { key:'admins', label:'Admins', icon:'👑' },
     { key:'applications', label:'Applications', icon:'📄' },
     { key:'resume-orders', label:'Resume Orders', icon:'📋' },
@@ -1982,8 +1983,10 @@ function renderRecruitersPage(){
       try{
         const now = new Date();
         const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-        const cycleThisMonth = new Date(y, m, Math.min(r.payroll_cycle_day, 28));
-        const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, m + 1, Math.min(r.payroll_cycle_day, 28));
+        const daysInThisMonth = new Date(y, m + 1, 0).getDate();
+        const daysInNextMonth = new Date(y, m + 2, 0).getDate();
+        const cycleThisMonth = new Date(y, m, Math.min(r.payroll_cycle_day, daysInThisMonth));
+        const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, m + 1, Math.min(r.payroll_cycle_day, daysInNextMonth));
         daysLeft = Math.floor((nextCycle - now) / 86400000);
       }catch(e){}
     }
@@ -2084,8 +2087,10 @@ function renderRecruiterDetailPage(){
     try{
       const now = new Date();
       const y = now.getFullYear(), m = now.getMonth();
-      const cycleThisMonth = new Date(y, m, Math.min(r.payroll_cycle_day, 28));
-      const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, m + 1, Math.min(r.payroll_cycle_day, 28));
+      const daysInThisMonth = new Date(y, m + 1, 0).getDate();
+      const daysInNextMonth = new Date(y, m + 2, 0).getDate();
+      const cycleThisMonth = new Date(y, m, Math.min(r.payroll_cycle_day, daysInThisMonth));
+      const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, m + 1, Math.min(r.payroll_cycle_day, daysInNextMonth));
       daysLeft = Math.floor((nextCycle - now) / 86400000);
       nextDue = nextCycle.toISOString().slice(0, 10);
     }catch(e){}
@@ -2173,8 +2178,10 @@ function renderManagersPage(){
       try{
         const now = new Date();
         const y = now.getFullYear(), mo = now.getMonth();
-        const cycleThisMonth = new Date(y, mo, Math.min(m.payroll_cycle_day, 28));
-        const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(m.payroll_cycle_day, 28));
+        const daysInThisMonth = new Date(y, mo + 1, 0).getDate();
+        const daysInNextMonth = new Date(y, mo + 2, 0).getDate();
+        const cycleThisMonth = new Date(y, mo, Math.min(m.payroll_cycle_day, daysInThisMonth));
+        const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(m.payroll_cycle_day, daysInNextMonth));
         daysLeft = Math.floor((nextCycle - now) / 86400000);
       }catch(e){}
     }
@@ -3700,8 +3707,10 @@ function renderRecruiterDashboard(){
     try{
       const now = new Date();
       const y = now.getFullYear(), mo = now.getMonth();
-      const cycleThisMonth = new Date(y, mo, Math.min(me.payroll_cycle_day, 28));
-      nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(me.payroll_cycle_day, 28));
+      const daysInThisMonth = new Date(y, mo + 1, 0).getDate();
+      const daysInNextMonth = new Date(y, mo + 2, 0).getDate();
+      const cycleThisMonth = new Date(y, mo, Math.min(me.payroll_cycle_day, daysInThisMonth));
+      nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(me.payroll_cycle_day, daysInNextMonth));
       daysLeft = Math.floor((nextCycle - now) / 86400000);
     }catch(e){}
   }
