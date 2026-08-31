@@ -1257,10 +1257,10 @@ function renderAdminDashboard(){
     <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;font-weight:500">${timeAgo(a.at)}</div>
   </div>`).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No recent activity.</div>`;
 
-  // Recruiter Activity Heatmap - REAL per-day application counts this week
+  // Two client heatmaps: applications received + reachouts, per client per weekday this week
   const heatmapDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
-  // Build per-recruiter per-weekday counts from loaded applications (current week)
-  const weekCounts = {}; // { recruiterCode: [mon..sun] }
+  const appCounts = {};    // { clientCode: [mon..sun] } - applications
+  const reachCounts = {};  // { clientCode: [mon..sun] } - reachouts
   if(window._allAppsForHeatmap){
     const now = new Date();
     const dow = (now.getDay() + 6) % 7; // 0=Mon
@@ -1268,14 +1268,16 @@ function renderAdminDashboard(){
     const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
     const todayIdx = dow;
     window._allAppsForHeatmap.forEach(a => {
-      const rc = a.recruiter_code || a.added_by;
-      if(!rc) return;
+      const cc = a.client_code;
+      if(!cc) return;
       const d = localDate(a.date || a.application_date || a.applied_at || a.created_at);
       if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
       const idx = (d.getDay() + 6) % 7;
       if(idx > todayIdx) return;
-      if(!weekCounts[rc]) weekCounts[rc] = [0,0,0,0,0,0,0];
-      weekCounts[rc][idx]++;
+      const isReach = (a.source === 'reachout' || a.type === 'reachout');
+      const bucket = isReach ? reachCounts : appCounts;
+      if(!bucket[cc]) bucket[cc] = [0,0,0,0,0,0,0];
+      bucket[cc][idx]++;
     });
   } else if(!window._loadingHeatmap){
     window._loadingHeatmap = true;
@@ -1285,13 +1287,19 @@ function renderAdminDashboard(){
       renderShell();
     }).catch(() => { window._allAppsForHeatmap = []; window._loadingHeatmap = false; });
   }
-  const recruiterRows = rs.filter(r => !r.deactivated_at).slice(0, 8).map(r => {
-    const counts = weekCounts[r.code] || [0,0,0,0,0,0,0];
-    return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:10px;align-items:center;padding:8px 0">
-      <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span></div>
-      ${counts.map((c, i) => svgHeatCell(c, r.name + ' · ' + heatmapDays[i])).join('')}
+  const clientName = (code) => { const c = (S.clients||[]).find(x => x.code === code); return c ? c.name : code; };
+  const heatRows = (bucket) => {
+    const codes = Object.keys(bucket).sort((a,b) => clientName(a).localeCompare(clientName(b)));
+    if(!codes.length) return `<div style="padding:16px;color:var(--text-muted);font-size:13px">No activity yet this week.</div>`;
+    return codes.slice(0,12).map(cc => {
+      const counts = bucket[cc] || [0,0,0,0,0,0,0];
+      return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:10px;align-items:center;padding:8px 0">
+      <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(clientName(cc))}</span></div>
+      ${counts.map((c, i) => svgHeatCell(c, clientName(cc) + ' · ' + heatmapDays[i])).join('')}
     </div>`;
-  }).join('');
+    }).join('');
+  };
+  const recruiterRows = heatRows(appCounts); // reused name below for the applications heatmap
 
   return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:16px">
     <div>
@@ -1369,22 +1377,28 @@ function renderAdminDashboard(){
   </div>
 
   <!-- Third row: Recruiter Activity Heatmap -->
-  ${recruiterRows ? `<div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Recruiter Activity Heatmap (Current Week)</div>
-      <div style="display:flex;gap:12px;font-size:11px">
+  ${(function(){
+    const legend = `<div style="display:flex;gap:12px;font-size:11px">
         <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-success);border-radius:2px"></span> Active</span>
         <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-warning);border-radius:2px"></span> Slow</span>
         <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-danger);border-radius:2px"></span> Idle</span>
         <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--bg-secondary);border-radius:2px"></span> Off</span>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;padding-bottom:8px;border-bottom:1px solid var(--bg-secondary);margin-bottom:8px">
-      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">Recruiter Profile</div>
+      </div>`;
+    const dayHeader = (label) => `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;padding-bottom:8px;border-bottom:1px solid var(--bg-secondary);margin-bottom:8px">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">${label}</div>
       ${heatmapDays.map(d => `<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;text-align:left">${d}</div>`).join('')}
-    </div>
-    ${recruiterRows}
-  </div>` : ''}`;
+    </div>`;
+    const heatCard = (title, rowsHtml) => `<div class="card" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">${title}</div>
+        ${legend}
+      </div>
+      ${dayHeader('Client')}
+      ${rowsHtml}
+    </div>`;
+    return heatCard('Client Applications Heatmap (Current Week)', heatRows(appCounts))
+         + heatCard('Client Reach-outs Heatmap (Current Week)', heatRows(reachCounts));
+  })()}`;
 }
 
 window.openClientDetail = function(code){
