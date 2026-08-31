@@ -313,7 +313,7 @@ textarea{resize:vertical;min-height:80px}
 /* client payment cards */
 .cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
 .cp-card{border:1px solid var(--bg-secondary);border-radius:var(--radius-lg);padding:16px 18px;background:var(--bg-card);display:flex;flex-direction:column}
-.cp-card.cp-due{border-color:var(--color-primary)}
+.cp-card.cp-due{border-color:var(--bg-secondary);box-shadow:inset 3px 0 0 var(--color-primary)}
 .cp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;min-height:42px}
 .cp-ident{display:flex;gap:10px;align-items:flex-start}
 .cp-ident>div{display:flex;flex-direction:column;justify-content:center}
@@ -839,7 +839,6 @@ const NAV_ITEMS = {
     { key:'leads', label:'Leads', icon:'🔥' },
     { key:'clients', label:'Clients', icon:'👥' },
     { key:'recruiters', label:'Recruiters', icon:'🎯' },
-    { key:'managers', label:'Managers', icon:'🧭' },
     { key:'admins', label:'Admins', icon:'👑' },
     { key:'applications', label:'Applications', icon:'📄' },
     { key:'resume-orders', label:'Resume Orders', icon:'📋' },
@@ -1258,11 +1257,10 @@ function renderAdminDashboard(){
     <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;font-weight:500">${timeAgo(a.at)}</div>
   </div>`).join('') || `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">No recent activity.</div>`;
 
-  // Client Heatmaps - REAL per-day counts this week, split by client and by app type
+  // Recruiter Activity Heatmap - REAL per-day application counts this week
   const heatmapDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
-  // Build per-client per-weekday counts from loaded applications (current week), split into applications vs reachouts
-  const clientAppCounts = {};   // { clientCode: [mon..sun] } - source === 'application' (or blank/default)
-  const clientReachCounts = {}; // { clientCode: [mon..sun] } - source === 'reachout'
+  // Build per-recruiter per-weekday counts from loaded applications (current week)
+  const weekCounts = {}; // { recruiterCode: [mon..sun] }
   if(window._allAppsForHeatmap){
     const now = new Date();
     const dow = (now.getDay() + 6) % 7; // 0=Mon
@@ -1270,15 +1268,14 @@ function renderAdminDashboard(){
     const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
     const todayIdx = dow;
     window._allAppsForHeatmap.forEach(a => {
-      const cc = a.client_code;
-      if(!cc) return;
+      const rc = a.recruiter_code || a.added_by;
+      if(!rc) return;
       const d = localDate(a.date || a.application_date || a.applied_at || a.created_at);
       if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
       const idx = (d.getDay() + 6) % 7;
       if(idx > todayIdx) return;
-      const bucket = (a.source === 'reachout') ? clientReachCounts : clientAppCounts;
-      if(!bucket[cc]) bucket[cc] = [0,0,0,0,0,0,0];
-      bucket[cc][idx]++;
+      if(!weekCounts[rc]) weekCounts[rc] = [0,0,0,0,0,0,0];
+      weekCounts[rc][idx]++;
     });
   } else if(!window._loadingHeatmap){
     window._loadingHeatmap = true;
@@ -1288,19 +1285,11 @@ function renderAdminDashboard(){
       renderShell();
     }).catch(() => { window._allAppsForHeatmap = []; window._loadingHeatmap = false; });
   }
-  const activeClientsForHeatmap = cs.filter(c => !c.deactivated_at).slice(0, 8);
-  const clientAppRows = activeClientsForHeatmap.map(c => {
-    const counts = clientAppCounts[c.code] || [0,0,0,0,0,0,0];
+  const recruiterRows = rs.filter(r => !r.deactivated_at).slice(0, 8).map(r => {
+    const counts = weekCounts[r.code] || [0,0,0,0,0,0,0];
     return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:10px;align-items:center;padding:8px 0">
-      <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</span></div>
-      ${counts.map((cnt, i) => svgHeatCell(cnt, c.name + ' · ' + heatmapDays[i])).join('')}
-    </div>`;
-  }).join('');
-  const clientReachRows = activeClientsForHeatmap.map(c => {
-    const counts = clientReachCounts[c.code] || [0,0,0,0,0,0,0];
-    return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:10px;align-items:center;padding:8px 0">
-      <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</span></div>
-      ${counts.map((cnt, i) => svgHeatCell(cnt, c.name + ' · ' + heatmapDays[i])).join('')}
+      <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.name)}</span></div>
+      ${counts.map((c, i) => svgHeatCell(c, r.name + ' · ' + heatmapDays[i])).join('')}
     </div>`;
   }).join('');
 
@@ -1379,10 +1368,10 @@ function renderAdminDashboard(){
     </div>
   </div>
 
-  <!-- Third row: Client Applications Heatmap -->
-  ${clientAppRows ? `<div class="card" style="margin-bottom:20px">
+  <!-- Third row: Recruiter Activity Heatmap -->
+  ${recruiterRows ? `<div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Client Applications Heatmap (Current Week)</div>
+      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Recruiter Activity Heatmap (Current Week)</div>
       <div style="display:flex;gap:12px;font-size:11px">
         <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-success);border-radius:2px"></span> Active</span>
         <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-warning);border-radius:2px"></span> Slow</span>
@@ -1391,28 +1380,10 @@ function renderAdminDashboard(){
       </div>
     </div>
     <div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;padding-bottom:8px;border-bottom:1px solid var(--bg-secondary);margin-bottom:8px">
-      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">Client Name</div>
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">Recruiter Profile</div>
       ${heatmapDays.map(d => `<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;text-align:left">${d}</div>`).join('')}
     </div>
-    ${clientAppRows}
-  </div>` : ''}
-
-  <!-- Fourth row: Client Reachouts Heatmap -->
-  ${clientReachRows ? `<div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em">Client Reachouts Heatmap (Current Week)</div>
-      <div style="display:flex;gap:12px;font-size:11px">
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-success);border-radius:2px"></span> Active</span>
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-warning);border-radius:2px"></span> Slow</span>
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--color-danger);border-radius:2px"></span> Idle</span>
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-body)"><span style="width:10px;height:10px;background:var(--bg-secondary);border-radius:2px"></span> Off</span>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:8px;padding-bottom:8px;border-bottom:1px solid var(--bg-secondary);margin-bottom:8px">
-      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">Client Name</div>
-      ${heatmapDays.map(d => `<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;text-align:left">${d}</div>`).join('')}
-    </div>
-    ${clientReachRows}
+    ${recruiterRows}
   </div>` : ''}`;
 }
 
@@ -1983,10 +1954,8 @@ function renderRecruitersPage(){
       try{
         const now = new Date();
         const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-        const daysInThisMonth = new Date(y, m + 1, 0).getDate();
-        const daysInNextMonth = new Date(y, m + 2, 0).getDate();
-        const cycleThisMonth = new Date(y, m, Math.min(r.payroll_cycle_day, daysInThisMonth));
-        const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, m + 1, Math.min(r.payroll_cycle_day, daysInNextMonth));
+        const cycleThisMonth = new Date(y, m, Math.min(r.payroll_cycle_day, 28));
+        const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, m + 1, Math.min(r.payroll_cycle_day, 28));
         daysLeft = Math.floor((nextCycle - now) / 86400000);
       }catch(e){}
     }
@@ -2087,10 +2056,8 @@ function renderRecruiterDetailPage(){
     try{
       const now = new Date();
       const y = now.getFullYear(), m = now.getMonth();
-      const daysInThisMonth = new Date(y, m + 1, 0).getDate();
-      const daysInNextMonth = new Date(y, m + 2, 0).getDate();
-      const cycleThisMonth = new Date(y, m, Math.min(r.payroll_cycle_day, daysInThisMonth));
-      const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, m + 1, Math.min(r.payroll_cycle_day, daysInNextMonth));
+      const cycleThisMonth = new Date(y, m, Math.min(r.payroll_cycle_day, 28));
+      const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, m + 1, Math.min(r.payroll_cycle_day, 28));
       daysLeft = Math.floor((nextCycle - now) / 86400000);
       nextDue = nextCycle.toISOString().slice(0, 10);
     }catch(e){}
@@ -2178,10 +2145,8 @@ function renderManagersPage(){
       try{
         const now = new Date();
         const y = now.getFullYear(), mo = now.getMonth();
-        const daysInThisMonth = new Date(y, mo + 1, 0).getDate();
-        const daysInNextMonth = new Date(y, mo + 2, 0).getDate();
-        const cycleThisMonth = new Date(y, mo, Math.min(m.payroll_cycle_day, daysInThisMonth));
-        const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(m.payroll_cycle_day, daysInNextMonth));
+        const cycleThisMonth = new Date(y, mo, Math.min(m.payroll_cycle_day, 28));
+        const nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(m.payroll_cycle_day, 28));
         daysLeft = Math.floor((nextCycle - now) / 86400000);
       }catch(e){}
     }
@@ -3707,10 +3672,8 @@ function renderRecruiterDashboard(){
     try{
       const now = new Date();
       const y = now.getFullYear(), mo = now.getMonth();
-      const daysInThisMonth = new Date(y, mo + 1, 0).getDate();
-      const daysInNextMonth = new Date(y, mo + 2, 0).getDate();
-      const cycleThisMonth = new Date(y, mo, Math.min(me.payroll_cycle_day, daysInThisMonth));
-      nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(me.payroll_cycle_day, daysInNextMonth));
+      const cycleThisMonth = new Date(y, mo, Math.min(me.payroll_cycle_day, 28));
+      nextCycle = cycleThisMonth >= now ? cycleThisMonth : new Date(y, mo + 1, Math.min(me.payroll_cycle_day, 28));
       daysLeft = Math.floor((nextCycle - now) / 86400000);
     }catch(e){}
   }
