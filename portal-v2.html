@@ -303,7 +303,7 @@ textarea{resize:vertical;min-height:80px}
 .txn-actions .icon-btn{padding:4px 4px}
 /* checkpoint timeline */
 .ck-row{display:flex;align-items:flex-start;margin:16px 0 4px;padding:0 4px}
-.ck-row:has(.ck-step:only-child){justify-content:flex-start}
+.ck-step:only-child{align-items:flex-start}
 .ck-step:only-child .ck-dot{margin-left:0}
 .ck-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto}
 .ck-line{flex:1 1 auto;height:2px;background:var(--bg-secondary);margin:11px 0 0;min-width:14px}
@@ -315,7 +315,7 @@ textarea{resize:vertical;min-height:80px}
 /* client payment cards */
 .cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;align-items:stretch}
 .cp-card{border:1px solid var(--bg-secondary);border-radius:var(--radius-lg);padding:16px 18px;background:var(--bg-card);display:flex;flex-direction:column;height:100%}
-.cp-card.cp-due{border-color:var(--bg-secondary)}
+.cp-card.cp-due{border-color:rgba(255,107,71,.35);background:linear-gradient(to bottom,rgba(255,107,71,.04),transparent 60%)}
 .cp-card .ck-row{margin-top:14px;min-height:44px;align-items:flex-start}
 .cp-card .cp-manage{min-height:0}
 .cp-card .cp-foot{margin-top:auto;padding-top:12px}
