@@ -1266,6 +1266,11 @@ function renderAdminDashboard(){
   const heatmapDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
   const appCounts = {};    // { clientCode: [mon..sun] } - applications
   const reachCounts = {};  // { clientCode: [mon..sun] } - reachouts
+  // Seed every active client so they always appear as a row (empty cells if no activity)
+  (S.clients || []).filter(c => !c.deactivated_at).forEach(c => {
+    appCounts[c.code] = [0,0,0,0,0,0,0];
+    reachCounts[c.code] = [0,0,0,0,0,0,0];
+  });
   if(window._allAppsForHeatmap){
     const now = new Date();
     const dow = (now.getDay() + 6) % 7; // 0=Mon
@@ -1295,8 +1300,8 @@ function renderAdminDashboard(){
   const clientName = (code) => { const c = (S.clients||[]).find(x => x.code === code); return c ? c.name : code; };
   const heatRows = (bucket) => {
     const codes = Object.keys(bucket).sort((a,b) => clientName(a).localeCompare(clientName(b)));
-    if(!codes.length) return `<div style="padding:16px;color:var(--text-muted);font-size:13px">No activity yet this week.</div>`;
-    return codes.slice(0,12).map(cc => {
+    if(!codes.length) return `<div style="padding:16px;color:var(--text-muted);font-size:13px">No clients yet.</div>`;
+    return codes.slice(0,30).map(cc => {
       const counts = bucket[cc] || [0,0,0,0,0,0,0];
       return `<div style="display:grid;grid-template-columns:180px repeat(7,1fr);gap:10px;align-items:center;padding:8px 0">
       <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(clientName(cc))}</span></div>
