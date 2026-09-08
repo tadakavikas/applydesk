@@ -3685,6 +3685,50 @@ function renderRecruiterDashboard(){
   const myClients = (S.clients || []).filter(c => !c.deactivated_at);
   const me = (S.me) || (S.recruiters || []).find(r => r.code === session.code) || {};
 
+  // Assigned-clients heatmap (this recruiter's own applications + reachouts, grouped by client)
+  const rHeatDays = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const rApp = {}, rReach = {};
+  myClients.forEach(c => { rApp[c.code] = [0,0,0,0,0,0,0]; rReach[c.code] = [0,0,0,0,0,0,0]; });
+  if(!window._recHeatApps && !window._loadingRecHeat){
+    window._loadingRecHeat = true;
+    rpc('fn_a_list_all_applications', {}).then(r => {
+      window._recHeatApps = (r && r.ok && Array.isArray(r.applications)) ? r.applications : [];
+      window._loadingRecHeat = false; renderShell();
+    }).catch(() => { window._recHeatApps = []; window._loadingRecHeat = false; });
+  }
+  if(window._recHeatApps){
+    const now = new Date(); const dow = (now.getDay()+6)%7;
+    const monday = new Date(now); monday.setDate(now.getDate()-dow); monday.setHours(0,0,0,0);
+    const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
+    window._recHeatApps.forEach(a => {
+      const cc = a.client_code; if(!cc) return;
+      const d = localDate(a.date || a.application_date || a.applied_at || a.created_at);
+      if(isNaN(d.getTime()) || d < monday || d > todayEnd) return;
+      const idx = (d.getDay()+6)%7; if(idx > dow) return;
+      const isReach = (a.source === 'reachout' || a.type === 'reachout');
+      const bucket = isReach ? rReach : rApp;
+      if(!bucket[cc]) bucket[cc] = [0,0,0,0,0,0,0];
+      bucket[cc][idx]++;
+    });
+  }
+  const rClientName = (code) => { const c = myClients.find(x => x.code === code); return c ? c.name : code; };
+  const rHeatRows = (bucket) => {
+    const codes = Object.keys(bucket).sort((a,b) => rClientName(a).localeCompare(rClientName(b)));
+    if(!codes.length) return `<div style="padding:16px;color:var(--text-muted);font-size:13px">No assigned clients yet.</div>`;
+    return codes.slice(0,20).map(cc => `<div style="display:grid;grid-template-columns:160px repeat(7,1fr);gap:8px;align-items:center;padding:7px 0">
+      <div style="display:flex;align-items:center;gap:8px"><div style="width:6px;height:6px;background:var(--color-success);border-radius:50%"></div><span style="font-size:13px;color:var(--text-heading);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(rClientName(cc))}</span></div>
+      ${bucket[cc].map((n,i) => svgHeatCell(n, rClientName(cc)+' · '+rHeatDays[i])).join('')}
+    </div>`).join('');
+  };
+  const rHeatCard = (title, rows) => `<div class="card" style="margin-top:20px">
+    <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:16px">${title}</div>
+    <div style="display:grid;grid-template-columns:160px repeat(7,1fr);gap:8px;padding-bottom:8px;border-bottom:1px solid var(--bg-secondary);margin-bottom:8px">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">Client</div>
+      ${rHeatDays.map(d => `<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;font-weight:700">${d}</div>`).join('')}
+    </div>${rows}</div>`;
+  const recruiterHeatmaps = rHeatCard('My Clients - Applications (This Week)', rHeatRows(rApp)) + rHeatCard('My Clients - Reach-outs (This Week)', rHeatRows(rReach));
+
+
   // Profile completeness (payroll is admin-set, so count the recruiter-facing fields)
   const fields = ['name','email','phone','target_roles','joined_date'];
   const filled = fields.filter(f => me[f]).length;
@@ -3784,7 +3828,8 @@ function renderRecruiterDashboard(){
         <span style="color:var(--color-success);font-weight:700">VERIFIED</span>
       </div>
     </div>
-  </div>`;
+  </div>
+  ${recruiterHeatmaps}`;
 }
 
 function renderClientDashboard(){
@@ -3940,6 +3985,37 @@ window.refreshClientApps = function(){
 };
 
 /* ═══════ APPLICATION DETAIL MODAL WITH STATUS TIMELINE ═══════ */
+
+window.openEditApplication = function(app){
+  const dateVal = (app.applied_at || '').slice(0,10);
+  const inner = `<div class="field"><label>Company *</label><input id="ea-company" type="text" value="${esc(app.company||'')}"></div>
+    <div class="field"><label>Role / Job title *</label><input id="ea-role" type="text" value="${esc(app.job_title||'')}"></div>
+    <div class="field"><label>Job link</label><input id="ea-link" type="text" value="${esc(app.job_url||'')}"></div>
+    <div class="field"><label>Date applied</label><input id="ea-date" type="date" value="${esc(dateVal)}"></div>`;
+  const back = document.createElement('div'); back.className='modal-back';
+  back.innerHTML = `<div class="modal-inner" style="max-width:480px"><h3>Edit application</h3>${inner}
+    <div class="modal-actions"><button class="btn ghost" id="ea-cancel">Cancel</button><button class="btn primary" id="ea-save">Save</button></div></div>`;
+  document.body.appendChild(back);
+  back.querySelector('#ea-cancel').onclick = () => back.remove();
+  back.onclick = e => { if(e.target===back) back.remove(); };
+  back.querySelector('#ea-save').onclick = async () => {
+    const company = back.querySelector('#ea-company').value.trim();
+    const role = back.querySelector('#ea-role').value.trim();
+    const link = back.querySelector('#ea-link').value.trim();
+    const date = back.querySelector('#ea-date').value;
+    if(!company || !role){ toast('Company and role are required','error'); return; }
+    try{
+      const r = await rpc('fn_a_edit_application', { p_record_id: app.id, p_company: company, p_role: role, p_link: link||null, p_date: date||null });
+      if(r && r.ok){
+        clientAppsCache = null; allAppsCache = null; recentAppsCache = null;
+        back.remove();
+        const m2 = document.querySelector('.modal-back'); if(m2) m2.remove();
+        toast('Application updated','success'); renderShell();
+      } else toast('Failed: ' + ((r && r.err) || 'unknown'), 'error');
+    }catch(e){ toast('Failed: ' + e.message, 'error'); }
+  };
+};
+
 window.deleteApplication = async function(recordId){
   if(!await confirmModal('Delete this application permanently? This cannot be undone.', { title:'Delete application', okLabel:'Delete', danger:true })) return;
   try{
@@ -4109,14 +4185,14 @@ window.openAppDetail = async function(recordId){
       ${app.job_url ? `<a href="${esc(app.job_url)}" target="_blank" class="btn ghost sm">🔗 View job posting</a>` : '<span style="font-size:12px;color:var(--text-muted);padding:6px 12px">No job posting link</span>'}
       <button onclick="downloadResume(${app.id}, '${esc(app.resume_used || '').replace(/'/g,'')}')" class="btn ghost sm">📄 Download resume used</button>
       ${app.screenshot_url ? `<button onclick="openStoredFile('${esc(app.screenshot_url).replace(/'/g,'')}')" class="btn ghost sm">📎 Original screenshot</button>` : ''}
-      ${session.role === 'admin' ? `<button onclick="deleteApplication(${app.id})" class="btn ghost sm" style="color:var(--color-danger);margin-left:auto">🗑 Delete</button>` : ''}
+      ${(session.role === 'admin' || session.role === 'manager' || session.role === 'recruiter') ? `<button onclick='openEditApplication(${JSON.stringify({id:app.id,company:app.company,job_title:app.job_title,job_url:app.job_url,applied_at:app.applied_at}).replace(/'/g,"&#39;")})' class="btn ghost sm" style="margin-left:auto">✎ Edit</button><button onclick="deleteApplication(${app.id})" class="btn ghost sm" style="color:var(--color-danger)">🗑 Delete</button>` : ''}
     </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px;margin-bottom:12px">
       <h4 style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:14px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px">Status Timeline</h4>
       <div style="max-height:280px;overflow-y:auto">${statusRows}</div>
     </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px">
-      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Call</option><option>Screening call</option><option>Screening</option><option>Assessment</option><option>Interview</option><option>Rejected</option><option>Offer received</option><option>Accepted offer</option><option>Withdrew</option><option>Follow-up sent</option></select></div>
+      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Assessment</option><option>Recruiter call</option><option>Screening call</option><option>Offer received</option></select></div>
       <div class="field"><textarea id="apd-note" placeholder="Notes (e.g. 'Recruiter said next round is Tuesday at 3pm')" rows="2"></textarea></div>
       <div class="field"><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Screenshot of email/message (optional)</label><input id="apd-screenshot-file" type="file" accept="image/*" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
     </div>
@@ -4833,7 +4909,7 @@ function renderApplicationsPage(){
     });
   }
   const clientOptions = (S.clients || []).map(c => `<option value="${esc(c.code)}" ${filterClient === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-  const statusOptions = ['Applied','Call','Screening','Screening call','Assessment','Interview','Rejected','Offer received','Accepted offer','Withdrew'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
+  const statusOptions = ['Assessment','Recruiter call','Screening call','Offer received'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
 
   // Stats
   const totalApps = apps.length;
