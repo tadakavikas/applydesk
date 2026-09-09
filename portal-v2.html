@@ -4192,7 +4192,7 @@ window.openAppDetail = async function(recordId){
       <div style="max-height:280px;overflow-y:auto">${statusRows}</div>
     </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px">
-      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Applied</option><option>Call</option><option>Interview</option><option>Selected</option><option>Rejected</option></select></div>
+      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Applied</option><option>Call</option><option>Assessment</option><option>Interview</option><option>Selected</option><option>Rejected</option></select></div>
       <div class="field"><textarea id="apd-note" placeholder="Notes (e.g. 'Recruiter said next round is Tuesday at 3pm')" rows="2"></textarea></div>
       <div class="field"><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Screenshot of email/message (optional)</label><input id="apd-screenshot-file" type="file" accept="image/*" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
     </div>
@@ -4909,7 +4909,7 @@ function renderApplicationsPage(){
     });
   }
   const clientOptions = (S.clients || []).map(c => `<option value="${esc(c.code)}" ${filterClient === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-  const statusOptions = ['Applied','Call','Interview','Selected','Rejected'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
+  const statusOptions = ['Applied','Call','Assessment','Interview','Selected','Rejected'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
 
   // Stats
   const totalApps = apps.length;
