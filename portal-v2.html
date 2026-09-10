@@ -3541,7 +3541,8 @@ function renderSettingsPage(){
         ${session.email ? `<dt>Email</dt><dd>${esc(session.email)}</dd>` : ''}
         <dt>Access code</dt><dd style="font-family:monospace">${esc(session.code)}</dd>
       </dl>
-      <button class="btn danger" onclick="logout()">Log out</button>
+      <button class="btn primary" onclick="openEditMyProfile()">✎ Edit profile</button>
+      <button class="btn danger" onclick="logout()" style="margin-left:8px">Log out</button>
     </div>
     <div class="card">
       <div class="card-title">🔑 Security</div>
@@ -3550,6 +3551,42 @@ function renderSettingsPage(){
     </div>
   </div>`;
 }
+
+window.openEditMyProfile = function(){
+  const isStaff = (session.role === 'recruiter' || session.role === 'client');
+  const inner = `<div class="field"><label>Name *</label><input id="mp-name" type="text" value="${esc(session.name||'')}"></div>
+    ${isStaff ? `<div class="field"><label>Phone</label><input id="mp-phone" type="text" value="${esc(session.phone||'')}"></div>` : ''}
+    <div class="field"><label>Email</label><input id="mp-email" type="email" value="${esc(session.email||'')}"><div style="font-size:11px;color:var(--text-muted);margin-top:4px">Changing email sends a confirmation link to the new address.</div></div>`;
+  const back = document.createElement('div'); back.className='modal-back';
+  back.innerHTML = `<div class="modal-inner" style="max-width:460px"><h3>Edit profile</h3>${inner}
+    <div class="modal-actions"><button class="btn ghost" id="mp-cancel">Cancel</button><button class="btn primary" id="mp-save">Save</button></div></div>`;
+  document.body.appendChild(back);
+  back.querySelector('#mp-cancel').onclick = () => back.remove();
+  back.onclick = e => { if(e.target===back) back.remove(); };
+  back.querySelector('#mp-save').onclick = async () => {
+    const name = back.querySelector('#mp-name').value.trim();
+    const phoneEl = back.querySelector('#mp-phone');
+    const phone = phoneEl ? phoneEl.value.trim() : null;
+    const email = back.querySelector('#mp-email').value.trim();
+    if(!name){ toast('Name is required','error'); return; }
+    try{
+      const r = await rpc('fn_a_edit_my_profile', { p_name: name, p_phone: phone });
+      if(!r || !r.ok){ toast('Failed: ' + ((r && r.err) || 'unknown'), 'error'); return; }
+      // Email change goes through Supabase auth (sends confirmation)
+      if(email && email.toLowerCase() !== (session.email||'').toLowerCase()){
+        try{ const { error } = await sb.auth.updateUser({ email }); if(error) toast('Name saved. Email change failed: '+error.message,'error'); else toast('Saved. Check your new email to confirm the change.','success'); }
+        catch(e){ toast('Name saved, email change failed: '+e.message,'error'); }
+      } else {
+        toast('Profile updated','success');
+      }
+      session.name = name; if(phone!==null) session.phone = phone;
+      back.remove();
+      await refresh();
+      renderShell();
+    }catch(e){ toast('Failed: ' + e.message, 'error'); }
+  };
+};
+
 
 /* ═══════ ROLE-SPECIFIC DASHBOARDS (simpler for now) ═══════ */
 function renderManagerDashboard(){
