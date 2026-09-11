@@ -40,7 +40,7 @@
   "serviceType": "Job Application Service",
   "provider": { "@type": "Organization", "name": "ApplyDesk", "url": "https://getapplydesk.com" },
   "areaServed": "US",
-  "offers": { "@type": "Offer", "price": "150", "priceCurrency": "USD", "description": "25-30 tailored job applications and 5-10 recruiter reach-outs per business day, with a daily evening report." }
+  "offers": { "@type": "Offer", "price": "15000", "priceCurrency": "INR", "description": "25-30 tailored job applications and 5-10 recruiter reach-outs per business day, with a daily evening report." }
 }
 </script>
 <link rel="icon" type="image/png" href="/favicon-64.png">
@@ -206,13 +206,29 @@ nav{position:sticky;top:0;z-index:50;background:rgba(255,248,240,.9);backdrop-fi
 .map-label{position:relative;font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.65)}
 .map-foot{position:absolute;left:30px;right:30px;bottom:24px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55)}
 
-.responses{padding:20px 0 40px}
-.resp-marquee{overflow:hidden;position:relative;margin-top:18px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
-.resp-track{display:flex;gap:8px;width:max-content;animation:marquee-slide 30s linear infinite;will-change:transform;padding:6px 0}
-.resp-marquee:hover .resp-track{animation-play-state:paused}
-.resp-card{flex:0 0 auto;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#FFF1E6,#FFE7D0);border:1px solid rgba(255,107,71,.18);box-shadow:0 8px 24px rgba(255,107,71,.10);padding:6px}
-.resp-card img{display:block;height:200px;width:auto;max-width:none;object-fit:contain;border-radius:10px}
-.resp-loading{color:var(--text-muted);font-family:var(--font-mono);font-size:13px;padding:40px 20px}
+.referral{padding:40px 0}
+.ref-card{background:var(--color-heading,#1A1F2E);border-radius:var(--radius-3xl);padding:0;overflow:hidden;box-shadow:var(--shadow-lift)}
+.ref-head{padding:44px 44px 32px;background:#1A2740}
+.ref-eyebrow{font-family:var(--font-mono);font-size:13px;letter-spacing:.06em;color:rgba(255,255,255,.7)}
+.ref-eyebrow b{color:#fff;font-weight:800}
+.ref-title{font-family:var(--font-display);font-weight:900;font-size:46px;line-height:1.05;color:#fff;margin:20px 0 16px}
+.ref-title i{color:var(--color-warning,#FFC53D);font-style:italic}
+.ref-sub{color:rgba(255,255,255,.75);font-size:16px;max-width:520px;line-height:1.5}
+.ref-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:0;padding:36px 44px;background:#F7F3EC}
+.ref-stat{padding:0 8px}
+.ref-pct{font-family:var(--font-display);font-weight:900;font-size:64px;color:var(--text-heading);line-height:1}
+.ref-pct sup{font-size:26px;vertical-align:super}
+.ref-label{font-family:var(--font-mono);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-heading);font-weight:700;margin:8px 0 12px}
+.ref-stat p{color:var(--text-muted);font-size:15px;line-height:1.5;max-width:280px}
+.ref-divider{width:1px;background:repeating-linear-gradient(180deg,rgba(26,31,46,.25) 0 6px,transparent 6px 12px);margin:0 24px}
+.ref-note{margin:0 44px 32px;background:#0F7871;color:#fff;border-radius:var(--radius-2xl);padding:26px 30px;font-size:17px;line-height:1.6}
+.ref-note b{color:var(--color-warning,#FFC53D)}
+.ref-foot{display:flex;align-items:center;gap:24px;padding:0 44px 44px;flex-wrap:wrap}
+.ref-terms{flex:1;min-width:260px;font-size:13px;color:rgba(255,255,255,.6);line-height:1.5}
+.ref-terms b{color:#fff}
+.ref-link{border:1px solid rgba(255,255,255,.3);border-radius:var(--radius-lg);padding:18px 28px;font-family:var(--font-display);font-weight:800;font-size:20px;color:#fff;text-decoration:none;letter-spacing:.02em;white-space:nowrap}
+.ref-link:hover{background:rgba(255,255,255,.08)}
+@media(max-width:720px){.ref-grid{grid-template-columns:1fr;gap:28px}.ref-divider{width:auto;height:1px;background:repeating-linear-gradient(90deg,rgba(26,31,46,.25) 0 6px,transparent 6px 12px);margin:0}.ref-title{font-size:34px}.ref-pct{font-size:52px}}
 </style>
 <style>
 /* ══════════ COMPARE ══════════ */
@@ -371,7 +387,7 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
     <h1 class="hero-headline">Job applications, done for you <span class="hl">every day</span></h1>
     <p class="hero-subtext">A real recruiter on our team tailors your resume and submits 25-30 job applications for you, every single business day. You focus on the interviews.</p>
     <div class="hero-cta">
-      <a href="#start" class="btn btn-primary cta-pulse">Start my campaign · $150/mo</a>
+      <a href="#start" class="btn btn-primary cta-pulse">Start my campaign · ₹15,000/mo</a>
       <a href="#how" class="btn btn-ghost">See how it runs</a>
     </div>
 
@@ -424,18 +440,6 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
       <span class="logo-pill" style="color:#1A1F2E">Uber</span>
       <span class="logo-pill" style="color:#0A66C2">LinkedIn</span>
       <span class="logo-pill" style="color:#FF4A00">Zapier</span>
-    </div>
-  </div>
-</section>
-
-<!-- ══════════ CLIENT RESPONSES ══════════ -->
-<section class="responses">
-  <div class="logos-head wrap">
-    <span class="eyebrow">· Real responses our clients received ·</span>
-  </div>
-  <div class="resp-marquee">
-    <div class="resp-track" id="respTrack">
-      <div class="resp-loading">Loading responses...</div>
     </div>
   </div>
 </section>
@@ -521,14 +525,14 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
   <div class="wrap">
     <div class="math-card reveal">
       <div>
-        <h2>What $150 actually buys</h2>
+        <h2>What ₹15,000 actually buys</h2>
         <div class="math-figs">
           <div class="mf"><div class="n">160+</div><div class="l">hours of your month handed back to you</div></div>
           <div class="mf"><div class="n">~$0.27</div><div class="l">per tailored application, at 25 a day across a working month</div></div>
         </div>
       </div>
       <div class="math-price">
-        <div class="p">$150<small>/mo</small></div>
+        <div class="p">₹15,000<small>/mo</small></div>
         <div class="d">Cancel any upcoming month. No notice period, no penalty.</div>
         <a href="#start" class="btn btn-primary">Run the numbers on me</a>
       </div>
@@ -546,13 +550,13 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;max-width:1150px;margin:32px auto 0;align-items:stretch">
 
-      <!-- MAIN PLAN - $150/mo -->
+      <!-- MAIN PLAN - ₹15,000/mo -->
       <div class="price-card reveal" style="position:relative;padding:32px 28px;display:flex;flex-direction:column">
         <span style="position:absolute;top:16px;right:16px;background:#FF6B47;color:#fff;font-size:10px;padding:5px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;font-weight:700">Main plan</span>
         <div style="width:52px;height:52px;background:#FFEBE4;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:16px">🚀</div>
         <span class="price-pill">Monthly service</span>
         <h3 style="font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--text-heading);margin:12px 0 8px">Job Applications</h3>
-        <div class="price-line"><span class="amt">$150</span><span class="per">/ month</span></div>
+        <div class="price-line"><span class="amt">₹15,000</span><span class="per">/ month</span></div>
         <p class="price-desc">A real recruiter runs your daily job search. Everything they do shows up in your portal.</p>
         <ul class="feat" style="flex:1">
           <li><span class="ck">✓</span><span><b>20-30 applications</b> submitted every business day</span></li>
@@ -561,7 +565,7 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
           <li><span class="ck">✓</span><span><b>Live portal</b> with logs and team chat</span></li>
           <li><span class="ck">✓</span><span><b>Cancel anytime</b>, no notice period</span></li>
         </ul>
-        <a href="#start" class="btn btn-primary price-cta cta-pulse" style="margin-top:16px">Start my plan · $150/mo</a>
+        <a href="#start" class="btn btn-primary price-cta cta-pulse" style="margin-top:16px">Start my plan · ₹15,000/mo</a>
       </div>
 
       <!-- RESUME + LINKEDIN BUNDLE - $100 one-time -->
@@ -604,6 +608,39 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
 
     <div style="text-align:center;margin-top:36px">
       <p style="color:var(--text-body);font-size:15px">Want the whole set? <b style="color:#FF6B47">All three for $300 first month (save $50).</b></p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ REFERRAL ══════════ -->
+<section class="referral" id="refer">
+  <div class="wrap">
+    <div class="ref-card">
+      <div class="ref-head">
+        <span class="ref-eyebrow">GET<b>APPLY DESK</b> &nbsp;·&nbsp; Referral Program</span>
+        <h2 class="ref-title">Bring a friend.<br>You <i>both</i> save.</h2>
+        <p class="ref-sub">Refer a friend to GetApplyDesk and you'll each get 10% off - for one month only.</p>
+      </div>
+      <div class="ref-grid">
+        <div class="ref-stat">
+          <div class="ref-pct">10<sup>%</sup></div>
+          <div class="ref-label">For you</div>
+          <p>Applied the same month your friend's application goes live.</p>
+        </div>
+        <div class="ref-divider"></div>
+        <div class="ref-stat">
+          <div class="ref-pct">10<sup>%</sup></div>
+          <div class="ref-label">For your friend</div>
+          <p>Applied automatically to their very first month.</p>
+        </div>
+      </div>
+      <div class="ref-note">
+        The discount applies once - to the <b>calendar month your friend joins</b>. If they join in June, June is the discounted month for both of you. Regular pricing resumes the month after.
+      </div>
+      <div class="ref-foot">
+        <div class="ref-terms"><b>Terms.</b> Valid once per referred friend, for application plans only. Does not stack with other offers or carry over to other months.</div>
+        <a href="mailto:hello@getapplydesk.com?subject=Referral" class="ref-link">GETAPPLYDESK.COM/REFER</a>
+      </div>
     </div>
   </div>
 </section>
@@ -656,7 +693,7 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
         <input type="email" id="lfEmail" placeholder="Email *" autocomplete="email" class="lf-full" required>
         <input type="tel" id="lfPhone" placeholder="Phone" autocomplete="tel">
         <select id="lfPlan">
-          <option value="Job Applications - $150/mo" selected>Job Applications · $150/mo</option>
+          <option value="Job Applications - ₹15,000/mo" selected>Job Applications · ₹15,000/mo</option>
           <option value="Resume + LinkedIn - $100 one-time">Resume + LinkedIn · $100 one-time</option>
           <option value="Recruiter Training - $100 one-time">Recruiter Training · $100 one-time</option>
           <option value="All three - $300">All three services · $300 first month (save $50)</option>
@@ -723,29 +760,6 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
 // ══════════ SUPABASE WIRING (unchanged endpoints) ══════════
 const SB_URL='https://rofyegirmgqjhekuxjat.supabase.co';
 const SB_KEY='sb_publishable_4f6WR1sk2N9EUO2bU7dkyA_9TByUhTL';
-
-// ── Client response screenshots (public bucket: response-screenshots) ──
-async function loadResponses(){
-  const track = document.getElementById('respTrack');
-  if(!track) return;
-  try{
-    const res = await fetch(SB_URL + '/storage/v1/object/list/response-screenshots', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+SB_KEY },
-      body: JSON.stringify({ prefix:'', limit:100, sortBy:{ column:'created_at', order:'desc' } })
-    });
-    const files = await res.json();
-    const imgs = (Array.isArray(files)?files:[]).filter(f => f.name && /\.(png|jpe?g|webp|gif)$/i.test(f.name));
-    if(!imgs.length){ const s=document.querySelector('.responses'); if(s) s.style.display='none'; return; }
-    const base = SB_URL + '/storage/v1/object/public/response-screenshots/';
-    const cards = imgs.map(f => `<div class="resp-card"><img src="${base}${encodeURIComponent(f.name)}" alt="Client response" loading="lazy"></div>`).join('');
-    // repeat enough times to fill the strip and slide smoothly even with few images
-    let reps = cards; let count = imgs.length;
-    while(count < 8){ reps += cards; count += imgs.length; }
-    track.innerHTML = reps + reps;
-  }catch(e){ const s=document.querySelector('.responses'); if(s) s.style.display='none'; }
-}
-loadResponses();
 
 // ── Live public stats (fn_get_public_stats) ──
 let liveStats=null;
