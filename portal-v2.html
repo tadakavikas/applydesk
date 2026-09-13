@@ -423,6 +423,10 @@ function localDate(v){
   return new Date(s);
 }
 const today = () => new Date().toISOString().slice(0,10);
+// Status -> color mapping (single source of truth)
+const STATUS_COLORS = { 'applied':'#9CA3AF', 'call':'#FFC53D', 'assessment':'#8B5CF6', 'interview':'#2E7CE0', 'selected':'#7CB342', 'rejected':'#C9264A' };
+function statusColor(s){ return STATUS_COLORS[(s||'applied').toLowerCase().trim()] || '#9CA3AF'; }
+function statusChip(s){ const c = statusColor(s); return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${c}22;color:${c}"><span style="width:7px;height:7px;border-radius:50%;background:${c}"></span>${esc(s||'Applied')}</span>`; }
 const fmt = d => { if(!d) return ''; try{ return new Date(d+'T00:00:00').toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}); }catch(e){ return d; } };
 // Viewer-local date+time. Auto-detects the viewer's timezone and locale.
 // US viewer sees US format in their zone; India viewer sees IST, dd/mm.
@@ -1694,7 +1698,7 @@ function renderClientsPage(){
       <div class="field"><label>Target role</label><input id="ac-role" type="text" placeholder="Senior Product Manager"></div>
       <div class="field"><label>Location</label><input id="ac-location" type="text" placeholder="e.g. Charlotte, NC"></div>
       <div class="field"><label>Years experience</label><input id="ac-years" type="number" placeholder="5"></div>
-      <div class="field"><label>Sponsorship</label><select id="ac-sponsor"><option value="">Select...</option><option>US Citizen</option><option>Green Card</option><option>H1B</option><option>OPT</option><option>OPT-EAD</option><option>Other</option></select></div>
+      <div class="field"><label>Sponsorship</label><select id="ac-sponsor"><option value="">Select...</option><option>OPT</option><option>STEM OPT</option><option>H1B</option></select></div>
       <div class="field"><label>Base resume URL</label><input id="ac-resume" type="url" placeholder="https://..."></div>
       <div class="field"><label>Subscription start</label><input id="ac-start" type="date"></div>
       <div class="field"><label>Amount</label><input id="ac-amount" type="number" placeholder="150"></div>
@@ -1727,7 +1731,7 @@ function renderClientsPage(){
     ${(sf.q||sf.visa||sf.minExp)?`<button class="btn ghost sm" onclick="clearClientSearch()">Clear all</button>`:''}
   </div>
   ${viewState.clientAdv ? `<div class="cf-adv">
-    <div class="cf-field"><label>Visa status</label><select id="cf-visa" onchange="setClientSearch('visa',this.value)"><option value="">Any</option>${['US Citizen','Green Card','H1B','OPT','OPT-EAD','Other'].map(v=>`<option ${sf.visa===v?'selected':''}>${v}</option>`).join('')}</select></div>
+    <div class="cf-field"><label>Visa status</label><select id="cf-visa" onchange="setClientSearch('visa',this.value)"><option value="">Any</option>${['OPT','STEM OPT','H1B'].map(v=>`<option ${sf.visa===v?'selected':''}>${v}</option>`).join('')}</select></div>
     <div class="cf-field"><label>Min experience (years)</label><input id="cf-exp" type="number" min="0" placeholder="Any" value="${esc(sf.minExp||'')}" oninput="setClientSearch('minExp',this.value)"></div>
   </div>` : ''}
   ${clientTable}`;
@@ -4375,6 +4379,7 @@ function renderLogApplication(){
     <div class="field"><label>Company *</label><input id="app-company" type="text" placeholder="e.g. Stripe, Google, Netflix" required></div>
     <div class="field"><label>Job title *</label><input id="app-job-title" type="text" placeholder="e.g. Senior Data Engineer" required></div>
     <div class="field"><label>Job posting URL</label><input id="app-job-url" type="url" placeholder="https://careers.company.com/..."></div>
+    <div class="field"><label>Does this role offer sponsorship? *</label><select id="app-sponsorship"><option value="">— Select —</option><option value="Yes">Yes</option><option value="No">No</option></select></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="field"><label>Resume file (PDF/DOC) *</label><input id="app-resume" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
       <div class="field"><label>Screenshot file (of confirmation email/page)</label><input id="app-screenshot" type="file" accept="image/*,.png,.jpg,.jpeg,.webp" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
@@ -4506,6 +4511,9 @@ window.submitApplication = async function(){
       p_source: source || null, p_resume_used: resumeUrl, p_screenshot_url: screenshotUrl
     });
     if(r && r.ok){
+      // store per-application sponsorship (Yes/No) if selected
+      const spons = (document.getElementById('app-sponsorship')||{}).value || '';
+      if(spons && r.id){ try{ await rpc('fn_a_set_app_sponsorship', { p_record_id: r.id, p_sponsorship: spons }); }catch(e){} }
       toast('Application dispatched with resume' + (screenshotUrl ? ' and screenshot' : '') + '!', 'success');
       recentAppsCache = null;
       allAppsCache = null;
@@ -4604,7 +4612,7 @@ window.openEditClient = function(code){
     { id:'target_role', label:'Target role', value:c.target_role },
     { id:'location', label:'Location (City, State)', value:c.location, placeholder:'e.g. Charlotte, NC' },
     { id:'years_experience', label:'Years experience', type:'number', value:c.years_experience },
-    { id:'sponsorship', label:'Sponsorship', type:'select', value:c.sponsorship_status || '', options:[{value:'',label:'—'},{value:'US Citizen',label:'US Citizen'},{value:'Green Card',label:'Green Card'},{value:'H1B',label:'H1B'},{value:'OPT',label:'OPT'},{value:'OPT-EAD',label:'OPT-EAD'},{value:'Other',label:'Other'}] },
+    { id:'sponsorship', label:'Sponsorship', type:'select', value:c.sponsorship_status || '', options:[{value:'',label:'—'},{value:'OPT',label:'OPT'},{value:'STEM OPT',label:'STEM OPT'},{value:'H1B',label:'H1B'}] },
     { id:'base_resume_url', label:'Resume (paste link or upload)', type:'file', uploadPrefix:code, value:c.base_resume_url },
     { id:'subscription_amount', label:'Subscription amount', type:'number', value:c.subscription_amount },
     { id:'subscription_currency', label:'Currency', type:'select', value:c.subscription_currency || 'USD', options:[{value:'USD',label:'USD ($)'},{value:'INR',label:'INR (₹)'}] },
@@ -4980,7 +4988,8 @@ function renderApplicationsPage(){
       <td style="white-space:nowrap;font-size:12px;color:var(--text-body)">${esc(fmtDateTime(when))}</td>
       ${showClientCol ? `<td style="white-space:nowrap">${esc(clientNm)}</td>` : ''}
       <td><b>${esc(a.company || 'Unknown')}</b><br><span style="color:var(--text-muted);font-size:12px">${esc(a.job_title || 'Untitled role')}</span></td>
-      <td><span class="tag ${statusClass}" style="font-size:10px;padding:3px 8px">${esc(statusLabel)}</span></td>
+      <td>${statusChip(statusLabel)}</td>
+      <td style="white-space:nowrap;font-size:12px">${a.sponsorship ? `<span class="tag ${a.sponsorship==='Yes'?'success':'muted'}" style="font-size:10px">${esc(a.sponsorship)}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="white-space:nowrap;font-size:12px;color:var(--text-body)">${esc(recruiterDisplay) || '—'}</td>
     </tr>`;
   }).join('');
@@ -4991,6 +5000,7 @@ function renderApplicationsPage(){
       ${showClientCol ? '<th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Client</th>' : ''}
       <th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Company / Role</th>
       <th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Status</th>
+      <th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Sponsorship</th>
       <th style="padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">Recruiter</th>
     </tr></thead><tbody>${rows}</tbody></table></div>`
     : `<div class="empty-state" style="padding:48px"><div class="empty-icon">📄</div><h3 class="empty-title">No applications yet</h3><p class="empty-text">${session.role === 'recruiter' ? 'Log your first application from the "Log Application" tab.' : 'Applications will appear here once recruiters start logging them.'}</p></div>`;
@@ -5003,6 +5013,20 @@ function renderApplicationsPage(){
       <p style="color:var(--text-body);font-size:13px;margin-top:4px">${totalApps} application${totalApps !== 1 ? 's' : ''} · ${responses} response${responses !== 1 ? 's' : ''} · ${responseRate}% response rate</p>
     </div>
     ${session.role === 'recruiter' ? `<button class="btn primary" onclick="setView('log')">➕ Dispatch new</button>` : ''}
+  </div>
+
+  <!-- Status color filter boxes -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+    ${['Applied','Call','Assessment','Interview','Selected','Rejected'].map(st => {
+      const col = statusColor(st);
+      const active = (filterSource === st);
+      const cnt = (allAppsCache||[]).filter(a => { const sj = Array.isArray(a.status_json)?a.status_json:[]; return sj.some(x => (x.status||'').toLowerCase()===st.toLowerCase()) || (st==='Applied' && !sj.length); }).length;
+      return `<button onclick="toggleStatusBox('${st}')" style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;border:2px solid ${active?col:'transparent'};background:${col}18;cursor:pointer;font-family:var(--font-body)">
+        <span style="width:12px;height:12px;border-radius:50%;background:${col}"></span>
+        <span style="font-weight:700;font-size:13px;color:var(--text-heading)">${st}</span>
+        <span style="font-size:12px;color:var(--text-muted);font-weight:600">${cnt}</span>
+      </button>`;
+    }).join('')}
   </div>
 
   <!-- Filters -->
@@ -5028,6 +5052,11 @@ window.setAppSearch = function(v){
     const n = document.getElementById('app-search');
     if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} }
   }, 200);
+};
+window.toggleStatusBox = function(st){
+  viewState.appFilterSource = (viewState.appFilterSource === st) ? '' : st;
+  allAppsCache = null;
+  renderShell();
 };
 window.applyAppFilter = function(){
   const cf = document.getElementById('app-filter-client');
