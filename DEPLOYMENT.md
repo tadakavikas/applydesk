@@ -1,8 +1,8 @@
 # ApplyDesk upgrade - Cloudflare deployment
 
-This upgrade uses your existing Cloudflare Pages site, GitHub deployment flow, and Supabase project (`rofyegirmgqjhekuxjat`). The original public website, Mission Control portals, recruiter conversations, documents, and role model remain in place. The self-service product is `copilot.html`, with public signup and its own `ad-selfserve-auth` browser session. It does not share the recruiter-managed client membership or records. Administrators use `copilot-admin.html` with their existing `ad-auth` staff session.
+This upgrade uses your existing Cloudflare `applydesk` Worker, GitHub deployment flow, and Supabase project (`rofyegirmgqjhekuxjat`). The original public website, Mission Control portals, recruiter conversations, documents, and role model remain in place. The self-service product is `copilot.html`, with public signup and its own `ad-selfserve-auth` browser session. It does not share the recruiter-managed client membership or records. Administrators use `copilot-admin.html` with their existing `ad-auth` staff session.
 
-Cloudflare Pages serves the frontend from `dist`. The job feed refresh runs as a separate Cloudflare Worker with a Cron Trigger because static Pages deployments do not run scheduled background code.
+Cloudflare Workers Static Assets serves the frontend from `dist`. The job feed refresh runs as a separate Cloudflare Worker with a Cron Trigger. Deploying the static website does not install this scheduled worker.
 
 ## What is included
 
@@ -47,21 +47,23 @@ Registration confirms the email first, then enrolls only that user in self-servi
 
 That message in the previous build meant Supabase could not find a required function/table. The redesigned app shows a dedicated setup-pending screen instead of a half-loaded job dashboard. Apply the pending migrations above in order and retry. A local preview alone does not install database functions. If patch 10 is already applied, check the Supabase project selection and REST schema cache before changing account data.
 
-## 2. Configure Cloudflare Pages
+## 2. Configure Cloudflare Workers Builds
 
-In Cloudflare Pages, keep the GitHub-connected project pointed at this upgraded folder. Use these build settings:
+The repository is connected to the existing `applydesk` Worker through Workers Builds. In that Worker's Settings -> Build, use these settings:
 
 | Setting | Value |
 |---|---|
-| Framework preset | None / Vite |
-| Build command | `npm ci && npm run build` |
-| Build output directory | `dist` |
-| Root directory | This `original-app` folder, if the GitHub repo contains more than one project |
+| GitHub repository | `tadakavikas/applydesk` |
+| Production branch | `main` |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Root directory | Repository root |
+| Static assets directory | `./dist`, configured in `wrangler.toml` |
 | Node.js version | `22.13` or newer |
 
-`wrangler.toml` declares the Pages build output directory for manual CLI deploys. The GitHub Pages integration can still be managed in the Cloudflare dashboard.
+Workers Builds installs dependencies before the build command. Set the build command in the dashboard: Workers Builds does not honor Wrangler's custom `[build]` command. `wrangler.toml` identifies the existing `applydesk` Worker and uploads only `dist`. Keep the existing custom domains and routes. Do not deploy the repository root as static assets: it contains server source and private business files. See [Cloudflare's build configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
 
-No Supabase service-role key is needed in the Pages frontend build. The browser uses the existing public Supabase URL/key in `desk-src/lib/client.ts`; do not add service-role secrets to `VITE_*` variables or public files.
+No Supabase service-role key is needed in the frontend build. The browser uses the existing public Supabase URL/key in `desk-src/lib/client.ts`; do not add service-role secrets to `VITE_*` variables or public files.
 
 ## 3. Deploy the scheduled job-sync Worker
 
@@ -79,7 +81,7 @@ In Cloudflare Workers, create these Worker secrets/variables:
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret | Supabase server-only service-role key |
 | `JOB_SYNC_SECRET` | Secret | Random 32+ character trigger secret |
 
-Generate the trigger secret with `openssl rand -hex 32`. Never put `SUPABASE_SERVICE_ROLE_KEY` or `JOB_SYNC_SECRET` in browser code, Git, Cloudflare Pages public variables, or chat.
+Generate the trigger secret with `openssl rand -hex 32`. Never put `SUPABASE_SERVICE_ROLE_KEY` or `JOB_SYNC_SECRET` in browser code, Git, frontend build variables, or chat.
 
 If using Wrangler locally:
 
@@ -114,7 +116,7 @@ npm test
 npm run build
 ```
 
-Push the upgraded project to GitHub. Cloudflare Pages will build and publish `dist`. A static upload or Pages deploy only publishes the website; it does not create the scheduled Worker or apply Supabase migrations.
+Push the upgraded project to GitHub. Cloudflare Workers Builds will build and publish `dist` using the settings above. The website deployment does not create the scheduled job-sync Worker or apply Supabase migrations.
 
 After deployment, run the Worker once manually, or wait for the next Cron Trigger. Then inspect `app_job_feed_status` and sign in as a new confirmed self-service member.
 

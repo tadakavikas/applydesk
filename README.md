@@ -6,7 +6,7 @@ Done-for-you job application service. https://getapplydesk.com
 
 The upgraded `copilot.html` provides H-1B job discovery, private resume versions, reviewed profiles, matching, exports and application tracking. It has its own signup/login session and member data. Existing recruiter-managed clients stay in Mission Control. Administrators manage self-service members at `copilot-admin.html` using their existing staff session.
 
-Read [DEPLOYMENT.md](DEPLOYMENT.md) before enabling it on your existing Cloudflare/Supabase project. Patch 10 (after prerequisites 5, 7, 8, 9), Supabase signup/email redirect settings, Cloudflare Pages build settings, and the Cloudflare job-sync Worker secrets are required. `npm run dev` opens the local project; visit `/copilot.html`. `npm run build` packages both the self-service and admin desks and preserves the existing public site and portals.
+Read [DEPLOYMENT.md](DEPLOYMENT.md) before enabling it on your existing Cloudflare/Supabase project. Patch 10 (after prerequisites 5, 7, 8, 9), Supabase signup/email redirect settings, Cloudflare Workers build settings, and the Cloudflare job-sync Worker secrets are required. `npm run dev` opens the local project; visit `/copilot.html`. `npm run build` packages both the self-service and admin desks and preserves the existing public site and portals.
 
 ## Repository structure
 
@@ -20,7 +20,7 @@ Read [DEPLOYMENT.md](DEPLOYMENT.md) before enabling it on your existing Cloudfla
 
 ## Live infrastructure
 
-- **Hosting:** Cloudflare Pages, deployed from GitHub
+- **Hosting:** Cloudflare Workers Static Assets, deployed from GitHub through Workers Builds
 - **Database + Auth:** Supabase (project: rofyegirmgqjhekuxjat)
 - **SMTP:** Google Workspace via hello@getapplydesk.com
 - **Domain:** getapplydesk.com (Namecheap)
@@ -31,11 +31,11 @@ Read [DEPLOYMENT.md](DEPLOYMENT.md) before enabling it on your existing Cloudfla
 2. Test in browser (open index.html or portal.html directly, or use Live Server)
 3. Commit changes: `git add . && git commit -m "description"`
 4. Push to GitHub: `git push origin main`
-5. Cloudflare Pages auto-deploys on push
+5. Cloudflare Workers Builds auto-deploys on push
 
 ## Manual deploy fallback
 
-If Cloudflare Pages auto-deploy is unavailable, run `npm run build` and upload the generated `dist/` folder with Cloudflare Pages Direct Upload or `wrangler pages deploy dist`. The scheduled feed refresh is a separate Cloudflare Worker and is not included in a static Pages upload.
+If Cloudflare auto-deploy is unavailable, run `npm run build` followed by `npx wrangler deploy` in this repository using the existing Cloudflare account. `wrangler.toml` serves only the generated `dist/` folder through the existing `applydesk` Worker. The scheduled feed refresh is a separate Worker and is not included in the website deployment.
 
 ## Contacts
 
