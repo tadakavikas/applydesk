@@ -1,0 +1,10 @@
+#ad-fill-root{all:initial;position:fixed;right:20px;bottom:20px;z-index:2147483646;font-family:ui-sans-serif,system-ui,sans-serif}
+#ad-fill-root *{box-sizing:border-box;font-family:inherit}
+.ad-card{width:280px;background:#171411;color:#f4efe6;padding:16px;border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 50px rgba(0,0,0,.28)}
+.ad-card b{display:block;font-size:14px;font-weight:700;letter-spacing:.02em}
+.ad-card small{display:block;color:#cbbba8;font-size:12px;line-height:1.45;margin:8px 0 12px}
+.ad-card button{width:100%;border:0;background:#c45c38;color:#fff;padding:11px 12px;font-size:13px;font-weight:700;cursor:pointer}
+.ad-card button:hover{filter:brightness(1.05)}
+.ad-card button:disabled{opacity:.45;cursor:not-allowed}
+.ad-kicker{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#e8b39a;margin-bottom:6px}
+input.ad-filled,textarea.ad-filled,select.ad-filled{outline:2px solid #1f6b63 !important;background:#f7fbf9 !important}

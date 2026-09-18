@@ -1,0 +1,98 @@
+<!-- Source: live apply.careers.microsoft.com job payload, 2026-09-18.
+     Phenom-hosted Microsoft Careers apply (not Greenhouse/Lever/Ashby/Workday).
+     recaptchaEnabled: true on the same payload — filler must hard-stop, classifier still runs. -->
+<!DOCTYPE html>
+<html lang="en"><head><title>Microsoft Careers apply</title></head>
+<body>
+<form id="msft-apply">
+  <section>
+    <h2>Contact Information</h2>
+    <div class="field">
+      <label for="firstname">Preferred First Name *</label>
+      <input id="firstname" name="firstname" type="text" required>
+    </div>
+    <div class="field">
+      <label for="lastname">Preferred Last Name *</label>
+      <input id="lastname" name="lastname" type="text" required>
+    </div>
+    <div class="field">
+      <label for="q_cust_sameName">Is your legal name the same as your preferred name?</label>
+      <select id="q_cust_sameName" name="q_cust_sameName" required>
+        <option>Yes</option><option>No</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="q_cust_firstName">Legal First Name *</label>
+      <input id="q_cust_firstName" name="q_cust_firstName" type="text" required>
+    </div>
+    <div class="field">
+      <label for="q_cust_lastName">Legal Last Name *</label>
+      <input id="q_cust_lastName" name="q_cust_lastName" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">Email *</label>
+      <input id="email" name="email" type="text" required>
+    </div>
+    <div class="field">
+      <label for="q_phone">Phone *</label>
+      <input id="q_phone" name="phone" type="tel" required>
+    </div>
+    <div class="field">
+      <label for="q_cust_altPhoneNo">Alternate Phone Number</label>
+      <input id="q_cust_altPhoneNo" name="altPhoneNo" type="tel">
+    </div>
+    <div class="field">
+      <label for="q_address">Address *</label>
+      <input id="q_address" name="address" type="text" required>
+    </div>
+    <div class="field">
+      <label for="q_city">City *</label>
+      <input id="q_city" name="city" type="text" required>
+    </div>
+    <div class="field">
+      <label for="q_zip">Postal Code/Zip *</label>
+      <input id="q_zip" name="zip" type="text" required>
+    </div>
+  </section>
+  <section>
+    <h2>Work Authorization - United States</h2>
+    <div class="field">
+      <label for="q_cust_workLegalAuth">Are you legally authorized to work in the country/region you are applying for?</label>
+      <select id="q_cust_workLegalAuth" name="q_cust_workLegalAuth" required>
+        <option>Yes</option><option>No</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="q_cust_empEligibility">In order to obtain or maintain employment eligibility, will you now or in the future require the company's sponsorship for an immigration-related employment benefit (i.e., a work visa, work permit, etc.)?</label>
+      <select id="q_cust_empEligibility" name="q_cust_empEligibility" required>
+        <option>Yes</option><option>No</option>
+      </select>
+    </div>
+  </section>
+  <section>
+    <h2>Voluntary self-identification</h2>
+    <p>When you apply for a U.S. based job with Microsoft, the government requires us to ask you for information such as gender, ethnicity and race, disability, and veteran status.</p>
+    <div class="field">
+      <label for="eeo_gender">Gender</label>
+      <select id="eeo_gender" name="gender"><option></option><option>Male</option><option>Female</option></select>
+    </div>
+    <div class="field">
+      <label for="eeo_race">Ethnicity and race</label>
+      <select id="eeo_race" name="race"><option></option></select>
+    </div>
+    <div class="field">
+      <label for="eeo_veteran">Veteran status</label>
+      <select id="eeo_veteran" name="veteran"><option></option></select>
+    </div>
+    <div class="field">
+      <label for="eeo_disability">Disability</label>
+      <select id="eeo_disability" name="disability"><option></option></select>
+    </div>
+    <div class="field">
+      <label for="instr4">Name *</label>
+      <input id="instr4" name="fullname" type="text" required>
+    </div>
+  </section>
+  <div class="g-recaptcha" data-sitekey="live-payload-recaptchaEnabled-true"></div>
+</form>
+</body></html>

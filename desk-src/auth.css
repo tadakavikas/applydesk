@@ -1,0 +1,228 @@
+.selfserve-auth .login-story {
+  background:
+    radial-gradient(ellipse at 5% 100%, #dfece3 0%, transparent 60%), #edf4ee;
+}
+.selfserve-auth .login-form-wrap {
+  max-width: 410px;
+  padding: 38px 0;
+}
+.selfserve-auth .login-story-content {
+  max-width: 470px;
+}
+.selfserve-auth .login-story-content > p:not(.eyebrow) {
+  color: #6a8774;
+}
+.selfserve-auth .login-benefit {
+  color: #587962;
+  line-height: 1.5;
+}
+.selfserve-auth .login-benefit svg {
+  flex-shrink: 0;
+}
+.selfserve-auth .login-form-wrap > p:not(.eyebrow) {
+  color: #74897b;
+  margin-bottom: 24px;
+}
+.selfserve-auth .login-form-wrap > .eyebrow {
+  margin-top: 20px;
+}
+.selfserve-auth .auth-existing-link {
+  color: #668471;
+}
+.auth-service-note {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-top: 1px solid #d7e3da;
+  margin-top: 36px;
+  padding-top: 25px;
+  color: #7a9583;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.auth-service-note strong {
+  font-weight: 400;
+  color: #557460;
+}
+.auth-service-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 7px;
+  background: #779e83;
+  box-shadow: 0 0 0 4px #dceade;
+  flex-shrink: 0;
+}
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  gap: 4px;
+  background: #edf3ef;
+  border-radius: 10px;
+  margin-bottom: 25px;
+}
+.auth-mode-switch button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  color: #718678;
+}
+.auth-mode-switch button[aria-pressed="true"] {
+  background: white;
+  color: #2e6147;
+  box-shadow: 0 1px 5px #25463210;
+}
+.auth-fields {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+.selfserve-auth .auth-fields label {
+  color: #5d7666;
+}
+.auth-password-field {
+  position: relative;
+}
+.selfserve-auth .auth-password-field input {
+  padding-right: 45px;
+}
+.auth-password-field > button {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: 36px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  color: #7d9585;
+  border-radius: 6px;
+}
+.auth-password-field > button:hover {
+  background: #f0f5f1;
+}
+.auth-field-hint {
+  display: block;
+  color: #85988b;
+  margin-top: 7px;
+  font-size: 11px;
+}
+.auth-forgot {
+  display: block;
+  margin: -2px 0 17px auto;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  color: #507b5f;
+}
+.auth-back-link {
+  background: none;
+  border: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  color: #61826c;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 19px;
+  padding: 2px;
+}
+.auth-back-link:hover,
+.auth-forgot:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.selfserve-auth .auth-product-note {
+  text-align: left;
+  align-items: flex-start;
+  padding-top: 20px;
+  margin-top: 25px;
+  color: #7b9183;
+  line-height: 1.7;
+  font-size: 11px;
+}
+.auth-product-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #769e83;
+}
+.auth-admin-link {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin-top: 23px;
+  font-size: 11px;
+  color: #8a9c90;
+}
+.auth-email-address {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 10px;
+  color: #537761;
+  background: #edf4ee;
+  font-size: 13px;
+}
+.auth-email-address svg {
+  flex-shrink: 0;
+}
+.auth-email-address strong {
+  overflow-wrap: anywhere;
+}
+.auth-email-content > p {
+  color: #85988a;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 16px 0 23px;
+}
+.auth-notice {
+  background: #edf5ef;
+  border: 1px solid #d2e4d8;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #4a7659;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 15px;
+}
+.selfserve-auth .notice.error {
+  margin-bottom: 17px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (min-width: 1000px) {
+  .selfserve-auth .login-story {
+    padding-right: 65px;
+    padding-left: 65px;
+  }
+}
+@media (max-width: 640px) {
+  .selfserve-auth .login-form-wrap {
+    padding: 30px 0;
+  }
+  .selfserve-auth .login-form-panel {
+    padding: 23px 24px;
+  }
+  .selfserve-auth .auth-existing-link {
+    font-size: 10px;
+  }
+  .selfserve-auth .login-form-wrap > h2 {
+    font-size: 26px;
+  }
+  .auth-mode-switch {
+    margin-bottom: 22px;
+  }
+  .selfserve-auth .auth-fields label {
+    margin-bottom: 16px;
+  }
+}

@@ -1,0 +1,40 @@
+<!-- Control: ApplyDesk apply-board.html application form (preview portal, not a third-party custom ATS).
+     Used to check the classifier against a full, labeled apply form we own. -->
+<!DOCTYPE html>
+<html lang="en"><head><title>ApplyDesk preview portal</title></head>
+<body>
+<form id="app-form">
+  <div class="field"><label for="first_name">First name <em>*</em></label><input id="first_name" name="first_name" type="text" required></div>
+  <div class="field"><label for="last_name">Last name <em>*</em></label><input id="last_name" name="last_name" type="text" required></div>
+  <div class="field"><label for="email">Email <em>*</em></label><input id="email" name="email" type="email" required></div>
+  <div class="field"><label for="phone">Phone</label><input id="phone" name="phone" type="tel"></div>
+  <div class="field"><label for="location">City, State</label><input id="location" name="location" type="text"></div>
+  <div class="field"><label for="address">Address</label><input id="address" name="address" type="text"></div>
+  <div class="field"><label for="linkedin">LinkedIn profile</label><input id="linkedin" name="linkedin" type="url"></div>
+  <div class="field"><label for="resume">Resume/CV <em>*</em></label><input id="resume" name="resume" type="file" required></div>
+  <div class="field"><label for="cover">Cover letter</label><textarea id="cover" name="cover_letter" rows="6"></textarea></div>
+  <div class="field">
+    <label>Are you legally authorized to work in the United States? <em>*</em></label>
+    <div class="radios">
+      <label><input type="radio" name="work_auth" value="Yes" required> Yes</label>
+      <label><input type="radio" name="work_auth" value="No"> No</label>
+    </div>
+  </div>
+  <div class="field">
+    <label>Will you now or in the future require visa sponsorship?</label>
+    <div class="radios">
+      <label><input type="radio" name="sponsorship" value="Yes"> Yes</label>
+      <label><input type="radio" name="sponsorship" value="No"> No</label>
+    </div>
+  </div>
+  <div class="field"><label for="eeo_gender">Gender</label><input id="eeo_gender" name="gender" type="text"></div>
+  <div class="field"><label for="eeo_veteran">Veteran status</label><input id="eeo_veteran" name="veteran" type="text"></div>
+  <div class="field"><label for="eeo_disability">Disability</label><input id="eeo_disability" name="disability" type="text"></div>
+  <div class="field"><label for="eeo_race">Race / ethnicity</label><input id="eeo_race" name="race" type="text"></div>
+  <div class="field"><label for="heard_from">How did you hear about this job?</label><input id="heard_from" name="heard_from" type="text"></div>
+  <div class="login-box" style="display:none">
+    <label>Email</label><input id="login-email" type="email">
+    <label>Password</label><input id="login-pass" type="password">
+  </div>
+</form>
+</body></html>

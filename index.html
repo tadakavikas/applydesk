@@ -229,6 +229,26 @@ nav{position:sticky;top:0;z-index:50;background:rgba(255,248,240,.9);backdrop-fi
 .ref-link{border:1px solid rgba(255,255,255,.3);border-radius:var(--radius-lg);padding:18px 28px;font-family:var(--font-display);font-weight:800;font-size:20px;color:#fff;text-decoration:none;letter-spacing:.02em;white-space:nowrap}
 .ref-link:hover{background:rgba(255,255,255,.08)}
 @media(max-width:720px){.ref-grid{grid-template-columns:1fr;gap:28px}.ref-divider{width:auto;height:1px;background:repeating-linear-gradient(90deg,rgba(26,31,46,.25) 0 6px,transparent 6px 12px);margin:0}.ref-title{font-size:34px}.ref-pct{font-size:52px}}
+
+/* Separate self-service product entry; recruiter-managed campaign stays intact. */
+.ss-product-section{padding:76px 0;background:#eef5ef;border-block:1px solid #dce9df;scroll-margin-top:85px}
+.ss-product-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:64px;align-items:center}
+.ss-product-section h2{font-size:clamp(30px,3.2vw,44px);line-height:1.15;letter-spacing:-1.4px;color:#284d3b;margin:14px 0 20px}
+.ss-product-section p{font-size:15px;line-height:1.75;color:#5f7a68;max-width:600px}
+.ss-product-section .ss-product-note{font-size:12px;margin-top:14px;color:#78917f}
+.ss-product-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+.ss-product-section .btn-primary{background:#2b684f;color:#fff;border-color:#2b684f;font-size:13px}
+.ss-product-section .btn-ghost{font-size:13px;color:#426f52;border-color:#bacfbf}
+.ss-product-card{background:#fff;border:1px solid #d5e4d9;border-radius:18px;padding:34px;box-shadow:0 10px 40px #305c4010}
+.ss-product-label{font-size:10px;letter-spacing:1.8px;color:#779b84;font-weight:700}
+.ss-product-card h3{font-size:23px;color:#355740;margin:14px 0 24px}
+.ss-product-card ul{list-style:none;padding:0;margin:0;display:grid;gap:22px}
+.ss-product-card li{display:flex;gap:14px;align-items:center;font-size:13px;color:#53745e;line-height:1.6}
+.ss-product-card li span{font-size:11px;font-weight:700;color:#75a188;background:#eef6f0;border:1px solid #dcebe0;border-radius:9px;padding:8px;flex-shrink:0}
+.ss-product-card p{font-size:11px;border-top:1px solid #e3ece5;padding-top:20px;margin-top:24px}
+.ss-product-card p a{color:#2d7350;font-weight:600}
+@media(max-width:800px){.ss-product-grid{grid-template-columns:1fr;gap:30px}.ss-product-section{padding:48px 0}.ss-product-card{padding:25px}.nav-right{gap:10px}.nav-login{font-size:12px}}
+@media(max-width:480px){.nav-inner{gap:10px;padding:0 16px}.nav-right .nav-cta{font-size:11px;padding:10px 12px}.nav-login{font-size:10px;max-width:75px}.ss-product-actions .btn{padding:12px 16px}}
 </style>
 <style>
 /* ══════════ COMPARE ══════════ */
@@ -369,12 +389,12 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
     <a href="#" class="logo"><span class="mark">A</span><span><em>Apply</em>Desk</span></a>
     <div class="nav-links">
       <a href="#how">How it runs</a>
-      <a href="#compare">Compare</a>
+      <a href="#self-service">Self-service</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
     </div>
     <div class="nav-right">
-      <a href="portal-v2" class="nav-login">Log in</a>
+      <a href="portal-v2.html" class="nav-login">Client &amp; team login</a>
       <a href="#start" class="btn btn-primary nav-cta">Start my campaign</a>
     </div>
   </div>
@@ -420,6 +440,25 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
     </div>
   </div>
 </header>
+
+<!-- ══════════ SELF-SERVICE PRODUCT ══════════ -->
+<section id="self-service" class="ss-product-section">
+  <div class="wrap ss-product-grid">
+    <div>
+      <span class="eyebrow teal">· ApplyDesk Self-service ·</span>
+      <h2>Your search. Your next move.</h2>
+      <p>Prefer to manage your own applications? Discover US jobs with explicit H-1B sponsorship language, review your resume's fit, and keep your versions and applications together.</p>
+      <p class="ss-product-note">Create a separate self-service account. Our recruiter-managed service continues through the client portal.</p>
+      <div class="ss-product-actions"><a href="copilot.html?mode=signup" class="btn btn-primary">Create a self-service account</a><a href="copilot.html" class="btn btn-ghost">Self-service login</a></div>
+    </div>
+    <div class="ss-product-card">
+      <span class="ss-product-label">FOR INDEPENDENT JOB SEEKERS</span>
+      <h3>A workspace for each step.</h3>
+      <ul><li><span>01</span> Explore jobs from connected employer boards</li><li><span>02</span> Review and tailor your resume for each role</li><li><span>03</span> Apply on employer sites and track your progress</li></ul>
+      <p>Already working with an ApplyDesk recruiter? <a href="portal-v2.html">Open your client portal ↗</a></p>
+    </div>
+  </div>
+</section>
 
 <!-- ══════════ LOGOS ══════════ -->
 <section class="logos">
@@ -732,7 +771,9 @@ footer{border-top:1px solid rgba(26,31,46,.08);padding:44px 0 36px}
         </div>
         <div class="foot-col">
           <b>Access</b>
-          <a href="portal-v2">Client login</a>
+          <a href="portal-v2.html">Managed client &amp; team login</a>
+          <a href="copilot.html">Self-service login</a>
+          <a href="copilot.html?mode=signup">Create a self-service account</a>
           <a href="/docs">Onboarding documents</a>
         </div>
         <div class="foot-col">

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Continue your application · ApplyDesk</title>
+  <style>
+    :root{font-family:system-ui,sans-serif;color:#171411;background:#F4EFE6;line-height:1.6}
+    *{box-sizing:border-box}
+    body{margin:0;padding:32px 20px}
+    main{max-width:680px;margin:8vh auto;background:#fffcf6;border:1px solid #ded7cc;border-radius:18px;padding:clamp(24px,5vw,44px)}
+    .brand{color:#9c442a;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+    h1{font-size:clamp(26px,5vw,36px);line-height:1.2;letter-spacing:-.035em}
+    p{color:#6B655C}
+    #job{font-weight:600;color:#171411}
+    #destination{overflow-wrap:anywhere;font-size:14px}
+    .actions{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:28px}
+    a{color:#9c442a;font-weight:600;text-underline-offset:4px}
+    .button{display:inline-block;padding:12px 18px;background:#171411;color:white;border-radius:8px;text-decoration:none}
+    a:focus-visible{outline:3px solid #1f6b63;outline-offset:4px}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">ApplyDesk · Application handoff</div>
+    <h1>Continue on the employer’s website</h1>
+    <p id="job" hidden></p>
+    <p id="message">This older application link does not include a supported employer career URL. Return to your job search and open a current posting.</p>
+    <p id="destination" hidden></p>
+    <p>ApplyDesk has not submitted an application. Sign in, review your details, attach your resume and submit on the employer’s website.</p>
+    <div class="actions">
+      <a id="continue" class="button" target="_blank" rel="noopener noreferrer" hidden>Continue on employer career site</a>
+      <a href="copilot.html">Back to job search &amp; resumes</a>
+    </div>
+  </main>
+  <script>
+    // This compatibility page only accepts recognized ATS career hosts.
+    // It never accepts an allowlist supplied in a stored application packet.
+    function approvedCareerUrl(value) {
+      if (typeof value !== 'string') return null;
+      try {
+        const url = new URL(value);
+        if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
+        const host = url.hostname.toLowerCase();
+        const atsHosts = new Set([
+          'boards.greenhouse.io', 'job-boards.greenhouse.io', 'boards.eu.greenhouse.io',
+          'jobs.lever.co', 'jobs.eu.lever.co', 'jobs.ashbyhq.com', 'jobs.smartrecruiters.com'
+        ]);
+        const workdayHost = /^[a-z0-9-]+\.wd[0-9]+\.myworkdayjobs\.com$/.test(host);
+        if (!atsHosts.has(host) && !workdayHost) return null;
+        if (!url.pathname || url.pathname === '/') return null;
+        return url;
+      } catch (_) { return null; }
+    }
+
+    (function renderHandoff() {
+      let packet;
+      try { packet = JSON.parse(sessionStorage.getItem('ad-apply-packet') || 'null'); }
+      catch (_) { return; }
+      if (!packet || !packet.job || typeof packet.job !== 'object') return;
+      const job = packet.job;
+      const title = [job.title, job.company].filter(value => typeof value === 'string' && value.trim()).join(' · ');
+      if (title) {
+        document.getElementById('job').textContent = title;
+        document.getElementById('job').hidden = false;
+      }
+      const url = approvedCareerUrl(job.url);
+      if (!url) return;
+      document.getElementById('message').textContent = 'Your next step opens this posting on the employer’s career platform in a new tab.';
+      const destination = document.getElementById('destination');
+      destination.textContent = 'Destination: ' + url.hostname + url.pathname;
+      destination.hidden = false;
+      const link = document.getElementById('continue');
+      link.href = url.href;
+      link.hidden = false;
+    })();
+  </script>
+</body>
+</html>

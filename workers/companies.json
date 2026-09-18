@@ -1,0 +1,20 @@
+{
+  "greenhouse": [
+    { "board": "nuancelabs", "company": "Nuance Labs" },
+    { "board": "riverai", "company": "River" },
+    { "board": "anthropic", "company": "Anthropic" },
+    { "board": "stripe", "company": "Stripe" },
+    { "board": "databricks", "company": "Databricks" },
+    { "board": "airbnb", "company": "Airbnb" },
+    { "board": "cloudflare", "company": "Cloudflare" }
+  ],
+  "lever": [],
+  "ashby": [
+    { "board": "ThinkingMachines", "company": "Thinking Machines Lab" },
+    { "board": "dmodel", "company": "Dmodel" },
+    { "board": "fal-ai", "company": "fal" },
+    { "board": "orpex", "company": "Orpex" },
+    { "board": "wispr-flow", "company": "Wispr Flow" },
+    { "board": "notion", "company": "Notion" }
+  ]
+}
