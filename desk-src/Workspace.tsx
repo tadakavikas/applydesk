@@ -77,7 +77,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Toaster } from "sonner";
-import { api, openOriginal } from "./lib/api";
+import { api, openOriginal, downloadApplicationResume } from "./lib/api";
 import { sb } from "./lib/client";
 import { toast } from "sonner";
 import {
@@ -90,6 +90,9 @@ import {
   resumeQuality,
   tailorProfile,
   sponsorshipLabel,
+  feedAvailability,
+  resumeSourceLabel,
+  type ResumeSource,
   type ResumeProfile,
   type Resume,
   type Job,
@@ -125,15 +128,17 @@ function Picker({
   options,
   label,
   className = "",
+  disabled = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: [string, string][];
   label: string;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger aria-label={label} className={"filter " + className}>
         <SelectValue />
       </SelectTrigger>
@@ -259,9 +264,19 @@ export default function Workspace() {
     [replaceId, setReplaceId] = useState<string | null>(null),
     [editingId, setEditingId] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
-    [selectedResume, setSelectedResume] = useState("");
+    [selectedResume, setSelectedResume] = useState(""),
+    [preferenceBusy, setPreferenceBusy] = useState(false),
+    [handoffJobId, setHandoffJobId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null),
     uploadRef = useRef<HTMLInputElement>(null);
+  const feedState = feedAvailability(feed);
+  const resumeSource = account?.applicationResumeSource || "applydesk";
+  const existingApplication = account?.activity.find(
+    (a) => a.jobId === job?.id && a.action === "application",
+  );
+  const handoffApplication = account?.activity.find(
+    (a) => a.jobId === handoffJobId && a.action === "application",
+  );
   const primary =
     account?.resumes.find((r) => r.primary) || account?.resumes[0] || null;
   const activeResume =
@@ -407,6 +422,7 @@ export default function Workspace() {
           status,
           resumeId: applyingResume?.id,
           resumeSnapshot: snapshot,
+          resumeSource,
           score:
             snapshot && j
               ? matchProfile(snapshot, j).score
@@ -507,8 +523,64 @@ export default function Workspace() {
       );
     }
   }
+  async function saveResumePreference(source: ResumeSource) {
+    setPreferenceBusy(true);
+    try {
+      await api("preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeSource: source }),
+      });
+      await refreshAccount();
+      setTailored(null);
+      toast.success(
+        source === "custom"
+          ? "Future applications will use your custom original."
+          : "Future applications will use your ApplyDesk resume.",
+      );
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setPreferenceBusy(false);
+    }
+  }
+  function resumePreference() {
+    return (
+      <div className="resume-preference">
+        <h3>Resume for new applications</h3>
+        <Picker
+          value={resumeSource}
+          disabled={preferenceBusy || busy}
+          onChange={(value) => void saveResumePreference(value as ResumeSource)}
+          label="Default application resume"
+          options={[
+            ["applydesk", "ApplyDesk resume (default)"],
+            ["custom", "Use my custom original"],
+          ]}
+        />
+        <p className="estimate-note">
+          {resumeSource === "applydesk"
+            ? "Use your reviewed ApplyDesk format and any changes you prepare for the job."
+            : "Use the selected uploaded file exactly as it is, without ApplyDesk formatting or tailoring."}{" "}
+          Saved for future applications. Past applications keep their saved
+          version.
+        </p>
+      </div>
+    );
+  }
+  async function downloadSavedApplication(application: Activity) {
+    if (!application.applicationId) return;
+    try {
+      await downloadApplicationResume(application.applicationId);
+      toast.success(
+        "Saved application resume downloaded. Upload it on the employer’s website.",
+      );
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
   async function applyNow() {
-    if (!job || !applyingResume) return;
+    if (!job || !applyingResume || preferenceBusy) return;
     const tab = window.open("about:blank", "_blank");
     if (tab) tab.opener = null;
     setBusy(true);
@@ -517,7 +589,9 @@ export default function Workspace() {
         job,
         "application",
         "Started",
-        tailored || applyingResume.profile,
+        resumeSource === "applydesk"
+          ? tailored || applyingResume.profile
+          : applyingResume.profile,
       );
       if (result?.url) {
         if (tab) tab.location.href = result.url;
@@ -525,8 +599,9 @@ export default function Workspace() {
         toast.success(
           result.already
             ? "Existing application reopened. Its saved resume and status are unchanged."
-            : "Application started. Complete it on the employer’s website.",
+            : "Application prepared. Download the saved resume and upload it on the employer’s website.",
         );
+        setHandoffJobId(job.id);
         setJob(null);
         setView("applications");
       } else tab?.close();
@@ -822,11 +897,23 @@ export default function Workspace() {
               <div className="feed-line">
                 <button onClick={() => setSourcesOpen(true)}>
                   <span
-                    className={"status-dot " + (feedError ? "offline" : "")}
+                    className={
+                      "status-dot " +
+                      (feedError ||
+                      (feed &&
+                        feed.sources.length > 0 &&
+                        !feed.sources.some((source) => source.ok))
+                        ? "offline"
+                        : !feed || !feed.sources.length
+                          ? "pending"
+                          : "")
+                    }
                   />
-                  {feed
-                    ? `${feed.sources.filter((s) => s.ok).length} of ${feed.sources.length} employer boards current`
-                    : "Connecting employer boards"}
+                  {feed && !feed.sources.length
+                    ? "Waiting for the first employer sync"
+                    : feed
+                      ? `${feed.sources.filter((s) => s.ok).length} of ${feed.sources.length} employer boards current`
+                      : "Connecting employer boards"}
                   <Info size={13} />
                 </button>
                 <span>
@@ -895,6 +982,33 @@ export default function Workspace() {
                   <LoaderCircle className="spin" />
                   <p>Checking employer career pages…</p>
                 </div>
+              ) : view === "jobs" &&
+                jobTab !== "skipped" &&
+                feedState !== "ready" ? (
+                <Blank
+                  title={
+                    feedState === "awaiting_sources"
+                      ? "The job feed is waiting for its first sync"
+                      : feedState === "unavailable"
+                        ? "Employer boards need a fresh check"
+                        : "No current roles meet the H-1B requirements"
+                  }
+                  action={
+                    <button
+                      className="button secondary"
+                      disabled={loading}
+                      onClick={() => void loadJobs()}
+                    >
+                      Check again
+                    </button>
+                  }
+                >
+                  {feedState === "awaiting_sources"
+                    ? "Your resume is saved. Employer listings have not synced yet, so search and matching have no jobs to use. The ApplyDesk team needs to finish connecting the feed."
+                    : feedState === "unavailable"
+                      ? "The latest source checks are unavailable or out of date. No eligible current listings can be shown yet. Matching will resume when fresh listings are available."
+                      : "The latest source checks found no eligible US listings with an explicit H-1B sponsorship statement and a publication date in the past 30 days. Your resume is ready for the next update."}
+                </Blank>
               ) : filtered.length ? (
                 <div className="job-grid">
                   {filtered.map((j) => {
@@ -1077,7 +1191,9 @@ export default function Workspace() {
                       ? "Your shortlist is waiting"
                       : jobTab === "matches" && !primary
                         ? "Add a resume to find your fit"
-                        : "No roles match these filters"
+                        : jobTab === "matches"
+                          ? "No close resume matches yet"
+                          : "No roles match these filters"
                   }
                   action={
                     <div className="button-row">
@@ -1109,7 +1225,9 @@ export default function Workspace() {
                 >
                   {view === "saved"
                     ? "Save a role using the bookmark on its card. Try clearing filters if your saved roles are hidden."
-                    : "Try a different title, state, or date range. Only eligible jobs from the connected employer boards appear here."}
+                    : jobTab === "matches"
+                      ? "For you shows roles with at least 60% of detected job skills in your primary resume. Explore All jobs for other eligible roles, or review your profile details."
+                      : "Try a different title, state, or date range. Only eligible jobs from the connected employer boards appear here."}
                 </Blank>
               )}
               <footer className="page-footer">
@@ -1230,6 +1348,8 @@ export default function Workspace() {
                           employer’s ATS score.
                         </p>
                         <div className="divider" />
+                        {resumePreference()}
+                        <div className="divider" />
                         <h3>Make this version yours</h3>
                         <button
                           className="button secondary full"
@@ -1343,6 +1463,33 @@ export default function Workspace() {
                 Opening a career page marks an application as Started. Update it
                 to Applied after you submit on the employer’s site.
               </p>
+              {handoffApplication && (
+                <div className="application-handoff" role="status">
+                  <FileText size={24} />
+                  <div>
+                    <strong>
+                      Your resume for {handoffApplication.job.title} is ready
+                    </strong>
+                    <p>
+                      {resumeSourceLabel(
+                        handoffApplication.resumeSource || "applydesk",
+                      )}{" "}
+                      saved for this application. Download it and upload it on
+                      the employer’s website. ApplyDesk does not attach files to
+                      that site automatically.
+                    </p>
+                  </div>
+                  <button
+                    className="button primary"
+                    onClick={() =>
+                      void downloadSavedApplication(handoffApplication)
+                    }
+                  >
+                    <Download size={16} />
+                    Download saved resume
+                  </button>
+                </div>
+              )}
               {account?.activity.some((a) => a.action === "application") ? (
                 <div className="application-list">
                   {account.activity
@@ -1357,8 +1504,8 @@ export default function Workspace() {
                           </span>
                           <small>
                             Updated {since(a.updatedAt)} ·{" "}
-                            {account.resumes.find((r) => r.id === a.resumeId)
-                              ?.name || "Application resume snapshot"}
+                            {resumeSourceLabel(a.resumeSource || "applydesk")} ·{" "}
+                            {a.resumeFileName || "Application resume snapshot"}
                           </small>
                         </div>
                         <Picker
@@ -1380,13 +1527,11 @@ export default function Workspace() {
                           }}
                           options={statuses.map((s) => [s, s])}
                         />
-                        {a.resumeSnapshot && (
+                        {a.applicationId && (
                           <button
                             className="icon-button"
                             aria-label="Download application resume"
-                            onClick={() =>
-                              void download(a.resumeSnapshot!, "pdf")
-                            }
+                            onClick={() => void downloadSavedApplication(a)}
                           >
                             <Download size={17} />
                           </button>
@@ -1455,6 +1600,9 @@ export default function Workspace() {
             </DialogDescription>
           </DialogHeader>
           <div className="source-list">
+            {feed && !feed.sources.length && (
+              <p>No employer sources have completed their first sync yet.</p>
+            )}
             {feed?.sources.map((s) => (
               <div key={s.name}>
                 <span className={"status-dot " + (s.ok ? "" : "offline")} />
@@ -1684,12 +1832,26 @@ export default function Workspace() {
                               setChosenResume(v);
                               setTailored(null);
                             }}
+                            disabled={
+                              !!existingApplication || busy || preferenceBusy
+                            }
                             label="Resume for application"
                             options={account!.resumes.map((r) => [
                               r.id,
                               r.name + (r.primary ? " · Primary" : ""),
                             ])}
                           />
+                          {existingApplication ? (
+                            <p className="notice">
+                              Saved for this application:{" "}
+                              {resumeSourceLabel(
+                                existingApplication.resumeSource || "applydesk",
+                              )}
+                              . Reopening keeps its original snapshot.
+                            </p>
+                          ) : (
+                            resumePreference()
+                          )}
                           {match.score === null ? (
                             <p className="notice">
                               A match score is unavailable because this
@@ -1705,6 +1867,8 @@ export default function Workspace() {
                             {match.matched.length} of {job.skills.length}{" "}
                             detected skills found. Estimated ATS keyword
                             coverage; employer systems may score differently.
+                            {resumeSource === "custom" &&
+                              " This estimate uses your reviewed profile; your unchanged custom file may contain different text."}
                           </p>
                           <h3>
                             {match.score !== null && match.score >= 85
@@ -1734,6 +1898,11 @@ export default function Workspace() {
                           <button
                             className="button secondary full"
                             onClick={() => setJobStage("tailor")}
+                            disabled={
+                              resumeSource === "custom" ||
+                              !!existingApplication ||
+                              preferenceBusy
+                            }
                           >
                             <Sparkles size={16} />
                             {match.score !== null && match.score >= 85
@@ -1741,21 +1910,26 @@ export default function Workspace() {
                               : "Fix my resume"}
                           </button>
                           <p className="estimate-note">
-                            We keep your roles and experience intact. Add a
-                            missing skill only if you actually have it.
+                            {resumeSource === "custom"
+                              ? "Your custom original is used unchanged. Choose ApplyDesk resume to use formatting and job-specific updates."
+                              : "We keep your roles and experience intact. Add a missing skill only if you actually have it."}
                           </p>
                           <button
                             className="button primary full"
                             onClick={() => void applyNow()}
                             disabled={
                               busy ||
+                              preferenceBusy ||
                               (job.status !== "active" &&
                                 actions.get(job.id)?.action !== "application")
                             }
                           >
                             Apply now <ArrowUpRight size={16} />
                           </button>
-                          <small>Continues to the company career site</small>
+                          <small>
+                            Opens the employer’s site. Download your saved
+                            resume, then upload it there.
+                          </small>
                         </>
                       ) : (
                         <>

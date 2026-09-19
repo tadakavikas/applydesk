@@ -59,6 +59,7 @@ async function mockWorkspace(page: any, { resume = true } = {}) {
         },
       ]
     : [];
+  let applicationResumeSource = "applydesk";
   const activity: any[] = [];
   const applications: any[] = [];
   const calls: any[] = [];
@@ -137,11 +138,18 @@ async function mockWorkspace(page: any, { resume = true } = {}) {
           data = {
             ok: true,
             resumes,
+            application_resume_source: applicationResumeSource,
             activity,
             applications,
             feed_status: feed,
           };
-        else if (fn === "fn_ss_discover_jobs")
+        else if (fn === "fn_ss_set_resume_preference") {
+          applicationResumeSource = body.p_source;
+          data = {
+            ok: true,
+            application_resume_source: applicationResumeSource,
+          };
+        } else if (fn === "fn_ss_discover_jobs")
           data = { ok: true, jobs, feed_status: feed };
         else if (fn === "fn_ss_set_job_activity") {
           const idx = activity.findIndex((a) => a.job_id === body.p_job_id);
@@ -187,7 +195,16 @@ async function mockWorkspace(page: any, { resume = true } = {}) {
               resume_id: body.p_resume_id,
               status: "opened",
               job_snapshot: job,
-              resume_snapshot: { parsed_profile: body.p_parsed_profile },
+              resume_snapshot: {
+                source: body.p_resume_source || applicationResumeSource,
+                file_name: resumes.find((r) => r.id === body.p_resume_id)
+                  ?.file_name,
+                storage_path: resumes.find((r) => r.id === body.p_resume_id)
+                  ?.storage_path,
+                ...(applicationResumeSource === "applydesk"
+                  ? { parsed_profile: body.p_parsed_profile }
+                  : {}),
+              },
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             });
@@ -208,7 +225,7 @@ async function mockWorkspace(page: any, { resume = true } = {}) {
   await page.route("https://job-boards.greenhouse.io/**", (route) =>
     route.fulfill({ body: "Employer application test destination" }),
   );
-  return { calls, resumes, activity, applications };
+  return { calls, resumes, activity, applications, jobs, feed };
 }
 test("signed-out page and mobile layout", async ({ page }) => {
   await page.goto(origin + "/copilot.html");
@@ -267,7 +284,9 @@ test("jobs, save/skip persistence, tailoring, exports and employer handoff", asy
   await page.getByRole("tab", { name: /All jobs/ }).click();
   await page
     .locator(".job-card")
-    .first()
+    .filter({
+      has: page.getByRole("button", { name: "Data Engineer", exact: true }),
+    })
     .getByRole("button", { name: "Apply now" })
     .click();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -298,6 +317,16 @@ test("jobs, save/skip persistence, tailoring, exports and employer handoff", asy
     state.applications[0].resume_snapshot.parsed_profile.skills,
   ).not.toContain("Spark");
   await popup.close();
+  await expect(page.locator(".application-handoff")).toContainText(
+    "ApplyDesk resume saved for this application",
+  );
+  const savedDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download saved resume", exact: true })
+    .click();
+  expect((await savedDownload).suggestedFilename()).toMatch(
+    /application-resume\.pdf$/,
+  );
   await page
     .getByRole("combobox", { name: "Status for Data Engineer" })
     .click();
@@ -306,7 +335,9 @@ test("jobs, save/skip persistence, tailoring, exports and employer handoff", asy
   await page.getByRole("button", { name: "Find jobs", exact: true }).click();
   await page
     .locator(".job-card")
-    .first()
+    .filter({
+      has: page.getByRole("button", { name: "Data Engineer", exact: true }),
+    })
     .getByRole("button", { name: "View job" })
     .click();
   await expect(page.getByText(/You already have an application/)).toBeVisible();
@@ -442,4 +473,127 @@ test("job filters compose and mobile cards stay within the viewport", async ({
   }));
   if (overflow.scroll > overflow.width) console.log(JSON.stringify(overflow));
   expect(overflow.scroll <= overflow.width).toBe(true);
+});
+
+test("default ApplyDesk choice persists and explicit custom choice is visible in employer handoff", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  await page.goto(origin + "/copilot.html");
+  await page
+    .getByRole("button", { name: "My resumes", exact: true })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Default application resume" }),
+  ).toContainText("ApplyDesk resume (default)");
+  await page
+    .getByRole("combobox", { name: "Default application resume" })
+    .click();
+  await page
+    .getByRole("option", { name: "Use my custom original", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Default application resume" }),
+  ).toContainText("Use my custom original");
+  await page.reload();
+  await page
+    .locator(".job-card")
+    .first()
+    .getByRole("button", { name: "Apply now" })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Default application resume" }),
+  ).toContainText("Use my custom original");
+  await expect(
+    page.getByRole("button", { name: "Fix my resume" }),
+  ).toBeDisabled();
+  const popup = page.waitForEvent("popup");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Apply now", exact: true })
+    .click();
+  await (await popup).close();
+  await expect(page.locator(".application-handoff")).toContainText(
+    "Custom original saved for this application",
+  );
+  await expect(page.locator(".application-handoff")).toContainText(
+    "does not attach files",
+  );
+  expect(state.applications[0].resume_snapshot.source).toBe("custom");
+  expect(state.applications[0].resume_snapshot.parsed_profile).toBeUndefined();
+  await page
+    .getByRole("button", { name: "My resumes", exact: true })
+    .first()
+    .click();
+  await page
+    .getByRole("combobox", { name: "Default application resume" })
+    .click();
+  await page
+    .getByRole("option", { name: "ApplyDesk resume (default)", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Applications", exact: true }).click();
+  await expect(page.locator(".application-row")).toContainText(
+    "Custom original",
+  );
+  expect(state.applications[0].resume_snapshot.source).toBe("custom");
+});
+
+test("an unsynced feed explains why searching and resume matching have no jobs", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  state.jobs.length = 0;
+  state.feed.length = 0;
+  await page.goto(origin + "/copilot.html");
+  await expect(
+    page.getByText("The job feed is waiting for its first sync", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Waiting for the first employer sync", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("0 of 0 employer boards current", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("No roles match these filters", { exact: true }),
+  ).toHaveCount(0);
+  await page.getByLabel("Search jobs", { exact: true }).fill("Python");
+  await page.getByRole("tab", { name: "For you", exact: true }).click();
+  await expect(
+    page.getByText("The job feed is waiting for its first sync", {
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
+test("healthy empty feed reports eligibility limits instead of failed search", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  state.jobs.length = 0;
+  await page.goto(origin + "/copilot.html");
+  await expect(
+    page.getByText("No current roles meet the H-1B requirements", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No roles match these filters", { exact: true }),
+  ).toHaveCount(0);
+});
+
+test("a failed latest sync does not hide jobs that are still verified and eligible", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  state.feed[0].status = "failed";
+  await page.goto(origin + "/copilot.html");
+  await expect(page.locator(".job-card")).toHaveCount(3);
+  await expect(
+    page.getByText("0 of 1 employer boards current", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".feed-line .status-dot")).toHaveClass(/offline/);
 });

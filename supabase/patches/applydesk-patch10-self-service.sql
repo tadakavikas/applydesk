@@ -1,5 +1,9 @@
 -- ApplyDesk patch 10: independent self-service product under the ApplyDesk brand.
--- Apply after patches 5, 7, 8, and 9. No users or client data are migrated.
+-- Requires the existing trusted app_auth_map and shared job-feed tables.
+-- If both feed tables are absent, apply applydesk-self-service-feed-foundation.sql
+-- first. Compatible feed tables from historical patches 8/9 also work.
+-- No historical managed-client Copilot APIs are required or installed here.
+-- No users or client data are migrated.
 -- Existing recruiter-managed clients and portal data remain separate.
 begin;
 

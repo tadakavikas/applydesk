@@ -17,7 +17,12 @@ import {
   X,
 } from "lucide-react";
 import { adminRpc, originalResumeUrl } from "./lib/admin-client";
-import { profileLabels, type ResumeProfile } from "./lib/model";
+import {
+  applicationResumeSource,
+  resumeSourceLabel,
+  profileLabels,
+  type ResumeProfile,
+} from "./lib/model";
 import { exportResume, saveFile } from "./lib/resume-files";
 
 type DataRow = Record<string, any>;
@@ -821,14 +826,27 @@ export default function Admin() {
                                   from the member marking an application as
                                   submitted.
                                 </p>
-                                <h3>Resume snapshot at handoff</h3>
+                                <h3>
+                                  Resume snapshot at handoff ·{" "}
+                                  {resumeSourceLabel(
+                                    applicationResumeSource(resume.source),
+                                  )}
+                                </h3>
                                 <p className="ss-caption">
                                   This snapshot preserves the resume used at the
                                   time, even if the member later edits or
                                   replaces a resume.
                                 </p>
                                 {resumeDownloads(resume)}
-                                <Profile row={resume} />
+                                {resume.source === "custom" ? (
+                                  <p className="ss-caption">
+                                    The member selected their unchanged uploaded
+                                    original. Use Original file above to
+                                    download the exact saved version.
+                                  </p>
+                                ) : (
+                                  <Profile row={resume} />
+                                )}
                                 <div className="ss-actions">
                                   <button
                                     className="ss-button ss-small"

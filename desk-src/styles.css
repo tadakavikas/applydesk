@@ -2238,3 +2238,48 @@ button {
     margin-top: 2px;
   }
 }
+
+.status-dot.pending {
+  background: #b79864;
+}
+.resume-preference {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+.resume-preference > .filter {
+  width: 100%;
+  height: auto !important;
+  min-height: 42px;
+  white-space: normal;
+}
+.resume-preference [data-slot="select-value"] {
+  white-space: normal;
+  text-align: left;
+}
+.application-handoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #c8ddd0;
+  border-radius: 10px;
+  background: #edf5ef;
+  margin: 18px 0;
+}
+.application-handoff > div {
+  flex: 1;
+  min-width: min(100%, 240px);
+}
+.application-handoff strong {
+  color: #315743;
+}
+.application-handoff p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 6px;
+  color: #62796a;
+}
+.application-handoff > .button {
+  flex-shrink: 0;
+}

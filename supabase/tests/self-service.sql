@@ -1,5 +1,11 @@
--- Disposable local PostgreSQL only. Requires bootstrap-local.sql; all fixtures roll back.
+-- Disposable local PostgreSQL only; all fixtures roll back.
+-- Default: bootstrap-local.sql, including historical managed-client workspace.
+-- Minimal: bootstrap-local-self-service.sql and -v self_service_only=true.
 \set ON_ERROR_STOP on
+\if :{?self_service_only}
+\else
+\set self_service_only false
+\endif
 begin;
 create function public._ss_assert(value boolean,message text) returns void language plpgsql as $$
 begin if value is distinct from true then raise exception 'FAIL: %',message; end if; end $$;
@@ -44,7 +50,11 @@ set request.jwt.claim.sub='00000000-0000-0000-0000-000000000001';
 select _ss_assert((fn_ss_enroll('Self-service A')->>'kind')='member','verified signup enrolls');
 select _ss_assert((fn_ss_enroll('Renamed attempt')->'profile'->>'full_name')='Self-service A','enrollment is idempotent without renaming');
 select _ss_assert((fn_ss_get_my_workspace()->>'ok')::boolean,'new member can access workspace');
+\if :self_service_only
+select _ss_assert(to_regprocedure('public.fn_a_get_my_workspace()') is null,'historical managed-client workspace RPC remains absent for self-service member');
+\else
 select _ss_assert(not (fn_a_get_my_workspace()->>'ok')::boolean,'self-service member cannot use managed client workspace');
+\endif
 select _ss_assert((select count(*)=0 from app_selfserve_members),'admin notes table is hidden from member');
 select _ss_assert(json_array_length(fn_ss_discover_jobs()->'jobs')=1,'discovery excludes unknown date, stale, closed, old and generic visa jobs');
 insert into storage.objects(bucket_id,name) values
@@ -116,7 +126,11 @@ set request.jwt.claim.sub='00000000-0000-0000-0000-000000000006';
 select _ss_assert((fn_ss_identity()->>'kind')='legacy','managed client remains legacy');
 select _ss_assert(not (fn_ss_enroll('Managed Client')->>'ok')::boolean,'managed client cannot enroll');
 select _ss_assert(not (fn_ss_get_my_workspace()->>'ok')::boolean,'managed client cannot use self-service workspace');
+\if :self_service_only
+select _ss_assert(to_regprocedure('public.fn_a_get_my_workspace()') is null,'self-service deployment does not install a historical managed-client workspace RPC');
+\else
 select _ss_assert((fn_a_get_my_workspace()->>'ok')::boolean,'managed client keeps original workspace access');
+\endif
 select _ss_assert((select count(*)=0 from app_selfserve_resumes),'managed client cannot read self-service resumes');
 
 set request.jwt.claim.sub='00000000-0000-0000-0000-000000000004';
@@ -183,9 +197,15 @@ select _ss_assert((select count(*)=3 from storage.objects where bucket_id='selfs
 reset role;
 select _ss_assert((select count(*)=1 from app_clients),'enrollment never creates managed clients');
 select _ss_assert((select count(*)=4 from app_auth_map),'enrollment never creates legacy auth mappings');
+\if :self_service_only
+select _ss_assert(to_regclass('public.app_member_resumes') is null,'historical managed-client resume table remains absent');
+select _ss_assert(to_regclass('public.app_member_applications') is null,'historical managed-client application table remains absent');
+select _ss_assert(to_regclass('public.app_copilot_profiles') is null,'historical client copilot profile table remains absent');
+\else
 select _ss_assert((select count(*)=0 from app_member_resumes),'self-service never writes managed-client resume table');
 select _ss_assert((select count(*)=0 from app_member_applications),'self-service never writes managed-client application table');
 select _ss_assert((select count(*)=0 from app_copilot_profiles),'self-service never writes legacy copilot profile');
+\endif
 do $$ begin
   begin
     update app_selfserve_applications set resume_snapshot='{}';

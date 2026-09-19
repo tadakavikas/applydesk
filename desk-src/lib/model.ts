@@ -41,6 +41,7 @@ export type Job = {
   status?: "active" | "closed" | "stale";
   evidence: string;
 };
+export type ResumeSource = "applydesk" | "custom";
 export type Activity = {
   jobId: string;
   action: "saved" | "skipped" | "application";
@@ -48,10 +49,14 @@ export type Activity = {
   job: Job;
   resumeId: string | null;
   resumeSnapshot: ResumeProfile | null;
+  resumeSource?: ResumeSource;
+  resumeFileName?: string;
+  applicationId?: string;
   updatedAt: string;
 };
 export type Account = {
   user: { userId: string; displayName: string; email: string };
+  applicationResumeSource: ResumeSource;
   resumes: Resume[];
   activity: Activity[];
 };
@@ -484,4 +489,22 @@ export function sponsorshipLabel(j: Job) {
       : j.sponsorship === "not_sponsored"
         ? "Sponsorship not offered"
         : "Sponsorship unverified";
+}
+
+// Existing applications used generated profiles before source selection existed.
+export function applicationResumeSource(value: unknown): ResumeSource {
+  return value === "custom" ? "custom" : "applydesk";
+}
+export function resumeSourceLabel(source: ResumeSource) {
+  return source === "custom" ? "Custom original" : "ApplyDesk resume";
+}
+export function feedAvailability(feed: Feed | null) {
+  if (!feed) return "loading";
+  // The server has already enforced verification freshness on these jobs. A
+  // failed latest source attempt must not hide still-current verified listings.
+  if (feed.jobs.length) return "ready";
+  if (!feed.sources.length) return "awaiting_sources";
+  if (!feed.sources.some((source) => source.ok)) return "unavailable";
+  if (!feed.jobs.length) return "no_eligible_jobs";
+  return "ready";
 }

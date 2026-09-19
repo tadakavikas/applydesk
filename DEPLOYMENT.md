@@ -17,7 +17,7 @@ Cloudflare Workers Static Assets serves the frontend from `dist`. The job feed r
 
 Back up the live database using your normal Supabase workflow. Review the migration before applying it.
 
-The new product requires patch 10 after the existing authentication migration (patch 5), compatibility patch 7, job-pool schema (patch 8), and feed/workspace foundations (patch 9). Check your deployed schema first; the supplied screenshot does not prove which patches have been applied:
+The self-service product needs the existing trusted `app_auth_map`, the shared job-feed tables, and patches 10–11. Check the deployed schema first:
 
 ```sql
 select to_regclass('public.app_auth_map') as auth_map,
@@ -27,11 +27,19 @@ select to_regclass('public.app_auth_map') as auth_map,
        to_regclass('public.app_selfserve_members') as selfserve_members;
 ```
 
-If a prerequisite is missing, apply only the required **pending** migration(s) from `supabase/patches/` in their documented order; do not blindly reapply old patches. For this update the final migration is:
+Verify that `app_auth_map` has a UUID `user_id` referencing `auth.users`, a trusted `role` value, and row-level security that prevents browser users from inserting or changing role mappings. The existing mapping and accounts are preserved; do not replay authentication patches 5, 6, or 7 to install this product.
 
-`supabase/patches/applydesk-patch10-self-service.sql`
+When both `app_job_pool` and `app_job_feed_status` are absent, apply these files in order using the trusted SQL Editor `postgres` role:
 
-It is transactional and additive. It creates separate `app_selfserve_*` tables, the private `selfserve-resumes` bucket, member/admin RPCs, and RLS policies. It does not copy, enroll, alter or delete recruiter-managed client records. Existing job listings are shared public-source reference data; member accounts, resumes, saved jobs and applications are separate. Patch 9 remains a historical prerequisite; the self-service frontend does not call its client-bound RPCs or use its `client-resumes` bucket. See `supabase/SELF-SERVICE.md` for the new data/access contract.
+1. `supabase/patches/applydesk-self-service-feed-foundation.sql`
+2. `supabase/patches/applydesk-patch10-self-service.sql`
+3. `supabase/patches/applydesk-patch11-resume-preference.sql`
+
+The feed foundation creates only the shared job pool and feed-status tables, their constraints/index, RLS, and server-role permissions. It is transactional and intentionally aborts if either table already exists. If feed tables are already present, compare their columns and constraints with this file and skip it when compatible; review a scoped change for any missing fields instead of replaying historical migrations.
+
+Patch 10 is transactional and rerunnable. It creates separate `app_selfserve_*` tables, the private `selfserve-resumes` bucket, member/admin RPCs, and RLS policies. It does not copy, enroll, alter or delete recruiter-managed client records. Job listings are shared public-source reference data; member accounts, resumes, saved jobs and applications are separate. Historical patches 8/9 and their managed-client Copilot tables, RPCs, and `client-resumes` bucket are not required by this deployment path. See `supabase/SELF-SERVICE.md` for the data/access contract and runnable local verification commands.
+
+Patch 11 adds a per-member resume preference: ApplyDesk by default, custom original only after an explicit choice. It freezes that source with each application. Apply it before publishing the updated frontend. On a project already running patch 10, apply only patch 11; do not replay patch 10 afterwards because it restores the older application RPC. Patch 11 itself is rerunnable and changes no legacy client records or storage policies.
 
 In **Supabase -> Authentication**, enable email/password signup, keep email confirmation enabled, and verify SMTP delivery. Add your production callback URLs under URL Configuration:
 

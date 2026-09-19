@@ -1,6 +1,7 @@
 import { sb, rpc, getMember, validEmployerUrl } from "./client";
 import {
   extractSkills,
+  applicationResumeSource,
   profileText,
   emptyProfile,
   STATES,
@@ -12,7 +13,7 @@ import {
   type ResumeProfile,
   type Activity,
 } from "./model";
-import { resumeLatex } from "./resume-files";
+import { exportResume, resumeLatex } from "./resume-files";
 let latest: Account | null = null;
 let accountGeneration = 0;
 export function resetAccountCache() {
@@ -153,6 +154,8 @@ export async function api(path: string, options?: RequestInit): Promise<any> {
       job: mapJob(a.job_snapshot),
       resumeId: String(a.resume_id),
       resumeSnapshot: a.resume_snapshot?.parsed_profile || null,
+      resumeSource: applicationResumeSource(a.resume_snapshot?.source),
+      resumeFileName: a.resume_snapshot?.file_name || "Application resume",
       applicationId: String(a.id),
       updatedAt: a.updated_at,
     }));
@@ -180,10 +183,18 @@ export async function api(path: string, options?: RequestInit): Promise<any> {
           "Your workspace",
         email: member.session.user.email || "",
       },
+      applicationResumeSource: applicationResumeSource(
+        data.application_resume_source,
+      ),
       resumes: (data.resumes || []).map(mapResume),
       activity: [...applications, ...activity],
     };
     return latest;
+  }
+  if (route === "preferences" && method === "PATCH") {
+    if (!["applydesk", "custom"].includes(body.resumeSource))
+      throw new Error("Choose an application resume source.");
+    return rpc("fn_ss_set_resume_preference", { p_source: body.resumeSource });
   }
   if (route === "resumes" && method === "POST") {
     const form = options!.body as FormData;
@@ -260,6 +271,8 @@ export async function api(path: string, options?: RequestInit): Promise<any> {
       p_notes:
         "Prepared by the self-service member. Employer submission is completed on the employer site.",
       p_parsed_profile: profile,
+      p_resume_source:
+        body.resumeSource || latest?.applicationResumeSource || "applydesk",
     });
     const url = validEmployerUrl(result.url);
     if (!url)
@@ -288,4 +301,47 @@ export async function openOriginal(id: string) {
     tab?.close();
     throw e;
   }
+}
+
+// Resolve against the saved application, never today's preference or active library.
+export async function downloadApplicationResume(applicationId: string) {
+  const requestGeneration = accountGeneration;
+  const checkAccount = () => {
+    if (requestGeneration !== accountGeneration)
+      throw new Error(
+        "Your account changed. Open your current workspace and try again.",
+      );
+  };
+  const data = await rpc("fn_ss_get_my_workspace");
+  checkAccount();
+  const application = (data.applications || []).find(
+    (a: any) => String(a.id) === applicationId,
+  );
+  if (!application) throw new Error("This application could not be found.");
+  const snapshot = application.resume_snapshot;
+  if (applicationResumeSource(snapshot?.source) === "custom") {
+    if (!snapshot?.storage_path)
+      throw new Error("The saved original is unavailable.");
+    const { data: link, error } = await sb.storage
+      .from("selfserve-resumes")
+      .createSignedUrl(snapshot.storage_path, 120, {
+        download: snapshot.file_name || "resume",
+      });
+    checkAccount();
+    if (error || !link?.signedUrl)
+      throw new Error("The saved original could not be downloaded.");
+    const a = document.createElement("a");
+    a.href = link.signedUrl;
+    a.download = snapshot.file_name || "resume";
+    a.click();
+    return;
+  }
+  if (!snapshot?.parsed_profile)
+    throw new Error("The saved ApplyDesk resume is unavailable.");
+  const profile = { ...emptyProfile(), ...snapshot.parsed_profile };
+  await exportResume(
+    profile,
+    "pdf",
+    (profile.name || "ApplyDesk") + "-application-resume",
+  );
 }

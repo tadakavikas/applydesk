@@ -80,7 +80,11 @@ async function session(page: Page, key: string, id: string) {
     { key, id },
   );
 }
-async function mockAdmin(context: BrowserContext, kind = "admin") {
+async function mockAdmin(
+  context: BrowserContext,
+  kind = "admin",
+  customSnapshot = false,
+) {
   const calls: { path: string; body: any; authorization: string }[] = [];
   const target = { ...member };
   await context.route(`${supabase}/**`, async (route) => {
@@ -150,14 +154,21 @@ async function mockAdmin(context: BrowserContext, kind = "admin") {
             score: 75,
             created_at: "2026-09-18T01:00:00Z",
             job_snapshot: job,
-            resume_snapshot: {
-              ...archivedResume,
-              parsed_profile: {
-                ...profile,
-                summary: "Immutable application summary",
-              },
-              resume_text: "Immutable application resume text",
-            },
+            resume_snapshot: customSnapshot
+              ? {
+                  source: "custom",
+                  resume_id: archivedResume.id,
+                  file_name: archivedResume.file_name,
+                  storage_path: archivedResume.storage_path,
+                }
+              : {
+                  ...archivedResume,
+                  parsed_profile: {
+                    ...profile,
+                    summary: "Immutable application summary",
+                  },
+                  resume_text: "Immutable application resume text",
+                },
           },
         ],
         audit: [{ action: "view_member", actor_user_id: adminId }],
@@ -369,4 +380,33 @@ test("returning to the admin tab preserves the open record and unsaved notes", a
   expect(
     calls.some((call) => call.path.endsWith("fn_ss_admin_update_member")),
   ).toBe(false);
+});
+
+test("administrator sees the exact custom-original choice without generated export controls", async ({
+  page,
+  context,
+}) => {
+  await mockAdmin(context, "admin", true);
+  await session(page, "ad-auth", adminId);
+  await page.goto("/copilot-admin.html");
+  await page.getByRole("button", { name: "View member", exact: false }).click();
+  await page
+    .getByRole("button", { name: "Applications (1)", exact: true })
+    .click();
+  await page.locator("details.ss-record > summary").click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Resume snapshot at handoff · Custom original",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Original file", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "PDF", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Word", exact: true }),
+  ).toHaveCount(0);
 });
