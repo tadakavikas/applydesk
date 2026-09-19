@@ -1,0 +1,112 @@
+{
+  "note": "Titles, employers and detected skill terms from the 13 verified public postings ingested on 2026-09-19. Only search fields are retained; no personal data or copied full job descriptions. Minimal exact description excerpts qualify ambiguous engineering titles; descriptions are not searchable text.",
+  "jobs": [
+    {
+      "title": "Human Evaluation Researcher",
+      "company": "Nuance Labs",
+      "skills": [
+        "Python",
+        "React",
+        "R",
+        "LLM",
+        "UX",
+        "Statistics"
+      ]
+    },
+    {
+      "title": "AI Engineer, Internal Systems",
+      "company": "Wispr Flow",
+      "skills": [],
+      "description": "application code"
+    },
+    {
+      "title": "Staff Engineer, Desktop (Windows)",
+      "company": "Wispr Flow",
+      "skills": [],
+      "description": "production code"
+    },
+    {
+      "title": "Forward Deployed Engineer",
+      "company": "Wispr Flow",
+      "skills": [
+        "Go",
+        "Machine learning"
+      ],
+      "description": "shipped production software"
+    },
+    {
+      "title": "Platform Engineer, Android",
+      "company": "Wispr Flow",
+      "skills": [
+        "Machine learning"
+      ]
+    },
+    {
+      "title": "Platform Engineer, Enterprise",
+      "company": "Wispr Flow",
+      "skills": [
+        "Machine learning",
+        "Distributed systems"
+      ],
+      "description": "architect and ship the backend systems"
+    },
+    {
+      "title": "Product Engineer, Growth",
+      "company": "Wispr Flow",
+      "skills": [
+        "SQL"
+      ]
+    },
+    {
+      "title": "Product Engineer, Enterprise",
+      "company": "Wispr Flow",
+      "skills": [
+        "TypeScript",
+        "React",
+        "Machine learning"
+      ]
+    },
+    {
+      "title": "Staff Engineer, Desktop (macOS)",
+      "company": "Wispr Flow",
+      "skills": [
+        "UX"
+      ],
+      "description": "production code for a desktop application"
+    },
+    {
+      "title": "Product Engineer, Systems Architect",
+      "company": "Wispr Flow",
+      "skills": []
+    },
+    {
+      "title": "Revenue Operations",
+      "company": "Wispr Flow",
+      "skills": [
+        "SQL",
+        "dbt",
+        "Git",
+        "REST",
+        "Salesforce"
+      ]
+    },
+    {
+      "title": "Security Assurance & GRC Lead",
+      "company": "Wispr Flow",
+      "skills": [
+        "Go",
+        "Customer success",
+        "HIPAA",
+        "GDPR",
+        "SOC 2"
+      ]
+    },
+    {
+      "title": "Lead SDET",
+      "company": "Wispr Flow",
+      "skills": [
+        "CI/CD"
+      ]
+    }
+  ]
+}

@@ -87,6 +87,7 @@ import {
   parseProfile,
   emptyProfile,
   matchProfile,
+  matchesJobQuery,
   resumeQuality,
   tailorProfile,
   sponsorshipLabel,
@@ -357,13 +358,7 @@ export default function Workspace() {
           j.sponsorship !== "h1b"
         )
           return false;
-        if (
-          query &&
-          !`${j.title} ${j.company} ${j.skills.join(" ")}`
-            .toLowerCase()
-            .includes(query.toLowerCase())
-        )
-          return false;
+        if (!matchesJobQuery(j, query)) return false;
         if (
           view === "jobs" &&
           jobTab !== "skipped" &&
@@ -961,7 +956,11 @@ export default function Workspace() {
                   <ShieldCheck size={14} />
                   H-1B explicitly stated in every listing
                 </span>
-                <span>Current roles from connected employer boards.</span>
+                <span>
+                  {view === "jobs" && jobTab !== "skipped" && feed?.jobs.length
+                    ? `${filtered.length} ${filtered.length === 1 ? "match" : "matches"} from ${feed.jobs.length} current H-1B ${feed.jobs.length === 1 ? "listing" : "listings"}`
+                    : "Current roles from connected employer boards."}
+                </span>
               </div>
               {feedError ? (
                 <Blank

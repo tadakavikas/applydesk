@@ -597,3 +597,43 @@ test("a failed latest sync does not hide jobs that are still verified and eligib
   ).toBeVisible();
   await expect(page.locator(".feed-line .status-dot")).toHaveClass(/offline/);
 });
+
+test("software developer search finds software engineers and keeps company/skill constraints", async ({
+  page,
+}) => {
+  await mockWorkspace(page);
+  await page.goto(origin + "/copilot.html");
+  await expect(page.locator(".job-card")).toHaveCount(3);
+  await page
+    .getByLabel("Search jobs", { exact: true })
+    .fill("Software, Developer");
+  await page.getByRole("button", { name: "Search jobs", exact: true }).click();
+  await expect(page.locator(".job-card")).toHaveCount(1);
+  await expect(page.locator(".job-card")).toContainText("Software Engineer");
+  await expect(page.locator(".scope-row")).toContainText(
+    "1 match from 3 current H-1B listings",
+  );
+  await page
+    .getByLabel("Search jobs", { exact: true })
+    .fill("SWE SQL Company C");
+  await expect(page.locator(".job-card")).toHaveCount(1);
+  await page
+    .getByLabel("Search jobs", { exact: true })
+    .fill("software developer Company A");
+  await expect(page.locator(".job-card")).toHaveCount(0);
+  await expect(page.locator(".scope-row")).toContainText(
+    "0 matches from 3 current H-1B listings",
+  );
+  await expect(
+    page.getByText("No roles match these filters", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Search jobs", { exact: true })
+    .fill("backend developer");
+  await expect(page.locator(".job-card")).toHaveCount(0);
+  await page
+    .getByLabel("Search jobs", { exact: true })
+    .fill("Python Company A");
+  await expect(page.locator(".job-card")).toHaveCount(1);
+  await expect(page.locator(".job-card")).toContainText("Data Engineer");
+});
