@@ -46,10 +46,10 @@ test('shared search metadata gives compact cards the same software matching as f
 });
 test('real employer URL validator accepts connected custom career hosts and rejects unsafe destinations',()=>{
   const client=loadResumeLibrary('client',{require(name){if(name==='@supabase/supabase-js')return {createClient:()=>({})};throw new Error(name);}});
-  for(const host of ['job-boards.greenhouse.io','boards.greenhouse.io','jobs.ashbyhq.com','jobs.lever.co','careers.duolingo.com','stripe.com','databricks.com','careers.airbnb.com']) {
+  for(const host of ['job-boards.greenhouse.io','boards.greenhouse.io','jobs.ashbyhq.com','jobs.lever.co','careers.duolingo.com','stripe.com','databricks.com','careers.airbnb.com','careers.datadoghq.com']) {
     const url='https://'+host+'/careers/job-123';assert.equal(client.validEmployerUrl(url),url,host);
   }
-  for(const url of ['http://stripe.com/jobs/1','https://stripe.com.evil.test/jobs/1','https://user:password@stripe.com/jobs/1','javascript:alert(1)','https://stripe.com/jobs/bad url'])assert.equal(client.validEmployerUrl(url),null,url);
+  for(const url of ['http://stripe.com/jobs/1','https://stripe.com.evil.test/jobs/1','https://user:password@stripe.com/jobs/1','javascript:alert(1)','https://stripe.com/jobs/bad url','http://careers.datadoghq.com/detail/6572669/','https://careers.datadoghq.com.evil.test/detail/6572669/','https://evil.careers.datadoghq.com/detail/6572669/','https://user:password@careers.datadoghq.com/detail/6572669/','https://datadoghq.com/detail/6572669/'])assert.equal(client.validEmployerUrl(url),null,url);
 });
 test('restricted sponsorship evidence is not mislabeled as an absent statement',()=>{
   assert.equal(model.sponsorshipLabel({sponsorship:'unknown',evidence:'H-1B transfers only.'}),'Sponsorship restrictions stated');

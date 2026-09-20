@@ -51,6 +51,82 @@
     {
       "board": "flexport",
       "company": "Flexport"
+    },
+    {
+      "board": "cloverhealth",
+      "company": "Clover Health"
+    },
+    {
+      "board": "oscar",
+      "company": "Oscar Health"
+    },
+    {
+      "board": "centriahealthcare",
+      "company": "Centria Healthcare"
+    },
+    {
+      "board": "lewiscountygeneralhospital",
+      "company": "Lewis County General Hospital"
+    },
+    {
+      "board": "kolmacintegratedbehavioralhealth",
+      "company": "Kolmac Integrated Behavioral Health"
+    },
+    {
+      "board": "datadog",
+      "company": "Datadog"
+    },
+    {
+      "board": "apolloio",
+      "company": "Apollo.io"
+    },
+    {
+      "board": "enigmaio",
+      "company": "Enigma"
+    },
+    {
+      "board": "instalilyai",
+      "company": "InstaLILY"
+    },
+    {
+      "board": "thetradedesk",
+      "company": "The Trade Desk"
+    },
+    {
+      "board": "sixfold",
+      "company": "Sixfold"
+    },
+    {
+      "board": "redwoodmaterials",
+      "company": "Redwood Materials"
+    },
+    {
+      "board": "energyhub",
+      "company": "EnergyHub"
+    },
+    {
+      "board": "shinolaretail",
+      "company": "Shinola Retail"
+    },
+    {
+      "board": "fourhands",
+      "company": "Four Hands"
+    },
+    {
+      "board": "rwzant",
+      "company": "R.W. Zant"
+    },
+    {
+      "board": "saltbox",
+      "company": "Saltbox"
+    },
+    {
+      "board": "piermontbank",
+      "company": "Piermont Bank"
+    },
+    {
+      "board": "firstnationalbankofamerica",
+      "company": "First National Bank of America"
     }
   ],
   "lever": [
@@ -61,6 +137,26 @@
     {
       "board": "includedhealth",
       "company": "Included Health"
+    },
+    {
+      "board": "inductivehealth",
+      "company": "InductiveHealth"
+    },
+    {
+      "board": "healthcare",
+      "company": "HealthCare.com"
+    },
+    {
+      "board": "avalerehealth",
+      "company": "Avalere Health"
+    },
+    {
+      "board": "palantir",
+      "company": "Palantir Technologies"
+    },
+    {
+      "board": "xcimer",
+      "company": "Xcimer Energy"
     }
   ],
   "ashby": [
@@ -111,6 +207,30 @@
     {
       "board": "render",
       "company": "Render"
+    },
+    {
+      "board": "compass-surgical-partners",
+      "company": "Compass Surgical Partners"
+    },
+    {
+      "board": "candidhealth",
+      "company": "Candid Health"
+    },
+    {
+      "board": "sprinter-health",
+      "company": "Sprinter Health"
+    },
+    {
+      "board": "midstream",
+      "company": "Midstream Health"
+    },
+    {
+      "board": "openai",
+      "company": "OpenAI"
+    },
+    {
+      "board": "hadrian-automation",
+      "company": "Hadrian Automation"
     }
   ]
 }

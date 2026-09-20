@@ -83,7 +83,8 @@ export function validEmployerUrl(value: string) {
         u.hostname === "careers.duolingo.com" ||
         u.hostname === "stripe.com" ||
         u.hostname === "databricks.com" ||
-        u.hostname === "careers.airbnb.com")
+        u.hostname === "careers.airbnb.com" ||
+        u.hostname === "careers.datadoghq.com")
       ? u.href
       : null;
   } catch {
