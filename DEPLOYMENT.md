@@ -100,9 +100,9 @@ Enter the key directly into GitHub's secret form. Never put it in chat, Git, a p
 
 Protect changes to `main` and the workflow with the repository's normal review controls: trusted workflow code with access to a service-role key can use its database privileges. If repository Actions policies restrict third-party actions, allow the pinned official `actions/checkout` and `actions/setup-node` actions. No environment approval is required for each scheduled run.
 
-Before enabling production refresh, retire the existing **`applydesk-job-sync`** Worker's Cron Trigger in **Cloudflare -> Workers & Pages -> applydesk-job-sync -> Settings -> Triggers**. Remove only its scheduled trigger, preserving the separate **`applydesk`** website Worker and domains. The checked-in `wrangler.job-sync.toml` now has `crons = []`; this is desired configuration, not proof the live trigger is gone. Applying this config to the job-sync Worker with `npm run cf:deploy:jobs` also retires its cron. Keep only one production scheduler enabled.
+Preserve the existing **`applydesk-job-sync`** Worker Cron Trigger while configuring GitHub Actions. The checked-in `wrangler.job-sync.toml` keeps `crons = ["*/15 * * * *"]` during this handoff. Do not remove the live trigger or deploy an empty cron configuration before GitHub Actions has the required secret and has completed a successful persisted manual refresh.
 
-Then open **GitHub -> Actions -> Sync ApplyDesk job feed -> Run workflow**, select `main`, and run it. Verify the sync step actually completes and reports all configured boards, then check source health in Supabase:
+After setting the variable and secret, open **GitHub -> Actions -> Sync ApplyDesk job feed -> Run workflow**, select `main`, and run it. Verify the sync step actually completes and reports all configured boards, then check source health in Supabase:
 
 ```sql
 select source, source_board, status, last_attempt_at, last_success_at,
@@ -112,6 +112,8 @@ order by source, source_board;
 ```
 
 The runner updates healthy boards even if another board fails. A failed fetch does not close jobs or overwrite its last-success timestamp; only a complete successful source response can close disappeared jobs. The workflow fails when any board fails, preserving a visible signal for investigation. There are no automatic whole-run retries; the next scheduled run checks again. Job discovery independently excludes source verifications older than 24 hours.
+
+After the manual GitHub Actions run succeeds and the source timestamps confirm persisted refreshes, retire the old **`applydesk-job-sync`** Cron Trigger in **Cloudflare -> Workers & Pages -> applydesk-job-sync -> Settings -> Triggers**. At that point, update `wrangler.job-sync.toml` to `crons = []` and publish that configuration so a later Worker deployment cannot restore the old trigger. Remove only the job-sync schedule; preserve the separate **`applydesk`** website Worker and domains. Check that no old Worker run is active when completing the handoff, and keep only one production scheduler enabled afterwards.
 
 Confirm a later **scheduled** run as well as the manual run. GitHub schedules are best-effort and can be delayed or dropped during load. A public repository's scheduled workflows can be disabled after 60 days without repository activity. Monitor failures and re-enable the workflow if GitHub disables it; a one-time green run does not prove indefinite freshness. See [GitHub's schedule behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) and [repository Actions secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
 

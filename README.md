@@ -12,7 +12,7 @@ Sponsorship badges distinguish **H-1B sponsorship stated**, **General visa suppo
 
 The browser loads the full current catalog as compact metadata pages, searches across those pages, and renders 50 cards at a time. It fetches the full description when a role is opened, before preparing an application. The ApplyDesk formatted resume remains the default for applications unless the member explicitly chooses their uploaded custom original; each application preserves its saved source and snapshot.
 
-**Automatic feed refresh uses GitHub Actions:** `.github/workflows/job-sync.yml` schedules the existing Node worker every 15 minutes and supports manual runs. Publish it to `main`, add the repository Actions variable `SUPABASE_URL` and secret `SUPABASE_SERVICE_ROLE_KEY`, retire the old Cloudflare job-sync Cron Trigger, and verify manual and scheduled runs as described in the deployment guide. The website remains on Cloudflare. The checked-in workflow alone is not proof of activation; jobs require a successful source verification within 24 hours. GitHub schedules can be delayed and public-repository schedules can be disabled after 60 days of inactivity.
+**Automatic feed refresh uses GitHub Actions:** `.github/workflows/job-sync.yml` schedules the existing Node worker every 15 minutes and supports manual runs. Publish it to `main`, add the repository Actions variable `SUPABASE_URL` and secret `SUPABASE_SERVICE_ROLE_KEY`, and verify a successful persisted manual refresh before retiring the old Cloudflare job-sync Cron Trigger. Then confirm a scheduled Actions run as described in the deployment guide. The website remains on Cloudflare. The checked-in workflow alone is not proof of activation; jobs require a successful source verification within 24 hours. GitHub schedules can be delayed and public-repository schedules can be disabled after 60 days of inactivity.
 
 ## Repository structure
 
@@ -41,7 +41,7 @@ The browser loads the full current catalog as compact metadata pages, searches a
 
 ## Manual deploy fallback
 
-If Cloudflare auto-deploy is unavailable, run `npm run build` followed by `npx wrangler deploy` in this repository using the existing Cloudflare account. `wrangler.toml` serves only the generated `dist/` folder through the existing `applydesk` Worker. The checked-in Cloudflare job-sync Worker is an optional paid-runtime alternative, with its cron disabled in configuration so GitHub Actions owns refresh scheduling. Remove any already-deployed job-sync Cron Trigger separately; deploying the website does not change it. See the scheduler activation steps in the deployment guide.
+If Cloudflare auto-deploy is unavailable, run `npm run build` followed by `npx wrangler deploy` in this repository using the existing Cloudflare account. `wrangler.toml` serves only the generated `dist/` folder through the existing `applydesk` Worker. The checked-in Cloudflare job-sync Worker retains its existing cron during the GitHub Actions handoff. Remove that trigger and publish `crons = []` only after the Actions secret is configured and a persisted manual refresh succeeds. The job-sync Worker is separate from the website; see the ordered scheduler handoff in the deployment guide.
 
 ## Contacts
 

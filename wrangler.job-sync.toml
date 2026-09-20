@@ -7,6 +7,6 @@ workers_dev = true
 SUPABASE_URL = "https://rofyegirmgqjhekuxjat.supabase.co"
 
 [triggers]
-# GitHub Actions owns scheduled refresh. Retire any existing live Worker Cron Trigger too.
-# To switch to a paid Worker later, disable the Actions workflow before restoring cron.
-crons = []
+# Preserve the existing production schedule until GitHub Actions has the required
+# secret and a successful persisted manual refresh. Only then retire this cron.
+crons = ["*/15 * * * *"]
