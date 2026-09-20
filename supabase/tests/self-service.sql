@@ -56,7 +56,9 @@ select _ss_assert(to_regprocedure('public.fn_a_get_my_workspace()') is null,'his
 select _ss_assert(not (fn_a_get_my_workspace()->>'ok')::boolean,'self-service member cannot use managed client workspace');
 \endif
 select _ss_assert((select count(*)=0 from app_selfserve_members),'admin notes table is hidden from member');
-select _ss_assert(json_array_length(fn_ss_discover_jobs()->'jobs')=1,'discovery excludes unknown date, stale, closed, old and generic visa jobs');
+select _ss_assert(json_array_length(fn_ss_discover_jobs()->'jobs')=
+  case when to_regprocedure('public.fn_ss_job_catalog(bigint,integer)') is null then 1 else 2 end,
+  'legacy discovery keeps known recent dates and freshness; patch 12 broadens sponsorship');
 insert into storage.objects(bucket_id,name) values
  ('selfserve-resumes','00000000-0000-0000-0000-000000000001/one/resume.pdf'),
  ('selfserve-resumes','00000000-0000-0000-0000-000000000001/two/resume.docx'),

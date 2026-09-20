@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { runWorkerJobSync } from "../cloudflare/job-sync-worker.mjs";
+import config from "../workers/companies.json" with { type: "json" };
 
 const env = {
   SUPABASE_URL: "https://example.supabase.co",
@@ -8,11 +9,25 @@ const env = {
   JOB_SYNC_SECRET: "s".repeat(64),
 };
 
-const emptyFeed = async (url) => ({
-  ok: true,
-  status: 200,
-  json: async () => String(url).includes("ashbyhq.com") ? { jobs: [] } : { jobs: [], meta: { total: 0 } },
-});
+const emptyFeed = async (url) => {
+  const hostname = new URL(String(url)).hostname;
+  const payloads = {
+    "boards-api.greenhouse.io": { jobs: [], meta: { total: 0 } },
+    "api.ashbyhq.com": { jobs: [] },
+    "api.lever.co": [],
+  };
+  assert.ok(Object.hasOwn(payloads, hostname), `Unmocked employer feed: ${url}`);
+  return { ok: true, status: 200, json: async () => payloads[hostname] };
+};
+
+function assertAllConfiguredFeedsSucceeded(result) {
+  const expected = Object.entries(config).flatMap(([source, boards]) =>
+    boards.map((entry) => `${source}/${typeof entry === "string" ? entry : entry.board}`),
+  ).sort();
+  assert.equal(result.failures, 0);
+  assert.deepEqual(result.feeds.map((feed) => `${feed.source}/${feed.board}`).sort(), expected);
+  assert.ok(result.feeds.every((feed) => feed.status === "ok"));
+}
 
 test("Cloudflare job-sync HTTP endpoint requires the shared trigger secret", async () => {
   const request = new Request("https://jobs.example.com/job-sync", { method: "POST" });
@@ -28,7 +43,7 @@ test("Cloudflare job-sync can run as a dry run without Supabase secrets", async 
     log: () => {},
   });
   assert.equal(result.dryRun, true);
-  assert.equal(result.failures, 0);
+  assertAllConfiguredFeedsSucceeded(result);
 });
 
 test("Cloudflare job-sync scheduled path persists through Supabase REST", async () => {
@@ -42,7 +57,7 @@ test("Cloudflare job-sync scheduled path persists through Supabase REST", async 
     return emptyFeed(url);
   };
   const result = await runWorkerJobSync({ env, fetchImpl, log: () => {} });
-  assert.equal(result.failures, 0);
+  assertAllConfiguredFeedsSucceeded(result);
   assert.ok(calls.some((call) => call.href.includes("/rest/v1/app_job_feed_status")));
   assert.ok(calls.some((call) => call.options.headers.Authorization === "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY));
 });

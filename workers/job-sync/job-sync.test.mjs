@@ -55,7 +55,7 @@ test('transfer-only and existing-holder rules do not imply a new graduate can re
   ]) {
     const evidence = sponsorshipEvidence(text);
     assert.notEqual(evidence.sponsorship_status, 'explicit_h1b', text);
-    assert.equal(isEligibleJob(normalize(ghJob({ content: text })), now), false, text);
+    assert.equal(isEligibleJob(normalize(ghJob({ content: text })), now), true, 'Restricted sponsorship is a label, not catalog exclusion: ' + text);
   }
   assert.equal(sponsorshipEvidence('We sponsor H1B visas, including new petitions and transfers.').sponsorship_status, 'explicit_h1b');
 });
@@ -68,15 +68,15 @@ test('US eligibility uses location evidence, not a description mentioning Americ
   assert.equal(isEligibleJob(normalize(ghJob({ location: { name: 'London, UK' } })), now), false);
 });
 
-test('updated_at is never relabeled as publication, and unknown/old/future/closed-date jobs are excluded', () => {
+test('publication dates stay honest: old/unknown are included, future and expired are excluded', () => {
   const row = normalize(ghJob({ first_published: '2025-01-01T00:00:00Z' }));
   assert.equal(row.posted_at, '2025-01-01T00:00:00.000Z');
   assert.equal(row.date_basis, 'first_published');
-  assert.equal(isEligibleJob(row, now), false);
+  assert.equal(isEligibleJob(row, now), true);
   const unknown = normalize(ghJob({ first_published: undefined }));
   assert.equal(unknown.posted_at, null);
   assert.equal(unknown.date_basis, 'unknown');
-  assert.equal(isEligibleJob(unknown, now), false);
+  assert.equal(isEligibleJob(unknown, now), true);
   assert.equal(isEligibleJob(normalize(ghJob({ first_published: '2026-10-01T00:00:00Z' })), now), false);
   assert.equal(isEligibleJob(normalize(ghJob({ application_deadline: '2026-09-18T11:00:00Z' })), now), false);
   assert.equal(isEligibleJob(normalize(ghJob({ internal_job_id: null })), now), false);
@@ -115,7 +115,7 @@ test('malformed/partial employer payloads fail rather than claiming every job is
   }
 });
 
-test('successful refresh closes disappeared jobs, expires ineligible ones, and preserves first seen', async () => {
+test('successful refresh closes disappeared jobs, refreshes sponsorship labels, expires ineligible jobs and preserves first seen', async () => {
   const calls = [];
   const rest = async (path, options = {}) => {
     calls.push({ path, ...options });
@@ -123,15 +123,17 @@ test('successful refresh closes disappeared jobs, expires ineligible ones, and p
       { id: 1, dedup_key: 'greenhouse:test:101', source_job_id: '101', first_seen_at: '2026-09-10T00:00:00Z', status: 'active' },
       { id: 2, dedup_key: 'greenhouse:test:102', source_job_id: '102', status: 'active' },
       { id: 3, dedup_key: 'greenhouse:test:103', source_job_id: '103', status: 'active' },
+      { id: 4, dedup_key: 'greenhouse:test:104', source_job_id: '104', status: 'active' },
     ];
   };
-  const result = await runJobSync({ config: { greenhouse: ['test'] }, rest, now, log: () => {}, fetchImpl: async () => response({ jobs: [ghJob(), ghJob({ id: 103, content: 'We cannot sponsor visas.' })] }) });
-  assert.equal(result.upserted, 1);
+  const result = await runJobSync({ config: { greenhouse: ['test'] }, rest, now, log: () => {}, fetchImpl: async () => response({ jobs: [ghJob(), ghJob({ id: 103, content: 'We cannot sponsor visas.' }), ghJob({ id: 104, application_deadline: '2026-09-17T00:00:00Z' })] }) });
+  assert.equal(result.upserted, 2);
   assert.equal(result.closed, 1);
   assert.ok(calls.some(call => call.path === 'app_job_pool?id=in.(2)' && call.body.status === 'closed'));
   const updatedRows = calls.filter(call => call.path === 'app_job_pool?on_conflict=dedup_key').flatMap(call => call.body);
   const excluded = updatedRows.find(row => row.source_job_id === '103');
-  assert.equal(excluded.status, 'stale');
+  assert.equal(excluded.status, 'active');
+  assert.equal(updatedRows.find(row => row.source_job_id === '104').status, 'stale');
   assert.equal(excluded.sponsorship_status, 'not_sponsored');
   assert.equal(excluded.sponsorship_evidence, 'We cannot sponsor visas.');
   assert.equal(updatedRows.find(row => row.source_job_id === '101').first_seen_at, '2026-09-10T00:00:00Z');
@@ -154,4 +156,79 @@ test('dry run reads public feeds and never calls persistence', async () => {
   const result = await runJobSync({ config: { greenhouse: ['test'] }, dryRun: true, now, log: () => {}, rest: () => assert.fail('No database access permitted'), fetchImpl: async () => response({ jobs: [ghJob()] }) });
   assert.equal(result.eligible, 1);
   assert.equal(result.upserted, 0);
+});
+
+
+test('all sponsorship categories remain discoverable with strict labels', () => {
+  const cases = [
+    ['We sponsor H-1B visas.', 'explicit_h1b'],
+    ['We do sponsor visas!', 'visa_sponsorship'],
+    ['Help patients receive excellent care.', 'unknown'],
+    ['We cannot sponsor visas.', 'not_sponsored'],
+  ];
+  for (const [content, expected] of cases) {
+    const row = normalize(ghJob({ content }));
+    assert.equal(row.sponsorship_status, expected);
+    assert.equal(isEligibleJob(row, now), true);
+  }
+});
+
+test('general visa support keeps its caveat and export-license wording is not an immigration denial', () => {
+  // Short public-source phrasing from official Anthropic and Cloudflare postings.
+  const general = sponsorshipEvidence("We do sponsor visas! However, we aren't able to successfully sponsor visas for every role and every candidate.");
+  assert.equal(general.sponsorship_status, 'visa_sponsorship');
+  assert.match(general.sponsorship_evidence, /every role and every candidate/);
+  assert.equal(sponsorshipEvidence('export laws without sponsorship for an export license.').sponsorship_status, 'unknown');
+  assert.equal(sponsorshipEvidence('We sponsor H1B visas. Export laws without sponsorship for an export license.').sponsorship_status, 'explicit_h1b');
+  assert.equal(sponsorshipEvidence('We cannot sponsor employment visas. Export laws without sponsorship for an export license.').sponsorship_status, 'not_sponsored');
+  assert.equal(sponsorshipEvidence('We cannot sponsor visas. Export laws without sponsorship for an export license.').sponsorship_status, 'not_sponsored');
+  assert.equal(sponsorshipEvidence('Do we sponsor visas?').sponsorship_status, 'unknown');
+});
+
+test('catalog eligibility rejects malformed deadlines, invalid URLs, future dates and stale source checks', () => {
+  for (const application_deadline of ['not-a-date', '', ' ', '2026-09-18T12:00:00Z']) {
+    const row = normalize(ghJob({ application_deadline }));
+    assert.equal(isEligibleJob(row, now), false, JSON.stringify(application_deadline));
+  }
+  assert.equal(isEligibleJob(normalize(ghJob({ application_deadline: '2026-09-18T12:00:01Z' })), now), true);
+  assert.equal(isEligibleJob(normalize(ghJob({ first_published: '2026-09-18T12:00:01Z' })), now), false);
+  const row = normalize(ghJob());
+  for (const patch of [
+    { status: 'closed' }, { title: '   ' }, { url: 'https://user:secret@example.test/job' },
+    { url: 'https://example.test/job with whitespace' }, { url: 'http://example.test/job' },
+    { last_verified_at: '2026-09-17T11:59:59Z' }, { last_verified_at: '2026-09-18T12:00:01Z' },
+    { last_verified_at: null }, { raw_json: { application_deadline: 'broken' } },
+  ]) assert.equal(isEligibleJob({ ...row, ...patch }, now), false, JSON.stringify(patch));
+  assert.equal(isEligibleJob({ ...row, last_verified_at: '2026-09-17T12:00:00Z' }, now), true);
+});
+
+test('normalized job search metadata uses the shared search contract', () => {
+  const software = normalize(ghJob({ title: 'Backend Engineer', content: 'Develop APIs using Python, Django, PostgreSQL and TypeScript.' }));
+  assert.ok(software.search_skills.includes('Python'));
+  assert.equal(software.software_role, true);
+  const clinical = normalize(ghJob({ title: 'Registered Nurse', content: 'Provide clinical patient care and coordinate treatment.' }));
+  assert.equal(clinical.software_role, false);
+});
+
+
+test('Lever preserves structured US eligibility and all public description sections', () => {
+  const job = { id: 'clinical-1', text: 'Clinical Software Engineer', country: 'US',
+    categories: { location: 'Remote', commitment: 'Full-time' },
+    hostedUrl: 'https://jobs.lever.co/health/clinical-1',
+    descriptionPlain: 'Build patient care systems.',
+    lists: [{ text: 'Requirements', content: '<li>Use Python and PostgreSQL.</li>' }],
+    additionalPlain: 'We cannot sponsor visas.', createdAt: Date.parse('2026-01-01T12:00:00Z'),
+  };
+  const row = normalizeJob('lever', 'health', 'Health', job, now);
+  assert.equal(row.country_code, 'US');
+  assert.equal(isEligibleJob(row, now), true);
+  assert.equal(row.date_basis, 'provider_created');
+  assert.equal(row.posted_at, '2026-01-01T12:00:00.000Z');
+  assert.ok(row.search_skills.includes('Python'));
+  assert.equal(row.software_role, true);
+  assert.equal(row.sponsorship_status, 'not_sponsored');
+  const foreign = normalizeJob('lever', 'health', 'Health', { ...job, country: 'GB', categories: { location: 'New York' } }, now);
+  assert.equal(foreign.country_code, '');
+  assert.equal(isEligibleJob(foreign, now), false);
+  assert.equal(normalizeJob('lever', 'health', 'Health', { ...job, createdAt: null }, now).posted_at, null);
 });

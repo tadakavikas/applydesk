@@ -2283,3 +2283,62 @@ button {
 .application-handoff > .button {
   flex-shrink: 0;
 }
+
+.sponsorship-tag.sponsorship-h1b {
+  color: #216345;
+  background: #e8f4ec;
+  border-color: #bfdec9;
+}
+.sponsorship-tag.sponsorship-visa {
+  color: #285b88;
+  background: #eaf2fb;
+  border-color: #c6d9ed;
+}
+.sponsorship-tag.sponsorship-unknown {
+  color: #626b75;
+  background: #f0f2f4;
+  border-color: #d9dee4;
+}
+.sponsorship-tag.sponsorship-not_sponsored {
+  color: #99502f;
+  background: #fff0e6;
+  border-color: #ebd2bf;
+}
+.evidence-box.sponsorship-visa {
+  color: #285b88;
+  background: #edf4fc;
+  border-color: #c6d9ed;
+}
+.evidence-box.sponsorship-unknown {
+  color: #626b75;
+  background: #f2f4f6;
+  border-color: #d9dee4;
+}
+.evidence-box.sponsorship-not_sponsored {
+  color: #99502f;
+  background: #fff1e8;
+  border-color: #ebd2bf;
+}
+.catalog-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  margin: 28px 0 8px;
+  color: #6c8275;
+  font-size: 13px;
+}
+.job-detail-state {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  text-align: center;
+  padding: 40px 24px;
+  color: #60796b;
+}
+.job-detail-state > p {
+  max-width: 560px;
+  line-height: 1.6;
+}

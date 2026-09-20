@@ -12,7 +12,7 @@ export function loadResumeLibrary(file, overrides = {}) {
     compilerOptions:{module:ts.ModuleKind.CommonJS, target:ts.ScriptTarget.ES2022}
   });
   const exports = {};
-  const localRequire = name => name === './model' ? loadResumeLibrary('model')
+  const localRequire = name => name === '../../shared/job-search.mjs' ? require('../shared/job-search.mjs') : name === './model' ? loadResumeLibrary('model')
     : name === 'mammoth' ? require('mammoth/mammoth.browser.js') : require(name);
   const env = {
     require:localRequire, exports, module:{exports}, Blob, Uint8Array,

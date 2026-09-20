@@ -35,7 +35,8 @@ async function persistBoard(rest, board, rows, now) {
   // Only a complete successful fetch can close jobs. An outage does not mean a job closed.
   await patchIds(rest, removed.map(row => row.id), { status: 'closed', closed_at: now });
   // Refresh all current source facts for an existing excluded job, including a
-  // revoked sponsorship statement. Saved cards must not retain obsolete proof.
+  // expired deadline or lost US eligibility. Sponsorship changes stay in the
+  // active catalog when the job remains eligible; saved cards receive new labels.
   const updates = [...eligible, ...excluded.map(row => ({ ...observedById.get(row.source_job_id), status: 'stale' }))];
   for (let start = 0; start < updates.length; start += 100) {
     const body = updates.slice(start, start + 100).map(row => ({ ...row, first_seen_at: previousByKey.get(row.dedup_key)?.first_seen_at || now }));

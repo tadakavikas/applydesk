@@ -1,20 +1,116 @@
 {
   "greenhouse": [
-    { "board": "nuancelabs", "company": "Nuance Labs" },
-    { "board": "riverai", "company": "River" },
-    { "board": "anthropic", "company": "Anthropic" },
-    { "board": "stripe", "company": "Stripe" },
-    { "board": "databricks", "company": "Databricks" },
-    { "board": "airbnb", "company": "Airbnb" },
-    { "board": "cloudflare", "company": "Cloudflare" }
+    {
+      "board": "nuancelabs",
+      "company": "Nuance Labs"
+    },
+    {
+      "board": "riverai",
+      "company": "River"
+    },
+    {
+      "board": "anthropic",
+      "company": "Anthropic"
+    },
+    {
+      "board": "stripe",
+      "company": "Stripe"
+    },
+    {
+      "board": "databricks",
+      "company": "Databricks"
+    },
+    {
+      "board": "airbnb",
+      "company": "Airbnb"
+    },
+    {
+      "board": "cloudflare",
+      "company": "Cloudflare"
+    },
+    {
+      "board": "vercel",
+      "company": "Vercel"
+    },
+    {
+      "board": "mercury",
+      "company": "Mercury"
+    },
+    {
+      "board": "figma",
+      "company": "Figma"
+    },
+    {
+      "board": "duolingo",
+      "company": "Duolingo"
+    },
+    {
+      "board": "reddit",
+      "company": "Reddit"
+    },
+    {
+      "board": "flexport",
+      "company": "Flexport"
+    }
   ],
-  "lever": [],
+  "lever": [
+    {
+      "board": "cfsenergy",
+      "company": "Commonwealth Fusion Systems"
+    },
+    {
+      "board": "includedhealth",
+      "company": "Included Health"
+    }
+  ],
   "ashby": [
-    { "board": "ThinkingMachines", "company": "Thinking Machines Lab" },
-    { "board": "dmodel", "company": "Dmodel" },
-    { "board": "fal-ai", "company": "fal" },
-    { "board": "orpex", "company": "Orpex" },
-    { "board": "wispr-flow", "company": "Wispr Flow" },
-    { "board": "notion", "company": "Notion" }
+    {
+      "board": "ThinkingMachines",
+      "company": "Thinking Machines Lab"
+    },
+    {
+      "board": "dmodel",
+      "company": "Dmodel"
+    },
+    {
+      "board": "fal-ai",
+      "company": "fal"
+    },
+    {
+      "board": "orpex",
+      "company": "Orpex"
+    },
+    {
+      "board": "wispr-flow",
+      "company": "Wispr Flow"
+    },
+    {
+      "board": "notion",
+      "company": "Notion"
+    },
+    {
+      "board": "Linear",
+      "company": "Linear"
+    },
+    {
+      "board": "ramp",
+      "company": "Ramp"
+    },
+    {
+      "board": "supabase",
+      "company": "Supabase"
+    },
+    {
+      "board": "cursor",
+      "company": "Cursor"
+    },
+    {
+      "board": "replit",
+      "company": "Replit"
+    },
+    {
+      "board": "render",
+      "company": "Render"
+    }
   ]
 }

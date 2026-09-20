@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-const origin = "http://127.0.0.1:5173";
+import { extractSkills } from "../desk-src/lib/model";
+const origin = process.env.APPLYDESK_TEST_ORIGIN || "http://127.0.0.1:5173";
 const userId = "00000000-0000-4000-8000-000000000001";
 const profile = {
   name: "Jordan Candidate",
@@ -17,7 +18,7 @@ const profile = {
   projects: "Reporting pipeline using Python",
   achievements: "",
 };
-const makeJob = (id: number, title: string, company: string) => ({
+const makeJob = (id: number, title: string, company: string): any => ({
   id,
   title,
   company,
@@ -39,7 +40,10 @@ const makeJob = (id: number, title: string, company: string) => ({
   description:
     "Build Python, SQL, AWS and Spark data pipelines. We sponsor H-1B visas for eligible candidates.",
 });
-async function mockWorkspace(page: any, { resume = true } = {}) {
+async function mockWorkspace(
+  page: any,
+  { resume = true, catalogPageSize = 250 } = {},
+) {
   const jobs = [
     makeJob(101, "Data Engineer", "Test Company A"),
     makeJob(102, "Analytics Engineer", "Test Company B"),
@@ -63,6 +67,9 @@ async function mockWorkspace(page: any, { resume = true } = {}) {
   const activity: any[] = [];
   const applications: any[] = [];
   const calls: any[] = [];
+  const detailFailures = new Set<number>();
+  const emptyDetails = new Set<number>();
+  const detailDelays = new Map<number, number>();
   const feed = [
     {
       source: "greenhouse",
@@ -149,6 +156,47 @@ async function mockWorkspace(page: any, { resume = true } = {}) {
             ok: true,
             application_resume_source: applicationResumeSource,
           };
+        } else if (fn === "fn_ss_job_catalog") {
+          const limit = Math.min(body.p_limit || 250, catalogPageSize);
+          const after = Number(body.p_after_id || 0);
+          const remaining = jobs
+            .filter((j) => j.id > after)
+            .sort((a, b) => a.id - b.id);
+          const batch = remaining.slice(0, limit);
+          data = {
+            ok: true,
+            jobs: batch.map((j) => {
+              const { description, ...metadata } = j;
+              return {
+                ...metadata,
+                search_skills:
+                  j.search_skills || extractSkills(description || ""),
+              };
+            }),
+            total: jobs.length,
+            has_more: remaining.length > batch.length,
+            next_after_id: batch.length ? batch[batch.length - 1].id : null,
+            feed_status: feed,
+          };
+        } else if (fn === "fn_ss_job_detail") {
+          const id = Number(body.p_job_id);
+          if (detailDelays.has(id))
+            await new Promise((resolve) =>
+              setTimeout(resolve, detailDelays.get(id)),
+            );
+          const found = jobs.find((j) => j.id === id);
+          data =
+            detailFailures.has(id) || !found
+              ? {
+                  ok: false,
+                  err: "The job details could not be loaded. Please retry.",
+                }
+              : {
+                  ok: true,
+                  job: emptyDetails.has(id)
+                    ? { ...found, description: "" }
+                    : found,
+                };
         } else if (fn === "fn_ss_discover_jobs")
           data = { ok: true, jobs, feed_status: feed };
         else if (fn === "fn_ss_set_job_activity") {
@@ -225,7 +273,17 @@ async function mockWorkspace(page: any, { resume = true } = {}) {
   await page.route("https://job-boards.greenhouse.io/**", (route) =>
     route.fulfill({ body: "Employer application test destination" }),
   );
-  return { calls, resumes, activity, applications, jobs, feed };
+  return {
+    calls,
+    resumes,
+    activity,
+    applications,
+    jobs,
+    feed,
+    detailFailures,
+    emptyDetails,
+    detailDelays,
+  };
 }
 test("signed-out page and mobile layout", async ({ page }) => {
   await page.goto(origin + "/copilot.html");
@@ -576,7 +634,7 @@ test("healthy empty feed reports eligibility limits instead of failed search", a
   state.jobs.length = 0;
   await page.goto(origin + "/copilot.html");
   await expect(
-    page.getByText("No current roles meet the H-1B requirements", {
+    page.getByText("No current US roles are available yet", {
       exact: true,
     }),
   ).toBeVisible();
@@ -611,7 +669,7 @@ test("software developer search finds software engineers and keeps company/skill
   await expect(page.locator(".job-card")).toHaveCount(1);
   await expect(page.locator(".job-card")).toContainText("Software Engineer");
   await expect(page.locator(".scope-row")).toContainText(
-    "1 match from 3 current H-1B listings",
+    "1 match from 3 current US listings",
   );
   await page
     .getByLabel("Search jobs", { exact: true })
@@ -622,7 +680,7 @@ test("software developer search finds software engineers and keeps company/skill
     .fill("software developer Company A");
   await expect(page.locator(".job-card")).toHaveCount(0);
   await expect(page.locator(".scope-row")).toContainText(
-    "0 matches from 3 current H-1B listings",
+    "0 matches from 3 current US listings",
   );
   await expect(
     page.getByText("No roles match these filters", { exact: true }),
@@ -636,4 +694,293 @@ test("software developer search finds software engineers and keeps company/skill
     .fill("Python Company A");
   await expect(page.locator(".job-card")).toHaveCount(1);
   await expect(page.locator(".job-card")).toContainText("Data Engineer");
+});
+
+test("all US roles are visible by default with four distinct sponsorship labels and filters", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  state.jobs.splice(
+    0,
+    state.jobs.length,
+    {
+      ...makeJob(1, "Software Engineer", "Alpha"),
+      sponsorship_status: "explicit_h1b",
+    },
+    {
+      ...makeJob(2, "Data Analyst", "Beta"),
+      sponsorship_status: "visa_sponsorship",
+    },
+    {
+      ...makeJob(3, "Marketing Manager", "Gamma"),
+      sponsorship_status: "unknown",
+      sponsorship_evidence: "",
+    },
+    {
+      ...makeJob(4, "Financial Analyst", "Delta"),
+      sponsorship_status: "not_sponsored",
+      sponsorship_evidence: "Visa sponsorship is not available.",
+    },
+  );
+  await page.goto(origin + "/copilot.html");
+  await expect(page.locator(".job-card")).toHaveCount(4);
+  await expect(
+    page.getByRole("combobox", { name: "Sponsorship", exact: true }),
+  ).toContainText("All sponsorship statuses");
+  for (const [key, label] of [
+    ["h1b", "H-1B sponsorship stated"],
+    ["visa", "General visa support"],
+    ["unknown", "Sponsorship not stated"],
+    ["not_sponsored", "Sponsorship not offered"],
+  ]) {
+    await expect(page.locator(".job-card .sponsorship-" + key)).toHaveText(
+      label,
+    );
+  }
+  const colors = await page
+    .locator(".job-card .sponsorship-tag")
+    .evaluateAll((items) =>
+      items.map((item) => getComputedStyle(item).backgroundColor),
+    );
+  expect(new Set(colors).size).toBe(4);
+  for (const [label, title] of [
+    ["General visa support", "Data Analyst"],
+    ["Not stated / unverified", "Marketing Manager"],
+    ["Sponsorship not offered", "Financial Analyst"],
+    ["H-1B sponsorship stated", "Software Engineer"],
+  ]) {
+    await page
+      .getByRole("combobox", { name: "Sponsorship", exact: true })
+      .click();
+    await page.getByRole("option", { name: label, exact: true }).click();
+    await expect(page.locator(".job-card")).toHaveCount(1);
+    await expect(page.locator(".job-card")).toContainText(title);
+  }
+});
+
+test("all-current dates include old and unknown postings while recent filters exclude them", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  state.jobs[0].posted_at = null;
+  state.jobs[0].date_basis = "unknown";
+  state.jobs[1].posted_at = new Date(Date.now() - 80 * 86400000).toISOString();
+  await page.goto(origin + "/copilot.html");
+  await expect(page.locator(".job-card")).toHaveCount(3);
+  await expect(
+    page.getByRole("combobox", { name: "Date posted" }),
+  ).toContainText("All current postings");
+  await expect(
+    page.getByText("Posting date unavailable", { exact: true }),
+  ).toHaveCount(1);
+  for (const label of ["Past 30 days", "Past week", "Past 24 hours (1 day)"]) {
+    await page.getByRole("combobox", { name: "Date posted" }).click();
+    await page.getByRole("option", { name: label, exact: true }).click();
+    await expect(page.locator(".job-card")).toHaveCount(1);
+    await expect(page.locator(".job-card")).toContainText("Software Engineer");
+  }
+  await page.getByRole("combobox", { name: "Date posted" }).click();
+  await page
+    .getByRole("option", { name: "All current postings", exact: true })
+    .click();
+  await expect(page.locator(".job-card")).toHaveCount(3);
+});
+
+test("catalog metadata loads across pages while cards paginate and searches reach beyond the first fifty", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page, { catalogPageSize: 40 });
+  state.jobs.splice(
+    0,
+    state.jobs.length,
+    ...Array.from({ length: 121 }, (_, i) =>
+      makeJob(
+        1000 + i,
+        i === 115
+          ? "Data Analyst"
+          : i === 116
+            ? "Frontend Engineer"
+            : i === 117
+              ? "Backend Engineer"
+              : "Sales Associate " + i,
+        "Catalog Employer",
+      ),
+    ),
+  );
+  await page.goto(origin + "/copilot.html");
+  await expect(page.locator(".job-card")).toHaveCount(50);
+  await expect(page.locator(".scope-row")).toContainText(
+    "121 matches from 121 current US listings",
+  );
+  expect(
+    state.calls.filter((c) => c.path.endsWith("fn_ss_job_catalog")),
+  ).toHaveLength(4);
+  await page
+    .getByRole("button", { name: "Load more jobs", exact: true })
+    .click();
+  await expect(page.locator(".job-card")).toHaveCount(100);
+  for (const [query, title] of [
+    ["data analyst", "Data Analyst"],
+    ["front-end developer", "Frontend Engineer"],
+    ["back end developer", "Backend Engineer"],
+  ]) {
+    await page.getByLabel("Search jobs", { exact: true }).fill(query);
+    await expect(page.locator(".job-card")).toHaveCount(1);
+    await expect(page.locator(".job-card")).toContainText(title);
+  }
+  await page.getByLabel("Search jobs", { exact: true }).fill("");
+  await expect(page.locator(".job-card")).toHaveCount(50);
+  expect(
+    state.calls.filter((c) => c.path.endsWith("fn_ss_job_detail")),
+  ).toHaveLength(0);
+});
+
+test("compact jobs require full details before tailoring or applying and errors support retry", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  state.detailFailures.add(103);
+  state.detailDelays.set(103, 300);
+  await page.goto(origin + "/copilot.html");
+  await expect(page.locator(".job-card")).toHaveCount(3);
+  expect(
+    state.calls.filter((c) => c.path.endsWith("fn_ss_job_detail")),
+  ).toHaveLength(0);
+  await page
+    .getByRole("button", { name: "Software Engineer", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Apply now", exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Fix my resume" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry job details", exact: true }),
+  ).toBeVisible();
+  expect(state.applications).toHaveLength(0);
+  state.detailFailures.delete(103);
+  state.emptyDetails.add(103);
+  await page
+    .getByRole("button", { name: "Retry job details", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "The full job description is unavailable",
+  );
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Apply now", exact: true }),
+  ).toBeDisabled();
+  state.emptyDetails.delete(103);
+  await page
+    .getByRole("button", { name: "Retry job details", exact: true })
+    .click();
+  await expect(page.locator(".description-text")).toContainText(
+    "Build Python, SQL, AWS and Spark",
+  );
+  await expect(
+    page.getByRole("button", { name: "Fix my resume" }),
+  ).toBeEnabled();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Apply now", exact: true }),
+  ).toBeEnabled();
+});
+
+test("closing a pending detail request prevents it from replacing the next selected job", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  state.detailDelays.set(101, 900);
+  await page.goto(origin + "/copilot.html");
+  await page
+    .getByRole("button", { name: "Data Engineer", exact: true })
+    .click();
+  await expect(
+    page.getByText("Loading the full job description…", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Software Engineer", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("heading", { name: "Software Engineer", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".description-text")).toBeVisible();
+  await page.waitForTimeout(1100);
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("heading", { name: "Software Engineer", exact: true }),
+  ).toBeVisible();
+  expect(state.applications).toHaveLength(0);
+});
+
+test("saved jobs and application snapshots reopen without replacing their full descriptions", async ({
+  page,
+}) => {
+  const state = await mockWorkspace(page);
+  state.activity.push({
+    job_id: 101,
+    state: "saved",
+    job: {
+      ...state.jobs[0],
+      description: "Saved description: build Python data pipelines.",
+    },
+    updated_at: new Date().toISOString(),
+  });
+  state.applications.push({
+    id: 501,
+    job_id: 103,
+    resume_id: 1,
+    status: "applied",
+    job_snapshot: {
+      ...state.jobs[2],
+      description: "Application snapshot: build TypeScript services.",
+    },
+    resume_snapshot: { source: "applydesk", parsed_profile: profile },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  state.jobs[0] = {
+    ...state.jobs[0],
+    description: "The current listing has changed.",
+  };
+  state.jobs[2] = {
+    ...state.jobs[2],
+    description: "The current listing has changed.",
+  };
+  await page.goto(origin + "/copilot.html");
+  await page.getByRole("button", { name: /Saved jobs/ }).click();
+  await page
+    .getByRole("button", { name: "Data Engineer", exact: true })
+    .click();
+  await expect(page.locator(".description-text")).toContainText(
+    "Saved description:",
+  );
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Find jobs", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Software Engineer", exact: true })
+    .click();
+  await expect(page.locator(".description-text")).toContainText(
+    "Application snapshot:",
+  );
+  await expect(page.getByText(/You already have an application/)).toBeVisible();
+  expect(
+    state.calls.filter((c) => c.path.endsWith("fn_ss_job_detail")),
+  ).toHaveLength(0);
+  expect(state.applications[0].status).toBe("applied");
 });

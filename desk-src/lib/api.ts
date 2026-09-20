@@ -73,10 +73,16 @@ export function mapJob(r: any): Job {
     salary: r.salary_text || null,
     experience: r.years_required || null,
     description: r.description || "",
-    skills: extractSkills(r.description || ""),
+    detailsLoaded: typeof r.description === "string",
+    softwareRole: typeof r.description !== "string" && typeof r.software_role === "boolean" ? r.software_role : undefined,
+    skills: Array.isArray(r.search_skills) && (r.search_skills.length || !r.description)
+      ? r.search_skills.filter((skill: unknown) => typeof skill === "string")
+      : extractSkills(r.description || ""),
     url: validEmployerUrl(r.url) || "",
     publishedAt: r.posted_at,
-    dateLabel: r.date_basis === "last_published" ? "Last published" : "Posted",
+    dateLabel: !r.posted_at || r.date_basis === "unknown"
+      ? "Posting date unavailable"
+      : r.date_basis === "last_published" ? "Last published" : "Posted",
     checkedAt: r.last_verified_at || r.last_seen_at,
     sponsorship:
       r.sponsorship_status === "explicit_h1b"
@@ -129,7 +135,47 @@ export async function api(path: string, options?: RequestInit): Promise<any> {
   let body: any = {};
   if (typeof options?.body === "string") body = JSON.parse(options.body);
   if (route === "jobs") {
-    return mapFeed(await rpc("fn_ss_discover_jobs", { p_limit: 1000 }));
+    const generation = accountGeneration;
+    const signal = options?.signal || undefined;
+    const assertCurrent = () => {
+      if (signal?.aborted || generation !== accountGeneration)
+        throw new DOMException("The job request was cancelled.", "AbortError");
+    };
+    assertCurrent();
+    if (id) {
+      if (!/^\d+$/.test(id)) throw new Error("Invalid job ID.");
+      const data = await rpc("fn_ss_job_detail", { p_job_id: Number(id) }, signal);
+      assertCurrent();
+      if (!data?.job || typeof data.job.description !== "string")
+        throw new Error("The job details could not be loaded. Try again.");
+      const job = mapJob(data.job);
+      if (!job.url) throw new Error("This employer link is not available.");
+      return job;
+    }
+    const jobs: any[] = [];
+    const seen = new Set<string>();
+    let cursor = 0;
+    let feedStatus: any[] = [];
+    for (;;) {
+      const data = await rpc("fn_ss_job_catalog", { p_after_id: cursor, p_limit: 250 }, signal);
+      assertCurrent();
+      if (!Array.isArray(data?.jobs) || typeof data.has_more !== "boolean")
+        throw new Error("The job catalog response was incomplete. Try again.");
+      if (cursor === 0) feedStatus = data.feed_status || [];
+      for (const row of data.jobs) {
+        const key = String(row.id);
+        if (!/^\d+$/.test(key) || seen.has(key))
+          throw new Error("The job catalog changed while loading. Refresh to try again.");
+        seen.add(key);
+        jobs.push(row);
+      }
+      if (!data.has_more) break;
+      const next = Number(data.next_after_id);
+      if (!Number.isSafeInteger(next) || next <= cursor || !data.jobs.length)
+        throw new Error("The job catalog could not finish loading. Try again.");
+      cursor = next;
+    }
+    return mapFeed({ jobs, feed_status: feedStatus });
   }
   if (route === "account") {
     const requestGeneration = accountGeneration;

@@ -117,7 +117,12 @@ const statuses = [
   "Rejected",
   "Withdrawn",
 ];
+function dateValue(date: unknown) {
+  const value = typeof date === "string" && date ? Date.parse(date) : NaN;
+  return Number.isFinite(value) ? value : null;
+}
 function since(date: string) {
+  if (dateValue(date) === null) return "Date unavailable";
   const hours = Math.max(0, (Date.now() - Date.parse(date)) / 3600000);
   if (hours < 1) return `${Math.max(1, Math.floor(hours * 60))}m ago`;
   if (hours < 24) return `${Math.floor(hours)}h ago`;
@@ -242,16 +247,19 @@ export default function Workspace() {
     [accountError, setAccountError] = useState(""),
     [accountLoading, setAccountLoading] = useState(true);
   const [query, setQuery] = useState(""),
-    [days, setDays] = useState("30"),
+    [days, setDays] = useState("all"),
     [employment, setEmployment] = useState("all"),
     [state, setState] = useState("all"),
     [mode, setMode] = useState("all"),
-    [scope] = useState("h1b"),
+    [scope, setScope] = useState("all"),
     [sort, setSort] = useState("newest"),
     [jobTab, setJobTab] = useState("all");
   const [login, setLogin] = useState(false),
     [sourcesOpen, setSourcesOpen] = useState(false),
     [job, setJob] = useState<Job | null>(null),
+    [detailLoading, setDetailLoading] = useState(false),
+    [detailError, setDetailError] = useState(""),
+    [visibleCount, setVisibleCount] = useState(50),
     [jobStage, setJobStage] = useState<"review" | "tailor">("review"),
     [chosenResume, setChosenResume] = useState(""),
     [level, setLevel] = useState<"light" | "substantial">("light"),
@@ -269,7 +277,9 @@ export default function Workspace() {
     [preferenceBusy, setPreferenceBusy] = useState(false),
     [handoffJobId, setHandoffJobId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null),
-    uploadRef = useRef<HTMLInputElement>(null);
+    uploadRef = useRef<HTMLInputElement>(null),
+    detailRequest = useRef(0),
+    detailAbort = useRef<AbortController | null>(null);
   const feedState = feedAvailability(feed);
   const resumeSource = account?.applicationResumeSource || "applydesk";
   const existingApplication = account?.activity.find(
@@ -284,9 +294,16 @@ export default function Workspace() {
     account?.resumes.find((r) => r.id === selectedResume) || primary;
   const applyingResume =
     account?.resumes.find((r) => r.id === chosenResume) || primary;
-  const match = job
-    ? matchProfile(applyingResume?.profile || null, job)
-    : { score: null, matched: [], missing: [] };
+  const detailsReady =
+    !!job &&
+    job.detailsLoaded !== false &&
+    !!job.description?.trim() &&
+    !detailLoading &&
+    !detailError;
+  const match =
+    job && detailsReady
+      ? matchProfile(applyingResume?.profile || null, job)
+      : { score: null, matched: [], missing: [] };
   const afterMatch = job && tailored ? matchProfile(tailored, job) : null;
   const actions = new Map(account?.activity.map((a) => [a.jobId, a]) || []);
   async function refreshAccount() {
@@ -328,6 +345,8 @@ export default function Workspace() {
     window.addEventListener("keydown", key);
     return () => {
       clearInterval(refresh);
+      detailAbort.current?.abort();
+      detailRequest.current++;
       window.removeEventListener("keydown", key);
     };
   }, []);
@@ -351,20 +370,17 @@ export default function Workspace() {
           action?.action === "skipped"
         )
           return false;
-        if (
-          view === "jobs" &&
-          jobTab !== "skipped" &&
-          scope === "h1b" &&
-          j.sponsorship !== "h1b"
-        )
-          return false;
+        if (scope !== "all" && j.sponsorship !== scope) return false;
         if (!matchesJobQuery(j, query)) return false;
-        if (
-          view === "jobs" &&
-          jobTab !== "skipped" &&
-          (Date.now() - Date.parse(j.publishedAt)) / 86400000 > +days
-        )
-          return false;
+        if (days !== "all") {
+          const published = dateValue(j.publishedAt);
+          if (
+            published === null ||
+            published > Date.now() ||
+            Date.now() - published > Number(days) * 86400000
+          )
+            return false;
+        }
         if (employment !== "all" && j.employment !== employment) return false;
         if (state !== "all" && !j.states.includes(state)) return false;
         if (mode !== "all" && j.workMode !== mode) return false;
@@ -379,7 +395,7 @@ export default function Workspace() {
         sort === "match"
           ? (matchProfile(primary?.profile || null, b).score ?? -1) -
             (matchProfile(primary?.profile || null, a).score ?? -1)
-          : Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
+          : (dateValue(b.publishedAt) ?? 0) - (dateValue(a.publishedAt) ?? 0),
       );
   }, [
     feed,
@@ -395,6 +411,10 @@ export default function Workspace() {
     jobTab,
     primary,
   ]);
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [view, query, days, employment, state, mode, scope, sort, jobTab, feed]);
+  const visibleJobs = filtered.slice(0, visibleCount);
   const requireAccount = () => {
     if (account) return true;
     setLogin(true);
@@ -431,13 +451,58 @@ export default function Workspace() {
       return null;
     }
   }
-  function openJob(j: Job) {
-    setJob(j);
+  function closeJob() {
+    detailAbort.current?.abort();
+    detailRequest.current++;
+    setJob(null);
+    setDetailLoading(false);
+    setDetailError("");
+  }
+  async function openJob(j: Job) {
+    detailAbort.current?.abort();
+    const request = ++detailRequest.current;
+    const controller = new AbortController();
+    detailAbort.current = controller;
+    // Reopening a saved application uses its immutable job snapshot. Saved or
+    // skipped full records also remain readable without replacing them with a
+    // current compact catalog entry.
+    const saved = actions.get(j.id)?.job;
+    const selected =
+      saved?.description?.trim() && saved.detailsLoaded !== false ? saved : j;
+    setJob(selected);
+    setDetailError("");
     setChosenResume(primary?.id || "");
     setJobStage("review");
     setConfirmed([]);
     setTailored(null);
     setLevel("light");
+    if (selected.detailsLoaded !== false && selected.description?.trim()) {
+      setDetailLoading(false);
+      return;
+    }
+    setDetailLoading(true);
+    try {
+      const details: Job = await api("jobs/" + selected.id, {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted || request !== detailRequest.current)
+        return;
+      if (
+        details.id !== selected.id ||
+        details.detailsLoaded === false ||
+        !details.description?.trim()
+      )
+        throw new Error(
+          "The full job description is unavailable. Try again before preparing an application.",
+        );
+      setJob(details);
+    } catch (error: any) {
+      if (!controller.signal.aborted && request === detailRequest.current)
+        setDetailError(error.message || "The job details could not be loaded.");
+    } finally {
+      if (!controller.signal.aborted && request === detailRequest.current)
+        setDetailLoading(false);
+    }
   }
   function openUpload(replace?: string) {
     if (!requireAccount()) return;
@@ -575,7 +640,7 @@ export default function Workspace() {
     }
   }
   async function applyNow() {
-    if (!job || !applyingResume || preferenceBusy) return;
+    if (!job || !applyingResume || preferenceBusy || !detailsReady) return;
     const tab = window.open("about:blank", "_blank");
     if (tab) tab.opener = null;
     setBusy(true);
@@ -597,7 +662,7 @@ export default function Workspace() {
             : "Application prepared. Download the saved resume and upload it on the employer’s website.",
         );
         setHandoffJobId(job.id);
-        setJob(null);
+        closeJob();
         setView("applications");
       } else tab?.close();
     } finally {
@@ -606,7 +671,8 @@ export default function Workspace() {
   }
   function resetFilters() {
     setQuery("");
-    setDays("30");
+    setDays("all");
+    setScope("all");
     setEmployment("all");
     setState("all");
     setMode("all");
@@ -699,9 +765,7 @@ export default function Workspace() {
               <br />
               Without the guesswork.
             </strong>
-            <p>
-              Opportunities with sponsorship language, straight from employers.
-            </p>
+            <p>Current US opportunities, straight from connected employers.</p>
             <small>BUILT FOR YOUR AMBITION ↗</small>
           </div>
         </SidebarContent>
@@ -843,6 +907,7 @@ export default function Workspace() {
                   value={days}
                   onChange={setDays}
                   options={[
+                    ["all", "All current postings"],
                     ["30", "Past 30 days"],
                     ["7", "Past week"],
                     ["1", "Past 24 hours (1 day)"],
@@ -882,12 +947,18 @@ export default function Workspace() {
                     ["On-site", "On-site"],
                   ]}
                 />
-                <span className="sponsor-chip">
-                  <ShieldCheck size={15} />
-                  {scope === "h1b"
-                    ? "H-1B explicitly stated"
-                    : "Visa sponsorship stated"}
-                </span>
+                <Picker
+                  label="Sponsorship"
+                  value={scope}
+                  onChange={setScope}
+                  options={[
+                    ["all", "All sponsorship statuses"],
+                    ["h1b", "H-1B sponsorship stated"],
+                    ["visa", "General visa support"],
+                    ["unknown", "Not stated / unverified"],
+                    ["not_sponsored", "Sponsorship not offered"],
+                  ]}
+                />
               </div>
               <div className="feed-line">
                 <button onClick={() => setSourcesOpen(true)}>
@@ -954,11 +1025,11 @@ export default function Workspace() {
               <div className="scope-row">
                 <span className="strict-label">
                   <ShieldCheck size={14} />
-                  H-1B explicitly stated in every listing
+                  Current US jobs · sponsorship labeled by employer wording
                 </span>
                 <span>
                   {view === "jobs" && jobTab !== "skipped" && feed?.jobs.length
-                    ? `${filtered.length} ${filtered.length === 1 ? "match" : "matches"} from ${feed.jobs.length} current H-1B ${feed.jobs.length === 1 ? "listing" : "listings"}`
+                    ? `${filtered.length} ${filtered.length === 1 ? "match" : "matches"} from ${feed.jobs.length} current US ${feed.jobs.length === 1 ? "listing" : "listings"}`
                     : "Current roles from connected employer boards."}
                 </span>
               </div>
@@ -990,7 +1061,7 @@ export default function Workspace() {
                       ? "The job feed is waiting for its first sync"
                       : feedState === "unavailable"
                         ? "Employer boards need a fresh check"
-                        : "No current roles meet the H-1B requirements"
+                        : "No current US roles are available yet"
                   }
                   action={
                     <button
@@ -1005,12 +1076,12 @@ export default function Workspace() {
                   {feedState === "awaiting_sources"
                     ? "Your resume is saved. Employer listings have not synced yet, so search and matching have no jobs to use. The ApplyDesk team needs to finish connecting the feed."
                     : feedState === "unavailable"
-                      ? "The latest source checks are unavailable or out of date. No eligible current listings can be shown yet. Matching will resume when fresh listings are available."
-                      : "The latest source checks found no eligible US listings with an explicit H-1B sponsorship statement and a publication date in the past 30 days. Your resume is ready for the next update."}
+                      ? "The latest source checks are unavailable or out of date. No current listings can be shown yet. Matching will resume when fresh listings are available."
+                      : "The latest source checks found no current US listings from the connected employer boards. Your resume is ready for the next update."}
                 </Blank>
               ) : filtered.length ? (
                 <div className="job-grid">
-                  {filtered.map((j) => {
+                  {visibleJobs.map((j) => {
                     const m = matchProfile(primary?.profile || null, j),
                       a = actions.get(j.id);
                     return (
@@ -1042,7 +1113,9 @@ export default function Workspace() {
                           <div>
                             <strong>{j.company}</strong>
                             <span>
-                              {j.dateLabel} {since(j.publishedAt)}
+                              {dateValue(j.publishedAt) === null
+                                ? "Posting date unavailable"
+                                : `${j.dateLabel} ${since(j.publishedAt)}`}
                             </span>
                           </div>
                           <button
@@ -1085,7 +1158,11 @@ export default function Workspace() {
                         >
                           {j.title}
                         </button>
-                        <span className="sponsorship-tag">
+                        <span
+                          className={
+                            "sponsorship-tag sponsorship-" + j.sponsorship
+                          }
+                        >
                           <ShieldCheck size={13} />
                           {sponsorshipLabel(j)}
                           {j.status !== "active"
@@ -1225,9 +1302,25 @@ export default function Workspace() {
                   {view === "saved"
                     ? "Save a role using the bookmark on its card. Try clearing filters if your saved roles are hidden."
                     : jobTab === "matches"
-                      ? "For you shows roles with at least 60% of detected job skills in your primary resume. Explore All jobs for other eligible roles, or review your profile details."
-                      : "Try a different title, state, or date range. Only eligible jobs from the connected employer boards appear here."}
+                      ? "For you shows roles with at least 60% of detected job skills in your primary resume. Explore All jobs for other current roles, or review your profile details."
+                      : "Try a different title, state, or date range. Current US roles from the connected employer boards appear here; sponsorship and date filters may narrow the results."}
                 </Blank>
+              )}
+              {!!filtered.length && (
+                <div className="catalog-pagination">
+                  <p>
+                    Showing {Math.min(visibleCount, filtered.length)} of{" "}
+                    {filtered.length} matching listings
+                  </p>
+                  {visibleCount < filtered.length && (
+                    <button
+                      className="button secondary"
+                      onClick={() => setVisibleCount((count) => count + 50)}
+                    >
+                      Load more jobs
+                    </button>
+                  )}
+                </div>
               )}
               <footer className="page-footer">
                 <ShieldCheck size={15} />
@@ -1608,7 +1701,7 @@ export default function Workspace() {
                 <strong>{s.name}</strong>
                 <span>
                   {s.ok
-                    ? `${s.count} eligible recent roles`
+                    ? `${s.count} current US roles`
                     : "Temporarily unavailable"}
                 </span>
               </div>
@@ -1617,9 +1710,9 @@ export default function Workspace() {
           <div className="tip">
             <Info size={18} />
             <p>
-              H-1B badges require an explicit positive statement in the job
-              description. Generic visa support or historical sponsorship alone
-              does not qualify a listing.
+              Sponsorship labels reflect wording in the current employer
+              listing. General visa support does not establish H-1B sponsorship,
+              and missing wording means sponsorship is not stated.
             </p>
           </div>
           <p className="estimate-note">
@@ -1752,7 +1845,7 @@ export default function Workspace() {
       <Dialog
         open={!!job}
         onOpenChange={(v) => {
-          if (!v) setJob(null);
+          if (!v) closeJob();
         }}
       >
         <DialogContent
@@ -1771,18 +1864,62 @@ export default function Workspace() {
           </DialogHeader>
           {job && (
             <>
-              {jobStage === "review" ? (
+              {!detailsReady ? (
+                <div
+                  className="job-detail-state"
+                  role={detailError ? "alert" : "status"}
+                >
+                  {detailLoading ? (
+                    <>
+                      <LoaderCircle className="spin" />
+                      <p>Loading the full job description…</p>
+                    </>
+                  ) : (
+                    <>
+                      <Info />
+                      <p>
+                        {detailError ||
+                          "The full job description is unavailable."}
+                      </p>
+                      <button
+                        className="button secondary"
+                        onClick={() => void openJob(job)}
+                      >
+                        Retry job details
+                      </button>
+                    </>
+                  )}
+                  <p>
+                    Review the full employer listing before matching, tailoring
+                    or starting an application.
+                  </p>
+                  <button className="button primary" disabled>
+                    Apply now
+                  </button>
+                </div>
+              ) : jobStage === "review" ? (
                 <>
                   <div className="job-review-grid">
                     <div className="job-description">
-                      <div className="evidence-box">
+                      <div
+                        className={
+                          "evidence-box sponsorship-" + job.sponsorship
+                        }
+                      >
                         <ShieldCheck size={19} />
                         <div>
                           <strong>{sponsorshipLabel(job)}</strong>
-                          <blockquote>“{job.evidence}”</blockquote>
+                          {job.evidence ? (
+                            <blockquote>“{job.evidence}”</blockquote>
+                          ) : (
+                            <p>
+                              No sponsorship statement was found in this
+                              listing.
+                            </p>
+                          )}
                           <p>
-                            Employer statement; individual eligibility is not
-                            guaranteed.
+                            Confirm current requirements on the employer’s
+                            website. Individual eligibility is not guaranteed.
                           </p>
                         </div>
                       </div>
@@ -1806,8 +1943,9 @@ export default function Workspace() {
                           {job.experience || "Experience not specified"}
                         </span>
                         <span>
-                          {job.dateLabel}{" "}
-                          {new Date(job.publishedAt).toLocaleDateString()}
+                          {dateValue(job.publishedAt) === null
+                            ? "Posting date unavailable"
+                            : `${job.dateLabel} ${new Date(job.publishedAt).toLocaleDateString()}`}
                         </span>
                         <span>Applicant count not published</span>
                       </div>
@@ -1941,7 +2079,7 @@ export default function Workspace() {
                           <button
                             className="button primary full"
                             onClick={() => {
-                              setJob(null);
+                              closeJob();
                               openUpload();
                             }}
                           >
@@ -2127,7 +2265,7 @@ export default function Workspace() {
             <span className="runway" />
             <span className="destination">UNITED STATES</span>
             <span className="visa-stamp">
-              H-1B
+              US JOBS
               <br />
               <small>YOUR NEXT CHAPTER</small>
             </span>

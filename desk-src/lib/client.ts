@@ -20,8 +20,9 @@ export class WorkspaceError extends Error {
     super(message);
   }
 }
-export async function rpc(name: string, args: Record<string, unknown> = {}) {
-  const { data, error } = await sb.rpc(name, args);
+export async function rpc(name: string, args: Record<string, unknown> = {}, signal?: AbortSignal) {
+  const request = sb.rpc(name, args);
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
   if (error) {
     if (["PGRST202", "42P01", "42883"].includes(error.code))
       throw new WorkspaceError(
@@ -74,11 +75,15 @@ export async function getMember(): Promise<SelfServiceMember | null> {
 export function validEmployerUrl(value: string) {
   try {
     const u = new URL(value);
-    return u.protocol === "https:" &&
+    return u.protocol === "https:" && !u.username && !u.password && !/\s/.test(value) &&
       (u.hostname === "job-boards.greenhouse.io" ||
         u.hostname === "boards.greenhouse.io" ||
         u.hostname === "jobs.ashbyhq.com" ||
-        u.hostname === "jobs.lever.co")
+        u.hostname === "jobs.lever.co" ||
+        u.hostname === "careers.duolingo.com" ||
+        u.hostname === "stripe.com" ||
+        u.hostname === "databricks.com" ||
+        u.hostname === "careers.airbnb.com")
       ? u.href
       : null;
   } catch {

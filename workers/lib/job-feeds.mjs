@@ -1,4 +1,5 @@
 // Public ATS parsing, independent of environment variables and persistence.
+import { extractSkills, matchesJobQuery } from '../../shared/job-search.mjs';
 export const DAY_MS = 86400000;
 export const RECENT_DAYS = 30;
 export const FRESH_HOURS = 24;
@@ -30,7 +31,7 @@ export function sponsorshipEvidence(description) {
     || /\b(?:visa\s+|H[\s‑–-]?1[\s‑–-]?B\s+)?sponsorship\s+(?:is\s+)?(?:not available|not offered|unavailable|not supported)/i.test(s)
     || /\bH[\s‑–-]?1[\s‑–-]?B\s+visas?\s+(?:are\s+|is\s+)?not\s+(?:supported|available|offered)/i.test(s)
     || /\b(?:must not|cannot|can't)\s+require\s+(?:visa\s+|employer\s+)?sponsorship/i.test(s)
-    || /\bwithout\s+(?:the need for\s+|requiring\s+)?(?:current or future\s+|now or future\s+|employment\s+|visa\s+|employer\s+)*sponsorship\b/i.test(s)
+    || /\bwithout\s+(?:the need for\s+|requiring\s+)?(?:current or future\s+|now or future\s+|employment\s+|visa\s+|employer\s+)*sponsorship\b(?!\s+for\s+(?:an?\s+)?export\s+licen[cs]e)/i.test(s)
     || /\bno\s+(?:visa\s+|H[\s‑–-]?1[\s‑–-]?B\s+)?sponsorship\b/i.test(s));
   if (negative) return { sponsorship_status: 'not_sponsored', sponsorship_evidence: negative.trim().slice(0, 1000) };
   // Transfer-only/existing-holder eligibility does not establish sponsorship for
@@ -54,8 +55,10 @@ export function sponsorshipEvidence(description) {
     const start = Math.max(0, evidence.search(H1B) - 250);
     return { sponsorship_status: 'explicit_h1b', sponsorship_evidence: (start ? '…' : '') + evidence.slice(start, start + 1000) };
   }
-  const general = relevant.find(s => /\b(?:we\s+(?:can\s+|will\s+)?sponsor\s+visas?|visa sponsorship\s+(?:is\s+)?(?:available|provided|offered))\b/i.test(s));
-  return { sponsorship_status: general ? 'visa_sponsorship' : 'unknown', sponsorship_evidence: general?.trim().slice(0, 1000) || '' };
+  const general = relevant.find(s => !/\?/.test(s) && /\b(?:we\s+(?:can\s+|will\s+|do\s+)?sponsor\s+visas?|visa sponsorship\s+(?:is\s+)?(?:available|provided|offered))\b/i.test(s));
+  const next = general ? sentences[sentences.indexOf(general) + 1] || '' : '';
+  const evidence = general ? general + (/sponsor|visa|guarantee|eligib/i.test(next) ? next : '') : '';
+  return { sponsorship_status: general ? 'visa_sponsorship' : 'unknown', sponsorship_evidence: evidence.trim().slice(0, 1000) };
 }
 
 export function isUSLocation(location, addresses = []) {
@@ -98,31 +101,51 @@ export function normalizeJob(source, board, company, job, now) {
   const id = job.id || job.jobId;
   if (id == null || id === '') throw new Error('Employer feed contains a job without an ID');
   const title = cleanText(job.title || job.text);
+  const companyName = cleanText(job.company_name || company);
   const locations = source === 'ashby' ? [job.location, ...(job.secondaryLocations || []).map(item => item.location)] : source === 'lever' ? job.categories?.allLocations || [job.categories?.location] : [job.location?.name];
   const location = [...new Set(locations.filter(Boolean))].join('; ');
-  const description = cleanText(job.descriptionPlain || job.content || job.descriptionHtml || job.description || '');
+  // Lever separates requirements and benefits into lists/additional sections.
+  // Include those public source facts when extracting skills and sponsorship.
+  const description = cleanText(source === 'lever' ? [
+    job.descriptionPlain || job.description || '',
+    ...(job.lists || []).map(item => `${item.text || ''}: ${item.content || ''}`),
+    job.additionalPlain || job.additional || '',
+  ].join(' ') : job.descriptionPlain || job.content || job.descriptionHtml || job.description || '');
+  const search_skills = extractSkills(description);
+  const software_role = matchesJobQuery({ title, company: companyName, skills: search_skills, description }, 'software developer');
   const posted_at = source === 'greenhouse' ? dateOrNull(job.first_published) : source === 'ashby' ? dateOrNull(job.publishedAt) : dateOrNull(job.createdAt);
   const url = safeUrl(job.absolute_url || job.jobUrl || job.hostedUrl || job.applyUrl);
-  const addresses = source === 'ashby' ? [job.address, ...(job.secondaryLocations || []).map(item => item.address)] : [];
+  const addresses = source === 'ashby' ? [job.address, ...(job.secondaryLocations || []).map(item => item.address)]
+    : source === 'lever' && job.country ? [{ addressCountry: job.country }] : [];
   return {
-    company: cleanText(job.company_name || company), title, source, source_board: board, source_job_id: String(id), url,
+    company: companyName, title, source, source_board: board, source_job_id: String(id), url,
     posted_at, date_basis: !posted_at ? 'unknown' : source === 'greenhouse' ? 'first_published' : source === 'ashby' ? 'last_published' : 'provider_created',
     source_updated_at: dateOrNull(job.updated_at || job.updatedAt), ats_type: source, location, description: description.slice(0, 60000),
+    search_skills, software_role,
     ...metadata(title, location, description, job), dedup_key: `${source}:${board.toLowerCase()}:${id}`,
     country_code: isUSLocation(location, addresses) ? 'US' : '', ...sponsorshipEvidence(description), sponsorship_evidence_url: url,
     status: 'active', closed_at: null, last_seen_at: now, last_verified_at: now, verification_confidence: 1,
-    raw_json: { id: String(id), board, is_listed: job.isListed !== false, is_prospect: source === 'greenhouse' && job.internal_job_id === null, application_deadline: dateOrNull(job.application_deadline) },
+    // Preserve malformed supplied deadlines so neither the worker nor the API
+    // silently treats bad source data as an unrestricted posting.
+    raw_json: { id: String(id), board, is_listed: job.isListed !== false, is_prospect: source === 'greenhouse' && job.internal_job_id === null,
+      application_deadline: job.application_deadline == null ? null : dateOrNull(job.application_deadline) ?? String(job.application_deadline) },
   };
 }
 
 export function isEligibleJob(row, now) {
   const posted = Date.parse(row.posted_at);
   const time = Date.parse(now);
-  const deadline = Date.parse(row.raw_json?.application_deadline);
-  return Boolean(row.title && row.url && row.country_code === 'US' && row.sponsorship_status === 'explicit_h1b'
-    && row.raw_json?.is_listed !== false && !row.raw_json?.is_prospect
-    && Number.isFinite(posted) && posted >= time - RECENT_DAYS * DAY_MS && posted <= time + 3600000
-    && (!Number.isFinite(deadline) || deadline > time));
+  const verified = Date.parse(row.last_verified_at);
+  const rawDeadline = row.raw_json?.application_deadline;
+  const deadline = Date.parse(rawDeadline);
+  // Sponsorship is a searchable label, not a condition for inclusion. Old and
+  // unknown publication dates remain honest while source verification is fresh.
+  return Boolean(String(row.title || '').trim() && typeof row.url === 'string'
+    && !/\s/.test(row.url) && safeUrl(row.url) && row.status === 'active' && row.country_code === 'US'
+    && row.raw_json?.is_listed !== false && row.raw_json?.is_prospect !== true
+    && Number.isFinite(time) && Number.isFinite(verified) && verified >= time - FRESH_HOURS * 3600000 && verified <= time
+    && (row.posted_at == null || (Number.isFinite(posted) && posted <= time))
+    && (rawDeadline == null || (Number.isFinite(deadline) && deadline > time)));
 }
 
 export function configuredBoards(config) {
