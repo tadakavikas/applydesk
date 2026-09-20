@@ -2,7 +2,7 @@
 
 This upgrade uses your existing Cloudflare `applydesk` Worker, GitHub deployment flow, and Supabase project (`rofyegirmgqjhekuxjat`). The original public website, Mission Control portals, recruiter conversations, documents, and role model remain in place. The self-service product is `copilot.html`, with public signup and its own `ad-selfserve-auth` browser session. It does not share the recruiter-managed client membership or records. Administrators use `copilot-admin.html` with their existing `ad-auth` staff session.
 
-Cloudflare Workers Static Assets serves the frontend from `dist`. Feed refresh is a separate server-side operation. The repository includes a Cloudflare job-sync Worker with a 15-minute Cron configuration, but **scheduler selection and runtime credentials are still pending**. Automatic refresh is not established by deploying the website, deploying a Worker without its credentials, or importing jobs once.
+Cloudflare Workers Static Assets serves the frontend from `dist`. GitHub Actions runs the separate server-side job refresh every 15 minutes. The workflow must be published to `main`, its repository variable and secret configured, and a persisted run verified before automatic refresh is considered active. Deploying the website or importing jobs once does not complete that setup.
 
 ## What is included
 
@@ -85,47 +85,39 @@ Workers Builds installs dependencies before the build command. Set the build com
 
 No Supabase service-role key is needed in the frontend build. The browser uses the existing public Supabase URL/key in `desk-src/lib/client.ts`; do not add service-role secrets to `VITE_*` variables or public files.
 
-## 3. Complete the pending refresh setup
+## 3. Activate GitHub Actions job refresh
 
-Scheduler selection and runtime credentials are pending. Do not treat the current catalog or a successful one-time import as evidence of automatic refresh. Source verification expires after 24 hours; without another successful sync, affected jobs disappear from discovery.
+`.github/workflows/job-sync.yml` runs `npm run jobs:sync` on a standard GitHub-hosted Ubuntu runner with Node 22. It runs at minutes **7, 22, 37, and 52 of every hour (UTC)** and supports **Run workflow**. Both triggers are restricted to `tadakavikas/applydesk` on `main`; there are no pull-request or fork triggers. Runs share one concurrency group and do not cancel an in-progress sync. The job has a 15-minute timeout, read-only repository permission, and no dependency install or saved checkout credential. Official setup actions are pinned to full commit SHAs.
 
-If Cloudflare is selected for scheduling, the repository provides this Worker option:
+After publishing the workflow to `main`, open **GitHub repository -> Settings -> Secrets and variables -> Actions**:
 
-- Worker source: `cloudflare/job-sync-worker.mjs`
-- Worker config: `wrangler.job-sync.toml`
-- Cron schedule: every 15 minutes, UTC, via `*/15 * * * *`
-
-For that Cloudflare option, configure these Worker secrets/variables:
-
-| Name | Type | Value |
+| Tab | Name | Value |
 |---|---|---|
-| `SUPABASE_URL` | Variable | `https://rofyegirmgqjhekuxjat.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret | Supabase server-only service-role key |
-| `JOB_SYNC_SECRET` | Secret | Random 32+ character trigger secret |
+| Variables | `SUPABASE_URL` | `https://rofyegirmgqjhekuxjat.supabase.co` |
+| Secrets | `SUPABASE_SERVICE_ROLE_KEY` | The server-only service-role key for that Supabase project |
 
-Generate the trigger secret with `openssl rand -hex 32`. Never put `SUPABASE_SERVICE_ROLE_KEY` or `JOB_SYNC_SECRET` in browser code, Git, frontend build variables, or chat.
+Enter the key directly into GitHub's secret form. Never put it in chat, Git, a public variable, browser code, or a `VITE_*` frontend build variable. The workflow exposes the secret only to the sync step, after checkout and Node setup. It rejects a missing key or a project URL different from the expected production URL before doing any feed or database work. A missing configuration is a failed run, not a successful refresh. The job needs no `JOB_SYNC_SECRET` or Cloudflare deployment secret.
 
-If using Wrangler locally:
+Protect changes to `main` and the workflow with the repository's normal review controls: trusted workflow code with access to a service-role key can use its database privileges. If repository Actions policies restrict third-party actions, allow the pinned official `actions/checkout` and `actions/setup-node` actions. No environment approval is required for each scheduled run.
 
-```sh
-npm run cf:deploy:jobs
+Before enabling production refresh, retire the existing **`applydesk-job-sync`** Worker's Cron Trigger in **Cloudflare -> Workers & Pages -> applydesk-job-sync -> Settings -> Triggers**. Remove only its scheduled trigger, preserving the separate **`applydesk`** website Worker and domains. The checked-in `wrangler.job-sync.toml` now has `crons = []`; this is desired configuration, not proof the live trigger is gone. Applying this config to the job-sync Worker with `npm run cf:deploy:jobs` also retires its cron. Keep only one production scheduler enabled.
+
+Then open **GitHub -> Actions -> Sync ApplyDesk job feed -> Run workflow**, select `main`, and run it. Verify the sync step actually completes and reports all configured boards, then check source health in Supabase:
+
+```sql
+select source, source_board, status, last_attempt_at, last_success_at,
+       jobs_seen, jobs_eligible, error_message
+from public.app_job_feed_status
+order by source, source_board;
 ```
 
-Set the two secrets in the Cloudflare dashboard, or run these commands from the repository root:
+The runner updates healthy boards even if another board fails. A failed fetch does not close jobs or overwrite its last-success timestamp; only a complete successful source response can close disappeared jobs. The workflow fails when any board fails, preserving a visible signal for investigation. There are no automatic whole-run retries; the next scheduled run checks again. Job discovery independently excludes source verifications older than 24 hours.
 
-```sh
-npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --config wrangler.job-sync.toml
-npx wrangler secret put JOB_SYNC_SECRET --config wrangler.job-sync.toml
-```
+Confirm a later **scheduled** run as well as the manual run. GitHub schedules are best-effort and can be delayed or dropped during load. A public repository's scheduled workflows can be disabled after 60 days without repository activity. Monitor failures and re-enable the workflow if GitHub disables it; a one-time green run does not prove indefinite freshness. See [GitHub's schedule behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) and [repository Actions secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
 
-The Worker also exposes a protected manual trigger:
+### Optional future switch to a paid Cloudflare job-sync Worker
 
-```sh
-curl -X POST "https://<job-sync-worker-domain>/job-sync" \
-  -H "Authorization: Bearer <JOB_SYNC_SECRET>"
-```
-
-Use `?dry-run=1` to check public employer feeds without Supabase writes. After scheduler selection and credentials are complete, verify a successful persisted manual run and then a scheduled run in Worker logs and `app_job_feed_status`. The Cron expression in a config file alone is not an operational check. If another scheduler is selected later, document and verify its deployment separately; no alternative scheduler is asserted to be published by this guide.
+The current Workers Free runtime is insufficient for the full 27-board refresh. The website stays on its existing Cloudflare plan; the GitHub scheduler does not require a Worker plan upgrade. To move job refresh to a suitable paid Worker later, first disable the GitHub Actions workflow, configure the job Worker's `SUPABASE_SERVICE_ROLE_KEY` and a random 32+ character `JOB_SYNC_SECRET`, restore the cron in `wrangler.job-sync.toml`, and deploy with `npm run cf:deploy:jobs`. Its public `SUPABASE_URL` is already in that config. Verify a persisted manual run and a scheduled run before declaring the switch complete. Do not run both schedulers.
 
 ## 4. Build and deploy from GitHub
 
@@ -138,9 +130,9 @@ npm test
 npm run build
 ```
 
-Push the upgraded project to GitHub. Cloudflare Workers Builds will build and publish `dist` using the settings above. The website deployment does not create the scheduled job-sync Worker or apply Supabase migrations.
+Push the upgraded project to GitHub. Cloudflare Workers Builds will build and publish `dist` using the settings above. The website deployment does not configure GitHub Actions secrets or apply Supabase migrations.
 
-After the database migration and a fresh import or persisted sync, inspect `app_job_feed_status` and sign in as a confirmed self-service member. Verify the frontend against the full catalog. Check a scheduled refresh separately once scheduler selection and credentials are complete; do not wait for an unconfigured scheduler to populate the catalog.
+After the database migration and a fresh import or persisted sync, inspect `app_job_feed_status` and sign in as a confirmed self-service member. Verify the frontend against the full catalog. Complete the Actions setup above, verify a persisted manual run, and then confirm a scheduled refresh; do not wait for an unconfigured scheduler to populate the catalog.
 
 A public read-only check that never loads secrets or writes to Supabase is available locally:
 
@@ -165,7 +157,7 @@ npm run jobs:check
 - Disposable PostgreSQL tests cover workspace access, primary/replacement lifecycle and immutable snapshots. The self-service test suite additionally checks separate enrollment, member isolation, admin-only access and suspension; see `supabase/SELF-SERVICE.md`.
 - Fifteen browser cases with **mocked accounts and intercepted Supabase requests** cover existing resume/application flows, sponsorship filters, old/unknown dates, multi-page catalog search, 50-card rendering, detail retry/cancellation, and saved snapshots. These do not validate the currently deployed project's configuration.
 
-These validation results describe local checks. Live migration, feed-import and deployment status must be verified separately; this guide does not establish that the pending scheduler or credentials are configured. No browser test submits a real employer application.
+These validation results describe local checks. Live migration, feed-import and deployment status must be verified separately; this guide does not establish that the workflow is published, its credentials are configured, or the live Cloudflare job-sync cron is retired. No browser test submits a real employer application.
 
 ## Operations notes
 

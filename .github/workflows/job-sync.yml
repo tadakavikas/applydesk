@@ -1,0 +1,50 @@
+name: Sync ApplyDesk job feed
+
+on:
+  schedule:
+    # Every 15 minutes, away from the start-of-hour queue peak (UTC).
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: applydesk-production-job-feed
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # Never expose production credentials to a fork or a manually selected branch.
+    if: github.repository == 'tadakavikas/applydesk' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out production code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      # The worker uses only Node built-ins and local files; no dependency install is needed.
+      # Keep the service-role secret out of checkout/setup steps and the website build.
+      - name: Sync current public employer listings
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::error::Set the repository Actions secret SUPABASE_SERVICE_ROLE_KEY before running job sync. No jobs were synced.'
+            exit 1
+          fi
+          if [ "$SUPABASE_URL" != 'https://rofyegirmgqjhekuxjat.supabase.co' ]; then
+            echo '::error::Set the repository Actions variable SUPABASE_URL to the ApplyDesk production project URL documented in DEPLOYMENT.md. No jobs were synced.'
+            exit 1
+          fi
+          npm run jobs:sync
