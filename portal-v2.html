@@ -424,7 +424,7 @@ function localDate(v){
 }
 const today = () => new Date().toISOString().slice(0,10);
 // Status -> color mapping (single source of truth)
-const STATUS_COLORS = { 'applied':'#9CA3AF', 'call':'#FFC53D', 'assessment':'#8B5CF6', 'interview':'#2E7CE0', 'selected':'#7CB342', 'rejected':'#C9264A' };
+const STATUS_COLORS = { 'applied':'#9CA3AF', 'call':'#FFC53D', 'screening':'#0F7871', 'assessment':'#8B5CF6', 'interview':'#2E7CE0', 'selected':'#7CB342', 'rejected':'#C9264A' };
 function statusColor(s){ return STATUS_COLORS[(s||'applied').toLowerCase().trim()] || '#9CA3AF'; }
 function statusChip(s){ const c = statusColor(s); return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${c}22;color:${c}"><span style="width:7px;height:7px;border-radius:50%;background:${c}"></span>${esc(s||'Applied')}</span>`; }
 const fmt = d => { if(!d) return ''; try{ return new Date(d+'T00:00:00').toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}); }catch(e){ return d; } };
@@ -1946,6 +1946,16 @@ function renderRecruitersPage(){
   const filtered = filter === 'all' ? rs : filter === 'active' ? rs.filter(r => !r.deactivated_at) : rs.filter(r => r.deactivated_at);
   const showAdd = viewState.showAddRecruiter;
 
+  // Response leaderboard (admin/manager only) - current month
+  const canSeeBoard = (session.role === 'admin' || session.role === 'manager');
+  if(canSeeBoard && !window._recBoard && !window._loadingRecBoard){
+    window._loadingRecBoard = true;
+    rpc('fn_a_recruiter_leaderboard', {}).then(r => {
+      window._recBoard = (r && r.ok) ? { rows:(r.leaderboard||[]), month:r.month } : { rows:[], month:null };
+      window._loadingRecBoard = false; renderShell();
+    }).catch(() => { window._recBoard = { rows:[], month:null }; window._loadingRecBoard = false; });
+  }
+
   // Load real app counts per recruiter AND per client (once per page load)
   if(!window.recruiterAppCounts && !window._loadingRecCounts){
     window._loadingRecCounts = true;
@@ -2041,6 +2051,37 @@ function renderRecruitersPage(){
     <div><h1 class="page-title">Recruiters</h1><p class="page-subtitle">${rs.filter(r => !r.deactivated_at).length} active · ${rs.filter(r => r.deactivated_at).length} deactivated</p></div>
     ${!showAdd ? '<button class="btn primary" onclick="toggleAddRecruiter()">➕ Add recruiter</button>' : ''}
   </div>
+  ${canSeeBoard ? (function(){
+    const b = window._recBoard;
+    if(!b) return `<div class="card" style="margin-bottom:20px"><div style="color:var(--text-muted);font-size:13px">Loading leaderboard...</div></div>`;
+    const rows = (b.rows||[]).filter(x => Number(x.total_apps)>0 || Number(x.responses)>0);
+    const monthLbl = b.month ? new Date(b.month+'T00:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'}) : 'This month';
+    if(!rows.length) return '';
+    const max = Math.max(1, ...rows.map(x => Number(x.responses)));
+    const medal = ['🥇','🥈','🥉'];
+    const list = rows.map((x,i) => {
+      const resp = Number(x.responses), apps = Number(x.total_apps);
+      const rate = apps ? Math.round(resp/apps*100) : 0;
+      const isWinner = i===0 && resp>0;
+      return `<div style="display:grid;grid-template-columns:32px 1fr 90px 70px;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--bg-secondary)">
+        <div style="font-size:18px;text-align:center">${medal[i] || '<span style=\"color:var(--text-muted);font-size:13px;font-weight:700\">'+(i+1)+'</span>'}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;color:var(--text-heading)">${esc(x.recruiter_name)}</span>${isWinner?'<span class="tag success" style="font-size:9px">₹1,000 BONUS</span>':''}</div>
+          <div style="height:6px;background:var(--bg-secondary);border-radius:3px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${Math.round(resp/max*100)}%;background:var(--color-success);border-radius:3px"></div></div>
+        </div>
+        <div style="text-align:right"><div style="font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--color-success)">${resp}</div><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase">responses</div></div>
+        <div style="text-align:right"><div style="font-weight:700;color:var(--text-heading)">${rate}%</div><div style="font-size:10px;color:var(--text-muted)">${apps} apps</div></div>
+      </div>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+        <div style="font-family:var(--font-heading);font-weight:700;color:var(--text-heading);font-size:15px">🏆 Response Leaderboard · ${monthLbl}</div>
+        <span style="font-size:11px;color:var(--text-muted)">Responses = Call / Screening / Assessment / Interview / Selected</span>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Top recruiter this month earns the ₹1,000 bonus.</p>
+      ${list}
+    </div>`;
+  })() : ''}
   ${addForm}
   <div class="filter-chips">
     <button class="filter-chip ${filter === 'all' ? 'active' : ''}" onclick="setRecruiterFilter('all')">All (${rs.length})</button>
@@ -4233,7 +4274,7 @@ window.openAppDetail = async function(recordId){
       <div style="max-height:280px;overflow-y:auto">${statusRows}</div>
     </div>
     <div style="border-top:1px solid var(--bg-secondary);padding-top:16px">
-      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Applied</option><option>Call</option><option>Assessment</option><option>Interview</option><option>Selected</option><option>Rejected</option></select></div>
+      <div class="field"><label>Add status update</label><select id="apd-status" style="margin-bottom:8px"><option value="">Choose status...</option><option>Applied</option><option>Call</option><option>Screening</option><option>Assessment</option><option>Interview</option><option>Selected</option><option>Rejected</option></select></div>
       <div class="field"><textarea id="apd-note" placeholder="Notes (e.g. 'Recruiter said next round is Tuesday at 3pm')" rows="2"></textarea></div>
       <div class="field"><label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Screenshot of email/message (optional)</label><input id="apd-screenshot-file" type="file" accept="image/*" style="padding:8px;background:var(--bg-primary);border:1px solid var(--bg-secondary);border-radius:8px;width:100%;font-family:var(--font-body);font-size:13px"></div>
     </div>
@@ -4954,7 +4995,7 @@ function renderApplicationsPage(){
     });
   }
   const clientOptions = (S.clients || []).map(c => `<option value="${esc(c.code)}" ${filterClient === c.code ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-  const statusOptions = ['Applied','Call','Assessment','Interview','Selected','Rejected'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
+  const statusOptions = ['Applied','Call','Screening','Assessment','Interview','Selected','Rejected'].map(s => `<option value="${esc(s)}" ${filterSource === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
 
   // Stats
   const totalApps = apps.length;
@@ -5017,7 +5058,7 @@ function renderApplicationsPage(){
 
   <!-- Status color filter boxes -->
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-    ${['Applied','Call','Assessment','Interview','Selected','Rejected'].map(st => {
+    ${['Applied','Call','Screening','Assessment','Interview','Selected','Rejected'].map(st => {
       const col = statusColor(st);
       const active = (filterSource === st);
       const cnt = (allAppsCache||[]).filter(a => { const sj = Array.isArray(a.status_json)?a.status_json:[]; return sj.some(x => (x.status||'').toLowerCase()===st.toLowerCase()) || (st==='Applied' && !sj.length); }).length;
