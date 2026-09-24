@@ -1,0 +1,12 @@
+name = "applydesk-job-sync"
+main = "cloudflare/job-sync-worker.mjs"
+compatibility_date = "2026-09-18"
+workers_dev = true
+
+[vars]
+SUPABASE_URL = "https://rofyegirmgqjhekuxjat.supabase.co"
+
+[triggers]
+# Preserve the existing production schedule until GitHub Actions has the required
+# secret and a successful persisted manual refresh. Only then retire this cron.
+crons = ["*/15 * * * *"]

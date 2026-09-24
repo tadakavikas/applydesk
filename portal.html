@@ -783,7 +783,7 @@ function renderAdmin(){
   $('#app').innerHTML=`
   <div class="topbar">
     <div class="logo"><span class="mark">A</span>ApplyDesk<span class="rolebadge">ADMIN</span></div>
-    <button class="btn sm" onclick="logout()">Log out</button>
+    <div><a class="btn sm" href="copilot-admin.html" style="margin-right:8px">Self-service members</a><button class="btn sm" onclick="logout()">Log out</button></div>
   </div>
   <div class="tabs">
     <div class="tab ${adminTab==='leads'?'active':''}" onclick="setAdminTab('leads')">🔥 Leads${unclaimedCount?'<span style="color:var(--red)"> ●</span>':''}</div>
@@ -1856,7 +1856,7 @@ function finForm() {
     ${isUSD ? `<div class="field"><label>Exchange rate <span style="color:var(--text3);font-weight:400;text-transform:none">(INR per 1 USD on transaction date - check google.com "USD to INR today")</span></label><input id="ff-fxrate" type="number" step="0.0001" min="0" placeholder="e.g. 88.15" value="${esc(f.fx_rate||'')}"></div>` : ''}
     <div class="row c2">
       <div class="field"><label>Category</label><select id="ff-category">${catOpts}</select></div>
-      <div class="field"><label>Related party (optional)</label><input id="ff-related" placeholder="e.g. Haritha, Netlify" value="${esc(f.related_party||'')}"></div>
+      <div class="field"><label>Related party (optional)</label><input id="ff-related" placeholder="e.g. Haritha, Cloudflare" value="${esc(f.related_party||'')}"></div>
     </div>
     <div class="field"><label>Description</label><input id="ff-desc" placeholder="e.g. August subscription" value="${esc(f.description||'')}"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">

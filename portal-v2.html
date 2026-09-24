@@ -409,6 +409,7 @@ let session = null;
 let S = {};
 let leads = [];
 let currentView = 'dashboard';
+let initialViewHandled = false;
 let viewState = {}; // per-view local state (selected lead, filter, etc)
 
 const $ = s => document.querySelector(s);
@@ -903,6 +904,7 @@ function renderShell(){
     <div class="sidebar-logo"><div class="sidebar-logo-mark">A</div><div class="sidebar-logo-text">ApplyDesk</div></div>
     <nav class="sidebar-nav">
       ${items.map(item => `<button class="sidebar-item ${item.key === currentView ? 'active' : ''}" onclick="setView('${item.key}')"><span class="nav-icon">${item.icon}</span><span>${esc(item.label)}</span></button>`).join('')}
+      ${session.role === 'admin' ? '<a class="sidebar-item" href="copilot-admin.html"><span class="nav-icon" aria-hidden="true">⌕</span><span>Self-service members</span></a>' : ''}
     </nav>
     <div class="sidebar-user" onclick="logout()" title="Click to log out">
       <div class="sidebar-user-avatar">${esc(initials(session.name))}</div>
@@ -1169,6 +1171,16 @@ window.setViewWithState = function(key, state){
 
 function rerender(){
   if(!session){ renderLogin(); return; }
+  // Honor a role-allowed deep link only after the normal login/bootstrap succeeds.
+  if(!initialViewHandled && authMode){
+    const requested = new URLSearchParams(window.location.search).get('view');
+    const key = requested === 'messages' ? 'chats' : requested;
+    if(key && getNavItems().some(item => item.key === key)){
+      currentView = key;
+      viewState = {};
+    }
+    initialViewHandled = true;
+  }
   renderShell();
 }
 

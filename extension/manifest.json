@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "ApplyDesk Autofill",
+  "version": "1.0.0",
+  "description": "Fill any career-portal application from your ApplyDesk profile. You log in and you submit.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_title": "ApplyDesk Autofill",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://127.0.0.1/*",
+        "http://localhost/*",
+        "https://*/*"
+      ],
+      "js": ["fill.js", "widget.js", "content.js"],
+      "css": ["widget.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}
