@@ -1209,7 +1209,7 @@ function renderAdminDashboard(){
   const monthlyRecurring = Number(fin.mrr||0); // real: INR collected this month
   // Real count: applications logged with today's date
   const _todayStr = new Date().toISOString().slice(0,10);
-  const appsToday = (S.records || []).filter(r => {
+  const appsToday = (typeof S.apps_today === 'number') ? S.apps_today : (S.records || []).filter(r => {
     if(r.type && r.type !== 'application') return false;
     const d = (r.date || r.created_at || '').slice(0,10);
     return d === _todayStr;
